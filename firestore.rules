@@ -11,8 +11,18 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
+    function isValidStyleBoard() {
+      return request.resource.data.keys().hasAll(['userId', 'hairType', 'currentStyles', 'pastStyles', 'wishlist', 'naturalHair', 'updatedAt']) &&
+             request.resource.data.userId == request.auth.uid;
+    }
+    
     function isParticipant(participants) {
       return isAuthenticated() && (request.auth.uid in participants);
+    }
+
+    function hasActiveSubscription(stylistId) {
+      return exists(/databases/$(database)/documents/subscriptions/$(stylistId)) &&
+             get(/databases/$(database)/documents/subscriptions/$(stylistId)).data.status == 'active';
     }
 
     // Users collection rules
@@ -30,11 +40,13 @@ service cloud.firestore {
     // Stylists collection rules
     match /stylists/{stylistId} {
       allow read: if true;
-      allow write: if isOwner(stylistId);
+      allow create: if isOwner(stylistId);
+      allow update: if isOwner(stylistId) && hasActiveSubscription(stylistId);
+      allow delete: if false;
       
       match /settings/{document=**} {
         allow read: if true;
-        allow write: if isOwner(stylistId);
+        allow write: if isOwner(stylistId) && hasActiveSubscription(stylistId);
       }
     }
 
@@ -64,31 +76,31 @@ service cloud.firestore {
     }
 
     // Message threads collection rules
-match /messageThreads/{threadId} {
-  allow read: if isAuthenticated() && 
-        request.auth.uid in resource.data.participants;
-  allow create: if isAuthenticated() && 
-          request.auth.uid in request.resource.data.participants &&
-          request.resource.data.keys().hasAll(['participants', 'participantDetails', 'lastMessage', 'updatedAt']);
-  allow update: if isAuthenticated() &&
-          request.auth.uid in resource.data.participants &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage', 'updatedAt']);
-  allow delete: if false;
-}
+    match /messageThreads/{threadId} {
+      allow read: if isAuthenticated() && 
+            request.auth.uid in resource.data.participants;
+      allow create: if isAuthenticated() && 
+              request.auth.uid in request.resource.data.participants &&
+              request.resource.data.keys().hasAll(['participants', 'participantDetails', 'lastMessage', 'updatedAt']);
+      allow update: if isAuthenticated() &&
+              request.auth.uid in resource.data.participants &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage', 'updatedAt']);
+      allow delete: if false;
+    }
 
-// Messages collection rules
-match /messages/{messageId} {
-  allow read: if isAuthenticated() && 
-        request.auth.uid in resource.data.participants;
-  allow create: if isAuthenticated() &&
-          request.auth.uid == request.resource.data.senderId &&
-          request.auth.uid in request.resource.data.participants &&
-          request.resource.data.keys().hasAll(['threadId', 'content', 'senderId', 'senderName', 'participants', 'readBy', 'createdAt']);
-  allow update: if isAuthenticated() &&
-          request.auth.uid in resource.data.participants &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy']);
-  allow delete: if false;
-}
+    // Messages collection rules
+    match /messages/{messageId} {
+      allow read: if isAuthenticated() && 
+            request.auth.uid in resource.data.participants;
+      allow create: if isAuthenticated() &&
+              request.auth.uid == request.resource.data.senderId &&
+              request.auth.uid in request.resource.data.participants &&
+              request.resource.data.keys().hasAll(['threadId', 'content', 'senderId', 'senderName', 'participants', 'readBy', 'createdAt']);
+      allow update: if isAuthenticated() &&
+              request.auth.uid in resource.data.participants &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy']);
+      allow delete: if false;
+    }
 
     // Message notifications collection rules
     match /notifications/{notificationId} {
@@ -103,11 +115,14 @@ match /messages/{messageId} {
     
     // Bookings collection rules
     match /bookings/{bookingId} {
-      // Allow read if user is the client or the stylist
       allow read: if isAuthenticated() && (
         request.auth.uid == resource.data.get('clientInfo').get('userId') ||
         request.auth.uid == resource.data.get('service').get('stylistId')
       );
+      allow create: if isAuthenticated() &&
+                   request.resource.data.clientInfo.userId == request.auth.uid;
+      allow update: if false; // Only server-side updates
+      allow delete: if false;
     }
 
     // StyleBoards collection rules
@@ -115,6 +130,39 @@ match /messages/{messageId} {
       allow read: if true;
       allow create, update: if isOwner(userId) && isValidStyleBoard();
       allow delete: if isOwner(userId);
+    }
+
+    // Stripe customer mapping
+    match /stripe_customers/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false; // Only server-side writes
+    }
+
+    // Stripe Connect account details
+    match /stripeAccounts/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false; // Only server-side writes
+    }
+
+    // Subscription status
+    match /subscriptions/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false; // Only server-side writes
+    }
+
+    // Payment transactions
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == resource.data.stylistId || 
+         request.auth.uid == resource.data.clientId);
+      allow write: if false; // Only server-side writes
+    }
+
+    // Payout records
+    match /payouts/{payoutId} {
+      allow read: if isAuthenticated() && 
+        request.auth.uid == resource.data.stylistId;
+      allow write: if false; // Only server-side writes
     }
 
     // Base rules

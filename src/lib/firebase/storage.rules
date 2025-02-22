@@ -1,0 +1,50 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size <= 5 * 1024 * 1024; // 5MB max
+    }
+
+    // Profile images
+    match /profile-images/{userId}/{allImages=**} {
+      allow read: if true;
+      allow write: if isOwner(userId) && isValidImage();
+    }
+
+    // Stylist profile images
+    match /stylist-profiles/{userId}/{allImages=**} {
+      allow read: if true;
+      allow write: if isOwner(userId) && isValidImage();
+    }
+
+    // Portfolio images
+    match /portfolio-images/{userId}/{allImages=**} {
+      allow read: if true;
+      allow write: if isOwner(userId) && isValidImage();
+    }
+
+    // Style board images - CRITICAL for Style Show feature
+    match /style-boards/{userId}/{category}/{imageId} {
+      allow read: if true; // Allow public read access for style show
+      allow create, update: if isOwner(userId) 
+        && isValidImage()
+        && category in ['current', 'past', 'wishlist', 'natural'];
+      allow delete: if isOwner(userId);
+    }
+
+    // Base rule - deny all access by default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* ... (keep existing base styles) ... */
+}
+
+@layer utilities {
+  /* Multiple floating animations with different patterns */
+  .float-1 {
+    animation: float1 6s ease-in-out infinite;
+  }
+
+  .float-2 {
+    animation: float2 7s ease-in-out infinite;
+  }
+
+  .float-3 {
+    animation: float3 8s ease-in-out infinite;
+  }
+
+  .float-4 {
+    animation: float4 9s ease-in-out infinite;
+  }
+
+  /* Hero card animations */
+  .animate-float {
+    animation: float1 6s ease-in-out infinite;
+  }
+
+  .animate-float-delayed {
+    animation: float2 7s ease-in-out infinite;
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-[#3F0052] to-[#FBCC14] bg-clip-text text-transparent;
+  }
+}
+
+/* Different float patterns */
+@keyframes float1 {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+@keyframes float2 {
+  0% { transform: translateY(0px) translateX(0px); }
+  50% { transform: translateY(-8px) translateX(4px); }
+  100% { transform: translateY(0px) translateX(0px); }
+}
+
+@keyframes float3 {
+  0% { transform: translateY(0px) translateX(0px); }
+  33% { transform: translateY(-6px) translateX(-3px); }
+  66% { transform: translateY(-12px) translateX(2px); }
+  100% { transform: translateY(0px) translateX(0px); }
+}
+
+@keyframes float4 {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(1deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}

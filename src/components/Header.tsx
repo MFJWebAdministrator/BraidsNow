@@ -5,6 +5,7 @@ import { Scissors, Bell, LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { UserProfile } from './Header/UserProfile';
 import { LogoutConfirmation } from './Header/LogoutConfirmation';
+import { NotificationPopup } from './Header/NotificationPopup';
 
 export function Header() {
   const { user } = useAuth();
@@ -32,17 +33,10 @@ export function Header() {
                 </Link>
               </nav>
               
+            
               <div className="flex items-center space-x-4">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="relative hidden md:flex"
-                >
-                  <Bell className="h-5 w-5 text-[#3F0052]" />
-                </Button>
-                
+                <NotificationPopup />
                 <UserProfile />
-                
                 <Button
                   variant="ghost"
                   size="icon"

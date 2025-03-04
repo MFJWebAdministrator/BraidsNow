@@ -33,17 +33,42 @@ export function MessagesContent() {
       setSendingMessage(true);
       const messageRef = doc(collection(db, 'messages'));
       const threadRef = doc(db, 'messageThreads', selectedThreadId);
+      const notificationRef = doc(collection(db, 'notifications'));
+
+      const currentThread = threads.find(t => t.id === selectedThreadId);
+      if (!currentThread) return;
+
+      // Get the recipient (stylist)
+      const recipientId = currentThread.participants.find(p => p !== user.uid);
+      if (!recipientId) return;
 
       const message = {
         id: messageRef.id,
         threadId: selectedThreadId,
         content: newMessage.trim(),
         senderId: user.uid,
-        senderName: threads.find(t => t.id === selectedThreadId)?.participantDetails[user.uid].name,
-        senderImage: threads.find(t => t.id === selectedThreadId)?.participantDetails[user.uid].image,
-        participants: threads.find(t => t.id === selectedThreadId)?.participants || [],
+        senderName: currentThread.participantDetails[user.uid].name,
+        senderImage: currentThread.participantDetails[user.uid].image,
+        participants: currentThread.participants,
         readBy: [user.uid],
         createdAt: new Date().toISOString()
+      };
+
+      // Create notification for stylist
+      const notification = {
+        id: notificationRef.id,
+        recipientId,
+        senderId: user.uid,
+        senderName: currentThread.participantDetails[user.uid].name,
+        senderImage: currentThread.participantDetails[user.uid].image,
+        type: 'message',
+        message: newMessage.trim(),
+        threadId: selectedThreadId,
+        read: false,
+        seen: false,
+        createdAt: new Date().toISOString(),
+        userType: 'client',
+        threadName: currentThread.participantDetails[user.uid].name
       };
 
       await Promise.all([
@@ -55,7 +80,8 @@ export function MessagesContent() {
             createdAt: new Date().toISOString()
           },
           updatedAt: new Date().toISOString()
-        }, { merge: true })
+        }, { merge: true }),
+        setDoc(notificationRef, notification)
       ]);
 
       setNewMessage('');

@@ -1,26 +1,40 @@
 import { loadStripe } from '@stripe/stripe-js';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase/config';
+import { getAuth } from 'firebase/auth';
 
 // Initialize Stripe with your publishable key
 export const stripe = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-// Product ID for stylist subscription
-const SUBSCRIPTION_PRODUCT_ID = 'prod_Rj9onIzGhaeuYk';
+// API URL for Firebase Functions
+const API_URL = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
 
 // Function to create a Stripe Connect account
 export async function createConnectAccount() {
   try {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+    
     // Redirect to your backend endpoint that handles Stripe Connect
-    const response = await fetch('/api/stripe/create-connect-account', {
+    const response = await fetch(`${API_URL}/create-connect-account`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      body: JSON.stringify({
+        userId: user.uid,
+        email: user.email,
+        origin: window.location.origin
+      })
     });
 
     if (!response.ok) {
-      throw new Error('Failed to create Connect account');
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create Connect account');
     }
 
     const { url } = await response.json();
@@ -34,21 +48,30 @@ export async function createConnectAccount() {
 // Function to set up subscription
 export async function setupSubscription() {
   try {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+    
     // Redirect to your backend endpoint that creates Stripe Checkout session
-    const response = await fetch('/api/stripe/create-subscription', {
+    const response = await fetch(`${API_URL}/create-checkout-session`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        priceId: SUBSCRIPTION_PRODUCT_ID,
-        successUrl: `${window.location.origin}/dashboard/stylist/payments`,
-        cancelUrl: `${window.location.origin}/dashboard/stylist/payments`
+        userId: user.uid,
+        email: user.email,
+        successUrl: `${window.location.origin}/dashboard/stylist/payments?success=true`,
+        cancelUrl: `${window.location.origin}/dashboard/stylist/payments?canceled=true`
       })
     });
 
     if (!response.ok) {
-      throw new Error('Failed to set up subscription');
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to set up subscription');
     }
 
     const { sessionId } = await response.json();
@@ -99,11 +122,15 @@ export async function checkSubscriptionStatus(userId: string) {
         return {
           active: true,
           currentPeriodEnd: subscription.currentPeriodEnd,
+          stripeAccountStatus: data.stripeAccountStatus,
         };
       }
     }
 
-    return { active: false };
+    return { 
+      active: false,
+      stripeAccountStatus: data.stripeAccountStatus 
+    };
   } catch (error) {
     console.error('Error checking subscription status:', error);
     throw error;

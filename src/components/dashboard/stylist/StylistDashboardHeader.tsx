@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bell, LogOut, Home, Scissors } from 'lucide-react';
+import {  LogOut, Home, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LogoutConfirmation } from '../client/LogoutConfirmation';
 import { useAuth } from '@/hooks/use-auth';
 import { useUserData } from '@/hooks/use-user-data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { NotificationPopup } from '@/components/Header/NotificationPopup';
 
 export function StylistDashboardHeader() {
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
@@ -33,9 +34,7 @@ export function StylistDashboardHeader() {
             </Button>
           </Link>
 
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5 text-[#3F0052]" />
-          </Button>
+          <NotificationPopup />
 
           <Button
             variant="ghost"

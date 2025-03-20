@@ -26,7 +26,12 @@ const priceId = process.env.STRIPE_PRICE_ID;
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
 
 // Middleware
-app.use(cors());
+// In your functions/src/index.ts file
+
+// Make sure you have proper CORS configuration
+app.use(cors({ origin: true }));
+
+// For callable functions, you don't need to worry about CORS as Firebase handles it
 app.use(express.json());
 
 interface RequestWithRawBody extends Request {

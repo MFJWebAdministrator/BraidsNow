@@ -1,11 +1,19 @@
 import { getAuth } from 'firebase/auth';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 
-// Use environment variables for API URL
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/braidsnow/us-central1/api';
+// Initialize Firebase Functions with region
+const functions = getFunctions(undefined, 'us-central1');
 
-// Initialize Firebase Functions
-const functions = getFunctions();
+// Connect to local emulator when in development mode
+if (import.meta.env.DEV) {
+  try {
+    // Use localhost with the port Firebase Functions emulator runs on (default: 5001)
+    connectFunctionsEmulator(functions, "localhost", 5001);
+    console.log('Connected to Firebase Functions emulator');
+  } catch (error) {
+    console.error('Failed to connect to Firebase Functions emulator:', error);
+  }
+}
 
 /**
  * Set up a subscription for the current user
@@ -19,15 +27,18 @@ export async function setupSubscription() {
       throw new Error('User not authenticated');
     }
     
+    console.log('Setting up subscription for user:', user.uid);
+    
     // Use Firebase Functions HTTP callable
     const createCheckoutSession = httpsCallable(functions, 'createCheckoutSession');
     const response = await createCheckoutSession({
       userId: user.uid,
-      email: user.email,
+      email: user.email || '',
       successUrl: `${window.location.origin}/dashboard/stylist/payments?success=true`,
       cancelUrl: `${window.location.origin}/dashboard/stylist/payments?canceled=true`
     });
     
+    console.log('Checkout session created:', response.data);
     const { sessionId } = response.data as { sessionId: string };
     
     // Load Stripe.js dynamically

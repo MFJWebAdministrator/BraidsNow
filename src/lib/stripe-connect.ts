@@ -1,5 +1,5 @@
 import { loadStripe } from '@stripe/stripe-js';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, } from 'firebase/firestore';
 import { db } from './firebase/config';
 import { getAuth } from 'firebase/auth';
 

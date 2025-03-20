@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { StripeConnect } from '@/components/StylistCommunity/StripeConnect';
 import { Card } from '@/components/ui/card';
 import { DollarSign, Loader2, CheckCircle, AlertCircle, CreditCard } from 'lucide-react';
+// Change this import
 import { checkSubscriptionStatus } from '@/lib/stripe-connect';
+
+// To thi
 import { useAuth } from '@/hooks/use-auth';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';

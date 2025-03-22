@@ -1,38 +1,28 @@
-import { getAuth } from 'firebase/auth';
-import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
-
-// Initialize Firebase Functions with region
-const functions = getFunctions(undefined, 'us-central1');
-
-// Connect to local emulator when in development mode
-if (import.meta.env.DEV) {
-  try {
-    // Use localhost with the port Firebase Functions emulator runs on (default: 5001)
-    connectFunctionsEmulator(functions, "localhost", 5001);
-    console.log('Connected to Firebase Functions emulator');
-  } catch (error) {
-    console.error('Failed to connect to Firebase Functions emulator:', error);
-  }
-}
+import { httpsCallable } from 'firebase/functions';
+import { doc, getDoc } from 'firebase/firestore';
+import { loadStripe } from '@stripe/stripe-js';
+import { auth, db, functions } from './firebase/config';
 
 /**
  * Set up a subscription for the current user
  */
-export async function setupSubscription() {
+export async function setupSubscription(userId: string) {
   try {
-    const auth = getAuth();
-    const user = auth.currentUser;
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
     
+    const user = auth.currentUser;
     if (!user) {
       throw new Error('User not authenticated');
     }
     
-    console.log('Setting up subscription for user:', user.uid);
+    console.log('Setting up subscription for user:', userId);
     
     // Use Firebase Functions HTTP callable
     const createCheckoutSession = httpsCallable(functions, 'createCheckoutSession');
     const response = await createCheckoutSession({
-      userId: user.uid,
+      userId: userId,
       email: user.email || '',
       successUrl: `${window.location.origin}/dashboard/stylist/payments?success=true`,
       cancelUrl: `${window.location.origin}/dashboard/stylist/payments?canceled=true`
@@ -41,8 +31,8 @@ export async function setupSubscription() {
     console.log('Checkout session created:', response.data);
     const { sessionId } = response.data as { sessionId: string };
     
-    // Load Stripe.js dynamically
-    const stripe = await loadStripe();
+    // Load Stripe
+    const stripe = await loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
     
     if (!stripe) {
       throw new Error('Failed to load Stripe');
@@ -67,25 +57,31 @@ export async function setupSubscription() {
 /**
  * Create a Stripe Connect account for the current user
  */
-export async function createConnectAccount() {
+export async function createConnectAccount(userId: string) {
   try {
-    const auth = getAuth();
-    const user = auth.currentUser;
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
     
+    const user = auth.currentUser;
     if (!user) {
       throw new Error('User not authenticated');
     }
     
+    console.log('Creating Connect account for user:', userId);
+    
     // Use Firebase Functions HTTP callable
     const createConnectAccountFn = httpsCallable(functions, 'createConnectAccount');
     const response = await createConnectAccountFn({
-      userId: user.uid,
-      email: user.email,
+      userId: userId,
+      email: user.email || '',
       origin: window.location.origin
     });
     
+    console.log('Connect account created:', response.data);
     const { url } = response.data as { url: string };
     window.location.href = url;
+    return url;
   } catch (error) {
     console.error('Error creating Connect account:', error);
     throw error;
@@ -97,10 +93,45 @@ export async function createConnectAccount() {
  */
 export async function checkSubscriptionStatus(userId: string) {
   try {
-    // Use Firebase Functions HTTP callable
-    const checkAccountStatus = httpsCallable(functions, 'checkAccountStatus');
-    const response = await checkAccountStatus({ userId });
+    if (!userId) {
+      console.error('User ID is required');
+      throw new Error('User ID is required');
+    }
     
+    console.log('Checking subscription status for user:', userId);
+    
+    // First try to get data from Firestore for better performance
+    const stylistRef = doc(db, 'stylists', userId);
+    const stylistDoc = await getDoc(stylistRef);
+    
+    if (stylistDoc.exists()) {
+      const data = stylistDoc.data();
+      const subscription = data.subscription;
+      
+      if (subscription) {
+        return {
+          active: subscription.status === 'active',
+          currentPeriodEnd: subscription.currentPeriodEnd?.toDate?.() 
+            ? subscription.currentPeriodEnd.toDate().toISOString() 
+            : subscription.currentPeriodEnd,
+          stripeAccountStatus: data.stripeAccountStatus || 'not_created',
+        };
+      }
+      
+      if (data.stripeAccountStatus) {
+        return {
+          active: false,
+          stripeAccountStatus: data.stripeAccountStatus
+        };
+      }
+    }
+    
+    // If we couldn't determine status from Firestore, use the Firebase Function
+    console.log('Calling checkAccountStatus function with userId:', userId);
+    const checkAccountStatusFn = httpsCallable(functions, 'checkAccountStatus');
+    const response = await checkAccountStatusFn({ userId });
+    
+    console.log('Subscription status response from function:', response.data);
     const data = response.data as any;
     
     return {
@@ -110,6 +141,7 @@ export async function checkSubscriptionStatus(userId: string) {
     };
   } catch (error) {
     console.error('Error checking subscription status:', error);
+    // Return a default status object instead of throwing
     return { active: false };
   }
 }

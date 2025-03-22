@@ -2,18 +2,26 @@ import React, { useEffect, useState } from 'react';
 import { StripeConnect } from '@/components/StylistCommunity/StripeConnect';
 import { Card } from '@/components/ui/card';
 import { DollarSign, Loader2, CheckCircle, AlertCircle, CreditCard } from 'lucide-react';
-// Change this import
-import { checkSubscriptionStatus } from '@/lib/stripe-connect';
-
-// To thi
 import { useAuth } from '@/hooks/use-auth';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { auth } from '@/lib/firebase/config';
+import axios from 'axios';
+
+// Define the API base URL - Use the /api prefix
+// Update the API base URL to the new endpoint
+const API_BASE_URL = 'https://api-5prtp2eqea-uc.a.run.app';
 
 interface SubscriptionStatus {
   active: boolean;
   currentPeriodEnd?: string;
   stripeAccountStatus?: string;
+  details?: {
+    chargesEnabled?: boolean;
+    payoutsEnabled?: boolean;
+    requirementsPending?: boolean;
+    requirementsCurrentlyDue?: string[];
+  };
 }
 
 export function PaymentsContent() {
@@ -32,9 +40,16 @@ export function PaymentsContent() {
     if (success === 'true') {
       toast({
         title: "Success",
-        description: "Your payment was processed successfully!",
+        description: "Your payment was processed successfully! Your subscription will be active shortly.",
         variant: "default"
       });
+      
+      // Force an immediate status check after successful payment
+      if (user) {
+        setTimeout(() => {
+          fetchStatus(true);
+        }, 2000); // Wait 2 seconds for webhook processing
+      }
     } else if (canceled === 'true') {
       toast({
         title: "Canceled",
@@ -47,38 +62,125 @@ export function PaymentsContent() {
         description: "Please complete your Stripe account setup.",
         variant: "default"
       });
+      
+      // Force an immediate status check after refresh
+      if (user) {
+        setTimeout(() => {
+          fetchStatus(true);
+        }, 2000);
+      }
     }
-  }, [searchParams, toast]);
+  }, [searchParams, toast, user]);
 
-  useEffect(() => {
-    const fetchStatus = async () => {
-      if (!user) {
+  // Define fetchStatus as a named function so we can call it from multiple places
+  const fetchStatus = async (forceRefresh = false) => {
+    if (!user || !user.uid) {
+      console.log('No user or user ID available');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      console.log('Fetching status for user ID:', user.uid);
+      
+      // Ensure user is authenticated and token is fresh
+      if (!auth.currentUser) {
+        console.log('No current user in auth object');
         setLoading(false);
         return;
       }
+      
+      // Refresh the token before making the request
+      const idToken = await auth.currentUser.getIdToken(forceRefresh);
+      console.log('Token refreshed successfully');
+      
+      // Call the Express API endpoint with the user ID
+      const response = await axios.post(
+        `${API_BASE_URL}/check-account-status`,
+        { userId: user.uid },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          }
+        }
+      );
+      
+      console.log('Subscription status response:', response.data);
+      
+      // Transform the response data to match our SubscriptionStatus interface
+      // Convert Firestore timestamp to JavaScript Date
+      const convertFirestoreTimestampToDate = (timestamp: { _seconds: number, _nanoseconds: number }) => {
+        return new Date(timestamp._seconds * 1000 + timestamp._nanoseconds / 1000000);
+      };
 
-      try {
-        const subscriptionStatus = await checkSubscriptionStatus(user.uid);
-        setStatus(subscriptionStatus);
-      } catch (error) {
-        console.error('Error fetching subscription status:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+      const subscriptionStatus: SubscriptionStatus = {
+        active: response.data.subscription?.status === 'active' || false,
+        currentPeriodEnd: response.data.subscription?.currentPeriodEnd ? convertFirestoreTimestampToDate(response.data.subscription.currentPeriodEnd).toISOString() : undefined,
+        stripeAccountStatus: response.data.status || 'not_created',
+        details: response.data.details
+      };
 
-    fetchStatus();
-    
-    // Refresh status every 30 seconds if page is kept open
-    const intervalId = setInterval(fetchStatus, 30000);
-    
-    return () => clearInterval(intervalId);
-  }, [user]);
+      setStatus(subscriptionStatus);
+    } catch (error) {
+      console.error('Error fetching subscription status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch subscription status. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial fetch and periodic refresh
+  useEffect(() => {
+    if (user) {
+      fetchStatus();
+      
+      // Refresh status every 30 seconds if page is kept open
+      const intervalId = setInterval(() => fetchStatus(), 30000);
+      
+      return () => clearInterval(intervalId);
+    } else {
+      setLoading(false);
+    }
+  }, [user, toast]);
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-[#3F0052]" />
+      <div className="space-y-8">
+        {/* Skeleton for Subscription Status */}
+        <Card className="p-6 animate-pulse">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
+            <div className="h-6 bg-gray-300 rounded w-1/3"></div>
+          </div>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <div className="h-4 bg-gray-300 rounded w-1/4"></div>
+                <div className="h-6 bg-gray-300 rounded w-1/2 mt-2"></div>
+              </div>
+              <div className="text-right">
+                <div className="h-4 bg-gray-300 rounded w-1/4"></div>
+                <div className="h-6 bg-gray-300 rounded w-1/3 mt-2"></div>
+              </div>
+            </div>
+            <div className="h-4 bg-gray-300 rounded w-full mt-4"></div>
+          </div>
+        </Card>
+
+        {/* Skeleton for Payment Account */}
+        <Card className="p-6 animate-pulse">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
+            <div className="h-6 bg-gray-300 rounded w-1/3"></div>
+          </div>
+          <div className="h-4 bg-gray-300 rounded w-full mt-4"></div>
+          <div className="h-4 bg-gray-300 rounded w-3/4 mt-2"></div>
+        </Card>
       </div>
     );
   }
@@ -110,9 +212,13 @@ export function PaymentsContent() {
               <CheckCircle className="w-5 h-5 mt-0.5" />
               <div>
                 <p className="font-medium">Your subscription is active</p>
-                {status.currentPeriodEnd && (
+                {status.currentPeriodEnd && !isNaN(new Date(status.currentPeriodEnd).getTime()) ? (
                   <p className="text-sm mt-1">
                     Next payment due: {new Date(status.currentPeriodEnd).toLocaleDateString()}
+                  </p>
+                ) : (
+                  <p className="text-sm mt-1">
+                    Next payment due: Date not available
                   </p>
                 )}
               </div>
@@ -176,7 +282,13 @@ export function PaymentsContent() {
       )}
 
       {/* Stripe Connect Section - Show if no subscription or if subscription is active but no Connect account */}
-      {(!status?.active || (status?.active && !status?.stripeAccountStatus)) && <StripeConnect />}
+      {(!status?.active || (status?.active && !status?.stripeAccountStatus)) && (
+        <StripeConnect 
+          subscriptionActive={status?.active || false} 
+          connectAccountStatus={status?.stripeAccountStatus || 'not_created'} 
+          useExpressApi={true} // Add this prop to indicate we're using Express API
+        />
+      )}
     </div>
   );
 }

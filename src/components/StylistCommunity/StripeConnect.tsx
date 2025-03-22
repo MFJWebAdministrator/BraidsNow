@@ -1,157 +1,222 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Loader2, CreditCard, CheckCircle, AlertCircle } from 'lucide-react';
-import { setupSubscription, createConnectAccount, checkSubscriptionStatus } from '@/lib/stripe-client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
+import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import axios from 'axios';
+import { auth } from '@/lib/firebase/config';
 
-export function StripeConnect() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [subscriptionStatus, setSubscriptionStatus] = useState<{
-    active: boolean;
-    stripeAccountStatus?: string;
-  }>({ active: false });
+// Define the API base URL - Use the /api prefix
+const API_BASE_URL = 'https://api-5prtp2eqea-uc.a.run.app';
+
+interface StripeConnectProps {
+  subscriptionActive: boolean;
+  connectAccountStatus: string;
+  useExpressApi?: boolean;
+}
+
+export function StripeConnect({ 
+  subscriptionActive, 
+  connectAccountStatus,
+  useExpressApi = false
+}: StripeConnectProps) {
+  const [loading, setLoading] = useState<'subscription' | 'connect' | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
-  useEffect(() => {
-    const checkStatus = async () => {
-      if (user?.uid) {
-        try {
-          const status = await checkSubscriptionStatus(user.uid);
-          setSubscriptionStatus(status);
-        } catch (error) {
-          console.error("Error checking subscription status:", error);
-        }
-      }
-    };
-    
-    checkStatus();
-  }, [user]);
-
   const handleSubscribe = async () => {
+    if (!user || !user.uid) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to subscribe.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading('subscription');
     try {
-      setIsLoading(true);
+      console.log('Setting up subscription for user ID:', user.uid);
       
-      if (!user) {
-        throw new Error('You must be logged in to subscribe');
+      if (useExpressApi) {
+        // Get fresh ID token
+        const idToken = await auth.currentUser?.getIdToken(true);
+        
+        // Call the Express API endpoint
+        const response = await axios.post(
+          `${API_BASE_URL}/create-checkout-session`,
+          {
+            userId: user.uid,
+            email: user.email || '',
+            successUrl: `${window.location.origin}/dashboard/stylist/payments?success=true`,
+            cancelUrl: `${window.location.origin}/dashboard/stylist/payments?canceled=true`
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+            }
+          }
+        );
+        
+        console.log('Checkout session created:', response.data);
+        
+        // Redirect to Stripe Checkout
+        const { sessionId } = response.data;
+        const stripe = await loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+        if (stripe) {
+          await stripe.redirectToCheckout({ sessionId });
+        } else {
+          throw new Error('Failed to load Stripe');
+        }
+      } else {
+        // Use the existing function (fallback)
+        await setupSubscription(user.uid);
       }
-      
-      // Set up the subscription
-      await setupSubscription();
-      
+    } catch (error) {
+      console.error('Error setting up subscription:', error);
       toast({
-        title: "Redirecting to Stripe",
-        description: "You'll be redirected to complete your subscription",
+        title: "Error",
+        description: "Failed to set up subscription. Please try again.",
+        variant: "destructive",
       });
-    } catch (error: any) {
-      toast({
-        title: "Subscription Failed",
-        description: error.message || "Failed to set up subscription",
-        variant: "destructive"
-      });
-      setIsLoading(false);
+      setLoading(null);
     }
   };
 
-  const handleConnect = async () => {
+  const handleConnectAccount = async () => {
+    if (!user || !user.uid) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to set up your payout account.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading('connect');
     try {
-      setIsLoading(true);
+      console.log('Creating Connect account for user ID:', user.uid);
       
-      if (!user) {
-        throw new Error('You must be logged in to connect with Stripe');
+      if (useExpressApi) {
+        // Get fresh ID token
+        const idToken = await auth.currentUser?.getIdToken(true);
+        
+        // Call the Express API endpoint
+        const response = await axios.post(
+          `${API_BASE_URL}/create-connect-account`,
+          {
+            userId: user.uid,
+            email: user.email || '',
+            origin: window.location.origin
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+            }
+          }
+        );
+        
+        console.log('Connect account created:', response.data);
+        
+        // Redirect to Stripe Connect onboarding
+        window.location.href = response.data.url;
+      } else {
+        // Use the existing function (fallback)
+        await createConnectAccount(user.uid);
       }
-      
-      // Create Connect account
-      await createConnectAccount();
-      
+    } catch (error) {
+      console.error('Error creating Connect account:', error);
       toast({
-        title: "Redirecting to Stripe",
-        description: "You'll be redirected to complete your account setup",
+        title: "Error",
+        description: "Failed to set up payout account. Please try again.",
+        variant: "destructive",
       });
-    } catch (error: any) {
-      toast({
-        title: "Connection Failed",
-        description: error.message || "Failed to connect with Stripe",
-        variant: "destructive"
-      });
-      setIsLoading(false);
+      setLoading(null);
     }
   };
 
   return (
-    <Card className="p-6 space-y-4">
-      <div className="flex items-center gap-2">
-        <CreditCard className="w-5 h-5 text-[#3F0052]" />
-        <h2 className="text-xl font-light text-[#3F0052] tracking-normal">
-          Payment Information
-        </h2>
-      </div>
-
-      <p className="text-gray-600 tracking-normal">
-        Connect your bank account to receive payments from clients and set up your subscription.
-      </p>
-
-      <div className="bg-[#3F0052]/5 p-4 rounded-lg">
-        {subscriptionStatus.active ? (
-          <div className="flex items-start gap-3">
-            <CheckCircle className="w-5 h-5 mt-0.5 text-green-600" />
-            <div>
-              <p className="font-medium">Your subscription is active</p>
-              <p className="text-sm mt-1">
-                {subscriptionStatus.stripeAccountStatus === 'active' ? (
-                  "Your Stripe account is fully set up and ready to receive payments."
-                ) : (
-                  "Now you can connect your Stripe account to receive payments."
-                )}
-              </p>
-              
-              {!subscriptionStatus.stripeAccountStatus && (
-                <Button 
-                  onClick={handleConnect}
-                  disabled={isLoading}
-                  className="mt-3 bg-[#3F0052] hover:bg-[#3F0052]/90"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Connecting...
-                    </>
-                  ) : (
-                    "Connect Stripe Account"
-                  )}
-                </Button>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 mt-0.5 text-amber-600" />
-            <div>
-              <p className="font-medium">Subscription Required</p>
-              <p className="text-sm mt-1">
-                A subscription is required to use the BraidsNow platform as a stylist.
-              </p>
-              
-              <Button 
-                onClick={handleSubscribe}
-                disabled={isLoading}
-                className="mt-3 bg-[#3F0052] hover:bg-[#3F0052]/90"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  "Subscribe Now - $19.99/month"
-                )}
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
+    <Card className="p-6">
+      <h2 className="text-xl font-light text-[#3F0052] tracking-normal mb-4">
+        {subscriptionActive ? "Set Up Payments" : "Get Started"}
+      </h2>
+      
+      {!subscriptionActive ? (
+        <div className="space-y-4">
+          <p className="text-gray-600">
+            Subscribe to our Professional Stylist plan to start accepting bookings and payments.
+          </p>
+          <Button 
+            onClick={handleSubscribe}
+            className="w-full bg-[#3F0052] hover:bg-[#2A0038] text-white"
+            disabled={loading === 'subscription'}
+          >
+            {loading === 'subscription' ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>Subscribe - $19.99/month</>
+            )}
+          </Button>
+          <p className="text-sm text-gray-500 text-center">
+            Cancel anytime. Subscription renews monthly.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <p className="text-gray-600">
+            Connect your Stripe account to receive payments from clients.
+          </p>
+          <Button 
+            onClick={handleConnectAccount}
+            className="w-full bg-[#3F0052] hover:bg-[#2A0038] text-white"
+            disabled={loading === 'connect'}
+          >
+            {loading === 'connect' ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>Set Up Payout Account</>
+            )}
+          </Button>
+          <p className="text-sm text-gray-500 text-center">
+            Powered by Stripe Connect. Your banking information is secure.
+          </p>
+        </div>
+      )}
     </Card>
   );
 }
+
+// Helper function to load Stripe
+async function loadStripe(key: string) {
+  if (!window.Stripe) {
+    const script = document.createElement('script');
+    script.src = 'https://js.stripe.com/v3/';
+    script.async = true;
+    document.body.appendChild(script);
+    
+    await new Promise((resolve) => {
+      script.onload = resolve;
+    });
+  }
+  
+  return window.Stripe(key);
+}
+
+// Add Stripe to the Window interface
+declare global {
+  interface Window {
+    Stripe?: any;
+  }
+}
+
+// Import these functions if needed for fallback
+import { setupSubscription, createConnectAccount } from '@/lib/stripe-client';

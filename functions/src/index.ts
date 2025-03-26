@@ -371,6 +371,7 @@ app.post(
   }
 );
 
+
 // Update create-connect-account endpoint
 app.post(
   '/create-connect-account',
@@ -382,7 +383,7 @@ app.post(
     try {
       const { userId, email, origin } = req.body;
 
-      if (!userId || !email || !origin) {
+      if (!userId || !email) {
         return res.status(400).json({ error: 'Missing required parameters' });
       }
 
@@ -425,25 +426,40 @@ app.post(
           business_type: 'individual',
           business_profile: {
             mcc: '7230', // Beauty and barber shops
-            url: origin,
           },
         });
 
-        accountId = account.id;
-
-        // Update the stylist document
+        // Store the account ID in Firestore
         await stylistRef.update({
-          stripeAccountId: accountId,
+          stripeAccountId: account.id,
           stripeAccountStatus: 'pending',
           stripeAccountCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+
+        accountId = account.id;
       }
 
-      // Create account link for onboarding
+      // Validate and sanitize the origin URL
+      let validatedOrigin = origin;
+      if (!validatedOrigin) {
+        // Default to a fallback URL if none provided
+        validatedOrigin = 'https://braidsnow.com';
+      }
+      
+      // Ensure the origin is a valid URL
+      try {
+        new URL(validatedOrigin);
+      } catch (error) {
+        console.warn('Invalid origin URL provided:', validatedOrigin);
+        // Use a fallback URL instead of failing
+        validatedOrigin = 'https://braidsnow.com';
+      }
+
+      // Create an account link for onboarding
       const accountLink = await stripe.accountLinks.create({
         account: accountId,
-        refresh_url: `${origin}/dashboard/stylist/payments?refresh=true`,
-        return_url: `${origin}/dashboard/stylist/payments?success=true`,
+        refresh_url: `${validatedOrigin}/dashboard/stylist/payments?refresh=true`,
+        return_url: `${validatedOrigin}/dashboard/stylist/payments?success=true`,
         type: 'account_onboarding',
       });
 
@@ -451,15 +467,11 @@ app.post(
     } catch (error) {
       console.error('Error creating Connect account:', error);
       return res.status(500).json({
-        error:
-          error instanceof Error ? error.message : 'Unknown error occurred',
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
       });
     }
   }
 );
-
-
-
 
 
 interface PaymentToStylistRequest {
@@ -470,7 +482,6 @@ interface PaymentToStylistRequest {
   successUrl?: string;
   cancelUrl?: string;
 }
-// ... existing code ...
 
 // Helper function to update stylist balance
 async function updateStylistBalance(stylistId: string, amountChange: number, description: string = 'Payment received') {
@@ -1594,14 +1605,25 @@ app.post(
 
       const stylistData = stylistDoc.data();
       
-      // Check if the stylist has a subscription
-      if (!stylistData?.subscription || !stylistData.subscription.stripeSubscriptionId) {
-        return res.status(400).json({ error: 'No active subscription found' });
+      // Verify subscription exists and has valid status
+      if (!stylistData?.subscription?.stripeSubscriptionId) {
+        return res.status(400).json({ error: 'No subscription found' });
       }
 
-      // Check if the subscription is set to cancel at period end
+      // Verify subscription status allows reactivation
       if (!stylistData.subscription.cancelAtPeriodEnd) {
-        return res.status(400).json({ error: 'Subscription is not scheduled for cancellation' });
+        return res.status(400).json({ error: 'Subscription is already active' });
+      }
+
+      // Get current subscription from Stripe to verify status
+      const currentSubscription = await stripe.subscriptions.retrieve(
+        stylistData.subscription.stripeSubscriptionId
+      );
+
+      if (currentSubscription.status !== 'active') {
+        return res.status(400).json({ 
+          error: 'Cannot reactivate subscription - current status is ' + currentSubscription.status 
+        });
       }
 
       // Reactivate the subscription in Stripe
@@ -1613,6 +1635,7 @@ app.post(
       // Update the subscription in Firestore
       await stylistDoc.ref.update({
         'subscription.cancelAtPeriodEnd': false,
+        'subscription.status': subscription.status,
         'subscription.updatedAt': admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -1621,17 +1644,25 @@ app.post(
         userId: userId,
         type: 'subscription_reactivated',
         title: 'Subscription Reactivated',
-        message: 'Your subscription has been reactivated and will continue at the end of the current billing period.',
+        message: 'Your subscription has been successfully reactivated and will continue at the end of the current billing period.',
         read: false,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         data: {
-          subscriptionId: subscription.id
+          subscriptionId: subscription.id,
+          currentPeriodEnd: subscription.current_period_end
         }
       });
 
-      console.log(`Reactivated subscription for stylist ${userId}`);
+      console.log(`Successfully reactivated subscription for stylist ${userId}`);
 
-      return res.status(200).json({ success: true });
+      return res.status(200).json({
+        success: true,
+        subscription: {
+          id: subscription.id,
+          status: subscription.status,
+          currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString()
+        }
+      });
     } catch (error) {
       console.error('Error reactivating subscription:', error);
       return res.status(500).json({
@@ -1640,7 +1671,6 @@ app.post(
     }
   }
 );
-
 
 
 

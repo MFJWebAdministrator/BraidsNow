@@ -16,7 +16,7 @@ const API_BASE_URL = 'https://api-5prtp2eqea-uc.a.run.app';
 // Helper function to ensure origin URL is properly formatted for Stripe
 const getFormattedOriginUrl = () => {
   const origin = window.location.origin;
-  
+
   // Stripe accepts localhost URLs, but we need to ensure they're properly formatted
   if (origin.includes('localhost')) {
     // Make sure it has the proper protocol
@@ -24,7 +24,7 @@ const getFormattedOriginUrl = () => {
       return `http://${origin}`;
     }
   }
-  
+
   return origin;
 };
 
@@ -43,80 +43,111 @@ interface SubscriptionStatus {
 
 export function PaymentsContent() {
   const { user } = useAuth();
-  const [status, setStatus] = useState<SubscriptionStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [cancelLoading, setCancelLoading] = useState(false);
-  const [reactivateLoading, setReactivateLoading] = useState(false);
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<SubscriptionStatus | null>(null);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [reactivateLoading, setReactivateLoading] = useState(false);
+  const [connectLoading, setConnectLoading] = useState(false);
 
-  // Check for success or error in URL params
+  // Check for success or canceled URL parameters
   useEffect(() => {
     const success = searchParams.get('success');
     const canceled = searchParams.get('canceled');
-    const refresh = searchParams.get('refresh');
 
     if (success === 'true') {
       toast({
-        title: "Payment Successful",
-        description: "Your payment was processed successfully! Your subscription will be active shortly.",
-        variant: "default"
+        title: 'Subscription Activated',
+        description: 'Your subscription has been successfully activated.',
+        variant: 'default',
       });
-
-      // Force an immediate status check after successful payment
-      if (user) {
-        setTimeout(() => {
-          fetchStatus(true);
-        }, 2000); // Wait 2 seconds for webhook processing
-      }
     } else if (canceled === 'true') {
       toast({
-        title: "Payment Canceled",
-        description: "Your payment was canceled. No charges were made to your account.",
-        variant: "destructive"
+        title: 'Subscription Canceled',
+        description: 'Your subscription setup was canceled.',
+        variant: 'destructive',
       });
-    } else if (refresh === 'true') {
-      toast({
-        title: "Account Setup",
-        description: "Please complete your Stripe account setup to receive payments.",
-        variant: "default"
-      });
-
-      // Force an immediate status check after refresh
-      if (user) {
-        setTimeout(() => {
-          fetchStatus(true);
-        }, 2000);
-      }
     }
-  }, [searchParams, toast, user]);
 
-  // Define fetchStatus as a named function so we can call it from multiple places
-  const fetchStatus = async (forceRefresh = false) => {
+    // Check for account setup success or failure
+    const accountSuccess = searchParams.get('account_success');
+    const accountCanceled = searchParams.get('account_canceled');
+
+    if (accountSuccess === 'true') {
+      toast({
+        title: 'Account Setup Complete',
+        description: 'Your payout account has been successfully set up.',
+        variant: 'default',
+      });
+    } else if (accountCanceled === 'true') {
+      toast({
+        title: 'Account Setup Canceled',
+        description: 'Your payout account setup was canceled.',
+        variant: 'destructive',
+      });
+    }
+  }, [searchParams, toast]);
+
+  // Fetch subscription status
+  useEffect(() => {
+    const fetchStatus = async () => {
+      if (!user || !user.uid) return;
+
+      try {
+        setLoading(true);
+        
+        // Get fresh ID token
+        const idToken = await auth.currentUser?.getIdToken(true);
+        
+        // Call the Express API endpoint
+        const response = await axios.post(
+          `${API_BASE_URL}/check-account-status`,
+          { userId: user.uid },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+            }
+          }
+        );
+        
+        setStatus(response.data);
+      } catch (error) {
+        console.error('Error fetching subscription status:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch subscription status. Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStatus();
+  }, [user, toast]);
+
+  // Handle canceling a subscription
+  const handleCancelSubscription = async () => {
     if (!user || !user.uid) {
-      console.log('No user or user ID available');
-      setLoading(false);
+      toast({
+        title: 'Authentication Error',
+        description: 'User information not available. Please log out and log back in.',
+        variant: 'destructive',
+      });
       return;
     }
 
+    setCancelLoading(true);
     try {
-      console.log('Fetching status for user ID:', user.uid);
-  
-      // Ensure user is authenticated and token is fresh
-      if (!auth.currentUser) {
-        console.log('No current user in auth object');
-        setLoading(false);
-        return;
-      }
-  
-      // Refresh the token before making the request
-      const idToken = await auth.currentUser.getIdToken(forceRefresh);
-      console.log('Token refreshed successfully');
-  
-      // Call the Express API endpoint with the user ID
-      const response = await axios.post(
-        `${API_BASE_URL}/check-account-status`,
+      // Get fresh ID token
+      const idToken = await auth.currentUser?.getIdToken(true);
+      
+      // Call the Express API endpoint
+      await axios.post(
+        `${API_BASE_URL}/cancel-subscription`,
         { userId: user.uid },
         {
           headers: {
@@ -125,270 +156,53 @@ export function PaymentsContent() {
           }
         }
       );
-
-      console.log('Subscription status response:', response.data);
-
-      // Transform the response data to match our SubscriptionStatus interface
-      // Convert Firestore timestamp to JavaScript Date
-      const convertFirestoreTimestampToDate = (timestamp: { _seconds: number, _nanoseconds: number }) => {
-        return new Date(timestamp._seconds * 1000 + timestamp._nanoseconds / 1000000);
-      };
-
-      const subscriptionStatus: SubscriptionStatus = {
-        active: response.data.subscription?.status === 'active' || false,
-        currentPeriodEnd: response.data.subscription?.currentPeriodEnd ? convertFirestoreTimestampToDate(response.data.subscription.currentPeriodEnd).toISOString() : undefined,
-        stripeAccountStatus: response.data.status || 'not_created',
-        cancelAtPeriodEnd: response.data.subscription?.cancelAtPeriodEnd || false,
-        details: response.data.details
-      };
-
-      setStatus(subscriptionStatus);
       
-      // Show toast for status changes if this is a forced refresh
-      if (forceRefresh) {
-        if (subscriptionStatus.active && !subscriptionStatus.cancelAtPeriodEnd) {
-          toast({
-            title: "Subscription Active",
-            description: "Your subscription is now active.",
-            variant: "default"
-          });
-        } else if (subscriptionStatus.stripeAccountStatus === 'active' && response.data.statusChanged) {
-          toast({
-            title: "Payout Account Ready",
-            description: "Your payout account is now set up and ready to receive payments.",
-            variant: "default"
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching subscription status:', error);
-      
-      // Provide more specific error messages
-      let errorMessage = "Failed to fetch your account status. Please try again.";
-      
-      if (error instanceof Error) {
-        if (error.message.includes('network')) {
-          errorMessage = "Network error. Please check your internet connection.";
-        }
-      }
-      
-      toast({
-        title: "Status Update Failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle subscription reactivation
-  const handleReactivateSubscription = async () => {
-    if (!user || !user.uid) {
-      toast({
-        title: "Authentication Error",
-        description: "User information not available. Please log out and log back in.",
-        variant: "destructive"
-      });
-      return;
-    }
-  
-    setReactivateLoading(true);
-    try {
-      // Refresh the token before making the request
-      const idToken = await auth.currentUser?.getIdToken(true);
-  
-      // Call the Express API endpoint to reactivate subscription
-      const response = await axios.post(
-        `${API_BASE_URL}/reactivate-subscription`,
-        { 
-          userId: user.uid,
-          origin: getFormattedOriginUrl() // Use the helper function here
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${idToken}`
-          }
-        }
-      );
-  
-      // Check if we need to create a new subscription instead of reactivating
-      if (response.data.needsNewSubscription) {
-        console.log('Need to create a new subscription:', response.data.message);
-        
-        // Redirect to subscription creation flow
-        await handleSubscribe();
-        return;
-      }
-  
-      // Show success message for reactivation
-      toast({
-        title: "Subscription Reactivated",
-        description: "Your subscription has been reactivated and will continue at the end of the current billing period.",
-        variant: "default"
-      });
-  
       // Update local state
-      setStatus(prev => prev ? {
-        ...prev,
-        cancelAtPeriodEnd: false
+      setStatus(prev => prev ? { 
+        ...prev, 
+        cancelAtPeriodEnd: true 
       } : null);
-    } catch (error) {
-      console.error('Error reactivating subscription:', error);
       
-      // Provide more specific error messages
-      let errorMessage = "Failed to reactivate subscription. Please try again.";
-      
-      if (error instanceof Error) {
-        if (error.message.includes('authentication')) {
-          errorMessage = "Authentication error. Please log out and log back in.";
-        } else if (error.message.includes('network')) {
-          errorMessage = "Network error. Please check your internet connection.";
-        } else if (error.message.includes('No subscription found')) {
-          // If there's no subscription, redirect to subscription creation
-          toast({
-            title: "No Active Subscription",
-            description: "You need to create a new subscription.",
-            variant: "default"
-          });
-          await handleSubscribe();
-          return;
-        }
-      }
-      
-      toast({
-        title: "Reactivation Failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    } finally {
-      setReactivateLoading(false);
-    }
-  };
-  
-  // Handle subscription cancellation
-  const handleCancelSubscription = async () => {
-    if (!user || !user.uid) {
-      toast({
-        title: "Authentication Error",
-        description: "User information not available. Please log out and log back in.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setCancelLoading(true);
-    try {
-      // Refresh the token before making the request
-      const idToken = await auth.currentUser?.getIdToken(true);
-
-      // Call the Express API endpoint to cancel subscription
-      const response = await axios.post(
-        `${API_BASE_URL}/cancel-subscription`,
-        { 
-          userId: user.uid,
-          origin: getFormattedOriginUrl() // Use the helper function here
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${idToken}`
-          }
-        }
-      );
-
-      // Show success message
-      toast({
-        title: "Subscription Canceled",
-        description: "Your subscription will end at the end of the current billing period.",
-        variant: "default"
-      });
-
-      // Update local state
-      setStatus(prev => prev ? {
-        ...prev,
-        cancelAtPeriodEnd: true
-      } : null);
-
       // Close the dialog
       setCancelDialogOpen(false);
-    } catch (error) {
-      console.error('Error canceling subscription:', error);
-      
-      // Provide more specific error messages
-      let errorMessage = "Failed to cancel subscription. Please try again.";
-      
-      if (error instanceof Error) {
-        if (error.message.includes('authentication')) {
-          errorMessage = "Authentication error. Please log out and log back in.";
-        } else if (error.message.includes('network')) {
-          errorMessage = "Network error. Please check your internet connection.";
-        }
-      }
       
       toast({
-        title: "Cancellation Failed",
-        description: errorMessage,
-        variant: "destructive"
+        title: 'Subscription Canceled',
+        description: 'Your subscription has been canceled and will end at the current billing period.',
+        variant: 'default',
+      });
+    } catch (error) {
+      console.error('Error canceling subscription:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to cancel subscription. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setCancelLoading(false);
     }
   };
 
-  // Initial fetch and periodic refresh
-  useEffect(() => {
-    if (user) {
-      fetchStatus();
-
-      // Refresh status every 30 seconds if page is kept open
-      const intervalId = setInterval(() => fetchStatus(), 30000);
-
-      return () => clearInterval(intervalId);
-    } else {
-      setLoading(false);
-    }
-  }, [user]);
-
-
-  const handleSubscribe = async () => {
+  // Handle reactivating a subscription
+  const handleReactivateSubscription = async () => {
     if (!user || !user.uid) {
       toast({
-        title: "Authentication Error",
-        description: "You must be logged in to subscribe.",
-        variant: "destructive",
+        title: 'Authentication Error',
+        description: 'User information not available. Please log out and log back in.',
+        variant: 'destructive',
       });
       return;
     }
-    
-    // Remove this check to allow creating a new subscription when needed
-    // We'll handle subscription state in the backend
-    
+
     setReactivateLoading(true);
     try {
-      console.log('Setting up subscription for user ID:', user.uid);
-      
       // Get fresh ID token
       const idToken = await auth.currentUser?.getIdToken(true);
-      if (!idToken) {
-        throw new Error('Failed to get authentication token');
-      }
-      
-      // Get properly formatted origin URL
-      const originUrl = getFormattedOriginUrl();
       
       // Call the Express API endpoint
-      const response = await axios.post(
-        `${API_BASE_URL}/create-checkout-session`,
-        {
-          userId: user.uid,
-          email: user.email || '',
-          successUrl: `${originUrl}/dashboard/stylist/payments?success=true`,
-          cancelUrl: `${originUrl}/dashboard/stylist/payments?canceled=true`,
-          mode: 'subscription', // Explicitly set mode to subscription
-          priceId: import.meta.env.VITE_STRIPE_PRICE_ID // Use the price ID from environment variables
-        },
+      await axios.post(
+        `${API_BASE_URL}/reactivate-subscription`,
+        { userId: user.uid },
         {
           headers: {
             'Content-Type': 'application/json',
@@ -397,48 +211,157 @@ export function PaymentsContent() {
         }
       );
       
-      console.log('Checkout session created:', response.data);
+      // Update local state
+      setStatus(prev => prev ? { 
+        ...prev, 
+        cancelAtPeriodEnd: false 
+      } : null);
       
-      // Show processing toast before redirect
       toast({
-        title: "Processing Subscription",
-        description: "You're being redirected to the secure payment page.",
-        variant: "default"
+        title: 'Subscription Reactivated',
+        description: 'Your subscription has been reactivated and will continue at the end of the current billing period.',
+        variant: 'default',
       });
-      
-      // Redirect to Stripe Checkout
-      const { sessionId } = response.data;
-      const stripe = await loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-      if (stripe) {
-        await stripe.redirectToCheckout({ sessionId });
-      } else {
-        throw new Error('Failed to load Stripe');
-      }
     } catch (error) {
-      console.error('Error setting up subscription:', error);
+      console.error('Error reactivating subscription:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to reactivate subscription. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setReactivateLoading(false);
+    }
+  };
+
+  // Format requirement strings to be more user-friendly
+  const formatRequirement = (requirement: string): string => {
+    const formattedRequirements: Record<string, string> = {
+      'external_account': 'Bank account information',
+      'individual.address.city': 'City',
+      'individual.address.line1': 'Address',
+      'individual.address.postal_code': 'Postal code',
+      'individual.address.state': 'State',
+      'individual.dob.day': 'Date of birth (day)',
+      'individual.dob.month': 'Date of birth (month)',
+      'individual.dob.year': 'Date of birth (year)',
+      'individual.email': 'Email address',
+      'individual.first_name': 'First name',
+      'individual.last_name': 'Last name',
+      'individual.phone': 'Phone number',
+      'individual.ssn_last_4': 'Last 4 digits of SSN',
+      'business_profile.url': 'Business website',
+      'business_profile.mcc': 'Business category',
+      'tos_acceptance.date': 'Terms of service acceptance',
+      'tos_acceptance.ip': 'Terms of service acceptance IP'
+    };
+
+    return formattedRequirements[requirement] || requirement;
+  };
+
+  // Handle connecting a Stripe account
+  const handleConnectStripeAccount = async () => {
+    if (!user || !user.uid) {
+      toast({
+        title: "Authentication Error",
+        description: "User information not available. Please log out and log back in.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setConnectLoading(true);
+    try {
+      // Refresh the token before making the request
+      const idToken = await auth.currentUser?.getIdToken(true);
+
+      // Call the Express API endpoint to create a Connect account
+      const response = await axios.post(
+        `${API_BASE_URL}/create-connect-account`,
+        { 
+          userId: user.uid,
+          email: user.email || '',
+          origin: getFormattedOriginUrl()
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          }
+        }
+      );
+
+      // Redirect to the Stripe Connect onboarding URL
+      window.location.href = response.data.url;
+    } catch (error) {
+      console.error('Error creating Connect account:', error);
       
-      // Provide more specific error messages based on the error type
-      let errorMessage = "Failed to set up subscription. Please try again.";
+      // Provide more specific error messages
+      let errorMessage = "Failed to set up payout account. Please try again.";
       
       if (error instanceof Error) {
         if (error.message.includes('authentication')) {
           errorMessage = "Authentication error. Please log out and log back in.";
         } else if (error.message.includes('network')) {
           errorMessage = "Network error. Please check your internet connection.";
-        } else if (error.message.includes('Stripe')) {
-          errorMessage = "Payment processor error. Please try again later.";
-        } else if (error.message.includes('recurring price')) {
-          errorMessage = "Subscription configuration error. Please contact support.";
+        } else if (error.message.includes('subscription')) {
+          errorMessage = "Active subscription required to set up payouts.";
         }
       }
       
       toast({
-        title: "Subscription Error",
+        title: "Setup Failed",
         description: errorMessage,
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
-      setReactivateLoading(false);
+      setConnectLoading(false);
+    }
+  };
+
+  // Handle viewing Stripe account dashboard
+  const handleViewStripeAccount = async () => {
+    if (!user || !user.uid) {
+      toast({
+        title: "Authentication Error",
+        description: "User information not available. Please log out and log back in.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setConnectLoading(true);
+    try {
+      // Refresh the token before making the request
+      const idToken = await auth.currentUser?.getIdToken(true);
+
+      // Call the Express API endpoint to get a dashboard link
+      const response = await axios.post(
+        `${API_BASE_URL}/create-account-link`,
+        { 
+          userId: user.uid,
+          origin: getFormattedOriginUrl()
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          }
+        }
+      );
+
+      // Redirect to the Stripe dashboard
+      window.location.href = response.data.url;
+    } catch (error) {
+      console.error('Error getting account dashboard:', error);
+      
+      toast({
+        title: "Error",
+        description: "Failed to access your payout account dashboard. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setConnectLoading(false);
     }
   };
 
@@ -449,86 +372,210 @@ export function PaymentsContent() {
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       ) : (
-        <Card className="p-6">
-          <h2 className="text-2xl font-semibold mb-4">Subscription Status</h2>
-          {status?.active ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="text-green-500" />
-                <span>Your subscription is active</span>
-              </div>
-              {status.currentPeriodEnd && (
-                <p className="text-sm text-gray-600">
-                  Next billing date: {new Date(status.currentPeriodEnd).toLocaleDateString()}
-                </p>
-              )}
-              {status.cancelAtPeriodEnd ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-amber-600">
-                    <AlertCircle />
-                    <span>Your subscription will end at the current billing period</span>
-                  </div>
-                  <Button
-                    onClick={handleReactivateSubscription}
-                    disabled={reactivateLoading}
-                  >
-                    {reactivateLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <CreditCard className="h-4 w-4 mr-2" />
-                    )}
-                    Reactivate Subscription
-                  </Button>
+        <>
+          <Card className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">Subscription Status</h2>
+            {status?.active ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="text-green-500" />
+                  <span className="font-medium">Your subscription is active</span>
                 </div>
-              ) : (
-                <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="destructive">
-                      <XCircle className="h-4 w-4 mr-2" />
-                      Cancel Subscription
+                
+                {/* Subscription details card */}
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-gray-700">Plan:</span>
+                    <span className="font-medium">Professional Stylist</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-gray-700">Price:</span>
+                    <span className="font-medium">$19.99/month</span>
+                  </div>
+                  {status.currentPeriodEnd && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-700">Next billing date:</span>
+                      <span className="font-medium">{new Date(status.currentPeriodEnd).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                </div>
+                
+                {status.cancelAtPeriodEnd ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-amber-600">
+                      <AlertCircle />
+                      <span>Your subscription will end on {status.currentPeriodEnd ? new Date(status.currentPeriodEnd).toLocaleDateString() : 'the current billing period'}</span>
+                    </div>
+                    <Button
+                      onClick={handleReactivateSubscription}
+                      disabled={reactivateLoading}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {reactivateLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <CreditCard className="h-4 w-4 mr-2" />
+                      )}
+                      Continue Subscription
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Cancel Subscription</DialogTitle>
-                      <DialogDescription>
-                        Are you sure you want to cancel your subscription? You'll continue to have access until the end of your current billing period.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
-                        Keep Subscription
+                  </div>
+                ) : (
+                  <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="text-red-500 border-red-200 hover:bg-red-50">
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Cancel Subscription
                       </Button>
-                      <Button
-                        variant="destructive"
-                        onClick={handleCancelSubscription}
-                        disabled={cancelLoading}
-                      >
-                        {cancelLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <XCircle className="h-4 w-4 mr-2" />
-                        )}
-                        Confirm Cancellation
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-amber-600">
-                <AlertCircle />
-                <span>No active subscription</span>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Cancel Subscription</DialogTitle>
+                        <DialogDescription>
+                          Are you sure you want to cancel your subscription? You'll still have access until the end of your current billing period.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="bg-amber-50 p-3 rounded-md border border-amber-200 text-amber-800 text-sm mb-4">
+                        <p>Your subscription will remain active until {status.currentPeriodEnd ? new Date(status.currentPeriodEnd).toLocaleDateString() : 'the end of your current billing period'}.</p>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
+                          Keep Subscription
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          onClick={handleCancelSubscription}
+                          disabled={cancelLoading}
+                        >
+                          {cancelLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <XCircle className="h-4 w-4 mr-2" />
+                          )}
+                          Confirm Cancellation
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
               </div>
-              <StripeConnect subscriptionActive={false} />
-            </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-amber-600">
+                  <AlertCircle />
+                  <span>No active subscription</span>
+                </div>
+                <StripeConnect 
+                  subscriptionActive={false} 
+                  subscriptionPrice={19.99}
+                  subscriptionInterval="month"
+                />
+              </div>
+            )}
+          </Card>
+          
+          {/* Only show Stripe Connect account section if subscription is active */}
+          {status?.active && (
+            <Card className="p-6">
+              <h2 className="text-2xl font-semibold mb-4">Payout Account</h2>
+              <div className="space-y-4">
+                {status.stripeAccountStatus === 'active' ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-green-600">
+                      <CheckCircle />
+                      <span className="font-medium">Your payout account is active</span>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <h3 className="font-medium mb-2">Account Details</h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Status:</span>
+                          <span className="font-medium text-green-600">Ready to receive payments</span>
+                        </div>
+                        {status.details?.payoutsEnabled && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Payouts:</span>
+                            <span className="font-medium text-green-600">Enabled</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleViewStripeAccount}
+                      className="w-full"
+                    >
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      Manage Payout Settings
+                    </Button>
+                  </div>
+                ) : status.stripeAccountStatus === 'pending' ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-amber-600">
+                      <AlertCircle />
+                      <span>Your payout account setup is incomplete</span>
+                    </div>
+                    {status.details?.requirementsPending && (
+                      <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                        <h3 className="font-medium mb-2 text-amber-800">Required Information</h3>
+                        <p className="text-sm text-amber-700 mb-2">
+                          Please complete your account setup to receive payments from clients.
+                        </p>
+                        {status.details.requirementsCurrentlyDue && status.details.requirementsCurrentlyDue.length > 0 && (
+                          <ul className="list-disc pl-5 text-sm text-amber-700 space-y-1">
+                            {status.details.requirementsCurrentlyDue.map((req, index) => (
+                              <li key={index}>{formatRequirement(req)}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                    <Button 
+                      onClick={handleConnectStripeAccount}
+                      disabled={connectLoading}
+                      className="w-full"
+                    >
+                      {connectLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <DollarSign className="h-4 w-4 mr-2" />
+                      )}
+                      {status.stripeAccountStatus === 'not_created' 
+                        ? 'Set Up Payout Account' 
+                        : 'Complete Account Setup'}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-amber-600">
+                      <AlertCircle />
+                      <span>No payout account set up</span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Set up a payout account to receive payments from clients directly to your bank account.
+                    </p>
+                    <Button 
+                      onClick={handleConnectStripeAccount}
+                      disabled={connectLoading}
+                      className="w-full"
+                    >
+                      {connectLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <DollarSign className="h-4 w-4 mr-2" />
+                      )}
+                      Set Up Payout Account
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </Card>
           )}
-        </Card>
+        </>
       )}
     </div>
   );
 }
+
+
 
 

@@ -159,72 +159,7 @@ interface ConnectAccountRequest {
   origin: string;
 }
 
-// Update check-account-status endpoint
-app.post(
-  '/check-account-status',
-  validateFirebaseIdToken,
-  async (req: RequestWithRawBody & { body: any, user?: admin.auth.DecodedIdToken }, res: Response) => {
-    try {
-      const { userId } = req.body;
 
-      if (!userId) {
-        return res.status(400).json({ error: 'User ID is required' });
-      }
-
-      // Verify that the authenticated user is requesting their own data
-      if (userId !== req.user?.uid) {
-        return res.status(403).json({ error: 'Unauthorized access to user data' });
-      }
-
-      const stylistDoc = await db.collection('stylists').doc(userId).get();
-      if (!stylistDoc.exists) {
-        return res.status(404).json({ error: 'Stylist not found' });
-      }
-
-      const stylistData = stylistDoc.data();
-
-      if (!stylistData?.stripeAccountId) {
-        return res.json({
-          status: 'not_created',
-          subscription: stylistData?.subscription || null,
-        });
-      }
-
-      // Get the latest account details from Stripe
-      const account = await stripe.accounts.retrieve(
-        stylistData.stripeAccountId as string
-      );
-
-      // Update the account status in Firestore
-      const accountStatus = account.charges_enabled ? 'active' : 'pending';
-
-      if (accountStatus !== stylistData.stripeAccountStatus) {
-        await stylistDoc.ref.update({
-          stripeAccountStatus: accountStatus,
-          stripeAccountUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
-
-      return res.json({
-        status: accountStatus,
-        subscription: stylistData.subscription || null,
-        details: {
-          chargesEnabled: account.charges_enabled,
-          payoutsEnabled: account.payouts_enabled,
-          requirementsPending:
-            account.requirements?.pending_verification?.length > 0 || false,
-          requirementsCurrentlyDue: account.requirements?.currently_due || [],
-        },
-      });
-    } catch (error) {
-      console.error('Error checking account status:', error);
-      return res.status(500).json({
-        error:
-          error instanceof Error ? error.message : 'Unknown error occurred',
-      });
-    }
-  }
-);
 // Cancel subscription endpoint
 app.post(
   '/cancel-subscription',
@@ -1673,6 +1608,216 @@ app.post(
       });
     } catch (error) {
       console.error('Error reactivating subscription:', error);
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      });
+    }
+  }
+);
+
+// ... existing code ...
+
+// Create a login link for an existing Connect account
+app.post(
+  '/create-account-link',
+  cors({ origin: true }),
+  async (req: Request, res: Response) => {
+    try {
+      // Verify authentication
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const idToken = authHeader.split('Bearer ')[1];
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      const userId = decodedToken.uid;
+
+      // Validate request body
+      const { origin } = req.body;
+      if (!origin) {
+        return res.status(400).json({ error: 'Origin URL is required' });
+      }
+
+      // Get the stylist document
+      const stylistRef = db.collection('stylists').doc(userId);
+      const stylistDoc = await stylistRef.get();
+
+      if (!stylistDoc.exists) {
+        return res.status(404).json({ error: 'Stylist not found' });
+      }
+
+      // Get the Stripe account ID
+      const stylistData = stylistDoc.data();
+      const accountId = stylistData?.stripeAccountId;
+
+      if (!accountId) {
+        return res.status(400).json({ error: 'No Stripe account found' });
+      }
+
+      // Validate and sanitize the origin URL
+      let validatedOrigin = origin;
+      try {
+        new URL(validatedOrigin);
+      } catch (error) {
+        console.warn('Invalid origin URL provided:', validatedOrigin);
+        validatedOrigin = 'https://braidsnow.com';
+      }
+
+      // Create a login link for the dashboard
+      const loginLink = await stripe.accounts.createLoginLink(accountId);
+
+      return res.status(200).json({ url: loginLink.url });
+    } catch (error) {
+      console.error('Error creating account login link:', error);
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      });
+    }
+  }
+);
+
+// Add this endpoint to check account requirements
+app.post(
+  '/check-account-requirements',
+  cors({ origin: true }),
+  async (req: Request, res: Response) => {
+    try {
+      // Verify authentication
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const idToken = authHeader.split('Bearer ')[1];
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      const userId = decodedToken.uid;
+
+      // Get the stylist document
+      const stylistRef = db.collection('stylists').doc(userId);
+      const stylistDoc = await stylistRef.get();
+
+      if (!stylistDoc.exists) {
+        return res.status(404).json({ error: 'Stylist not found' });
+      }
+
+      // Get the Stripe account ID
+      const stylistData = stylistDoc.data();
+      const accountId = stylistData?.stripeAccountId;
+
+      if (!accountId) {
+        return res.status(400).json({ error: 'No Stripe account found' });
+      }
+
+      // Retrieve the account details from Stripe
+      const account = await stripe.accounts.retrieve(accountId);
+
+      // Extract requirements information
+      const requirements = {
+        currentlyDue: account.requirements?.currently_due || [],
+        eventuallyDue: account.requirements?.eventually_due || [],
+        pendingVerification: account.requirements?.pending_verification || [],
+        disabled: account.requirements?.disabled_reason || null,
+        chargesEnabled: account.charges_enabled,
+        payoutsEnabled: account.payouts_enabled,
+        detailsSubmitted: account.details_submitted
+      };
+
+      // Update the stylist document with the latest requirements
+      await stylistRef.update({
+        stripeAccountRequirements: requirements,
+        stripeAccountUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      return res.status(200).json({ requirements });
+    } catch (error) {
+      console.error('Error checking account requirements:', error);
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      });
+    }
+  }
+);
+
+// Update the check-account-status endpoint to include more detailed account information
+app.post(
+  '/check-account-status',
+  cors({ origin: true }),
+  async (req: Request, res: Response) => {
+    try {
+      // Verify authentication
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const idToken = authHeader.split('Bearer ')[1];
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      const userId = decodedToken.uid;
+
+      // Get the stylist document
+      const stylistRef = db.collection('stylists').doc(userId);
+      const stylistDoc = await stylistRef.get();
+
+      if (!stylistDoc.exists) {
+        return res.status(404).json({ error: 'Stylist not found' });
+      }
+
+      const stylistData = stylistDoc.data();
+      let statusChanged = false;
+      let accountDetails = null;
+
+      // Check Stripe Connect account status if it exists
+      if (stylistData?.stripeAccountId) {
+        try {
+          const account = await stripe.accounts.retrieve(stylistData.stripeAccountId);
+          
+          // Determine account status
+          let accountStatus = 'pending';
+          if (account.charges_enabled && account.payouts_enabled) {
+            accountStatus = 'active';
+          }
+          
+          // Check if status has changed
+          if (stylistData.stripeAccountStatus !== accountStatus) {
+            await stylistRef.update({
+              stripeAccountStatus: accountStatus,
+              stripeAccountUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            statusChanged = true;
+          }
+          
+          // Get detailed requirements information
+          accountDetails = {
+            chargesEnabled: account.charges_enabled,
+            payoutsEnabled: account.payouts_enabled,
+            requirementsPending: account.requirements?.currently_due?.length > 0,
+            requirementsCurrentlyDue: account.requirements?.currently_due || [],
+            detailsSubmitted: account.details_submitted,
+            balance: account.balance
+          };
+        } catch (error) {
+          console.error('Error retrieving Stripe account:', error);
+        }
+      }
+
+      // Get subscription information
+      const subscriptionData = stylistData?.subscription || null;
+      
+      // Return the combined status
+      return res.status(200).json({
+        status: stylistData?.stripeAccountStatus || 'not_created',
+        subscription: subscriptionData,
+        details: accountDetails,
+        statusChanged,
+        priceInfo: {
+          amount: 1999, // $19.99 in cents
+          currency: 'usd',
+          interval: 'month'
+        }
+      });
+    } catch (error) {
+      console.error('Error checking account status:', error);
       return res.status(500).json({
         error: error instanceof Error ? error.message : 'Unknown error occurred',
       });

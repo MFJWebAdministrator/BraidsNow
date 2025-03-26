@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CreditCard } from 'lucide-react';
 
 import axios from 'axios';
 import { auth } from '@/lib/firebase/config';
@@ -27,16 +27,18 @@ const getFormattedOriginUrl = () => {
 
 interface StripeConnectProps {
   subscriptionActive: boolean;
+  subscriptionPrice?: number;
+  subscriptionInterval?: string;
 }
 
 export function StripeConnect({ 
-  subscriptionActive
+  subscriptionActive,
+  subscriptionPrice = 19.99,
+  subscriptionInterval = 'month'
 }: StripeConnectProps) {
   const [loading, setLoading] = useState<'subscription' | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
-
-
 
   const handleSubscribe = async () => {
     if (!user || !user.uid) {
@@ -47,14 +49,17 @@ export function StripeConnect({
       });
       return;
     }
-  // If subscription is already active, don't show the subscription button
-  if (subscriptionActive) {
-    return toast({
-      title: "Subscription Error",
-      description: "You already have an active subscription.",
-      variant: "destructive",
-    });;
-  }
+    
+    // If subscription is already active, don't allow subscribing again
+    if (subscriptionActive) {
+      toast({
+        title: "Subscription Active",
+        description: "You already have an active subscription.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLoading('subscription');
     try {
       console.log('Setting up subscription for user ID:', user.uid);
@@ -75,7 +80,9 @@ export function StripeConnect({
           userId: user.uid,
           email: user.email || '',
           successUrl: `${originUrl}/dashboard/stylist/payments?success=true`,
-          cancelUrl: `${originUrl}/dashboard/stylist/payments?canceled=true`
+          cancelUrl: `${originUrl}/dashboard/stylist/payments?canceled=true`,
+          mode: 'subscription', // Explicitly set mode to subscription
+          priceId: import.meta.env.VITE_STRIPE_PRICE_ID // Use the price ID from environment variables
         },
         {
           headers: {
@@ -115,6 +122,8 @@ export function StripeConnect({
           errorMessage = "Network error. Please check your internet connection.";
         } else if (error.message.includes('Stripe')) {
           errorMessage = "Payment processor error. Please try again later.";
+        } else if (error.message.includes('recurring price')) {
+          errorMessage = "Subscription configuration error. Please contact support.";
         }
       }
       
@@ -128,28 +137,63 @@ export function StripeConnect({
     }
   };
 
+  // Format the price with currency symbol
+  const formattedPrice = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(subscriptionPrice);
+
   return (
     <div className="space-y-4">
-      <p className="text-gray-600">
-        Subscribe to our Professional Stylist plan to start accepting bookings and payments.
-      </p>
-      <Button 
-        onClick={handleSubscribe}
-        className="w-full bg-[#3F0052] hover:bg-[#2A0038] text-white"
-        disabled={loading === 'subscription'}
-      >
-        {loading === 'subscription' ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Processing...
-          </>
-        ) : (
-          <>Subscribe - $19.99/month</>
-        )}
-      </Button>
-      <p className="text-sm text-gray-500 text-center">
-        Cancel anytime. Subscription renews monthly.
-      </p>
+      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+        <h3 className="text-xl font-semibold mb-2 text-[#3F0052]">Professional Stylist Plan</h3>
+        <div className="flex items-baseline mb-4">
+          <span className="text-3xl font-bold">{formattedPrice}</span>
+          <span className="text-gray-500 ml-1">/{subscriptionInterval}</span>
+        </div>
+        
+        <ul className="space-y-2 mb-6">
+          <li className="flex items-start">
+            <CheckIcon className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
+            <span>Accept client bookings</span>
+          </li>
+          <li className="flex items-start">
+            <CheckIcon className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
+            <span>Process payments securely</span>
+          </li>
+          <li className="flex items-start">
+            <CheckIcon className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
+            <span>Showcase your portfolio</span>
+          </li>
+          <li className="flex items-start">
+            <CheckIcon className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
+            <span>Priority customer support</span>
+          </li>
+        </ul>
+        
+        <Button 
+          onClick={handleSubscribe}
+          className="w-full bg-[#3F0052] hover:bg-[#2A0038] text-white"
+          disabled={loading === 'subscription'}
+        >
+          {loading === 'subscription' ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            <>
+              <CreditCard className="mr-2 h-4 w-4" />
+              Subscribe Now
+            </>
+          )}
+        </Button>
+        
+        <p className="text-sm text-gray-500 text-center mt-4">
+          Cancel anytime. Subscription renews monthly.
+        </p>
+      </div>
     </div>
   );
 }
@@ -175,4 +219,22 @@ declare global {
   interface Window {
     Stripe?: any;
   }
+}
+
+// Simple check icon component
+function CheckIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
 }

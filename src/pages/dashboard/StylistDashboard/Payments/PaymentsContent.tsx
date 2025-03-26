@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { StripeConnect } from '@/components/StylistCommunity/StripeConnect';
 import { Card } from '@/components/ui/card';
-import { DollarSign, Loader2, CheckCircle, AlertCircle, CreditCard } from 'lucide-react';
+import { DollarSign, Loader2, CheckCircle, AlertCircle, CreditCard, XCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { auth } from '@/lib/firebase/config';
 import axios from 'axios';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
-// Define the API base URL - Use the /api prefix
 // Update the API base URL to the new endpoint
 const API_BASE_URL = 'https://api-5prtp2eqea-uc.a.run.app';
 
@@ -16,6 +17,7 @@ interface SubscriptionStatus {
   active: boolean;
   currentPeriodEnd?: string;
   stripeAccountStatus?: string;
+  cancelAtPeriodEnd?: boolean;
   details?: {
     chargesEnabled?: boolean;
     payoutsEnabled?: boolean;
@@ -28,6 +30,8 @@ export function PaymentsContent() {
   const { user } = useAuth();
   const [status, setStatus] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   
@@ -118,6 +122,7 @@ export function PaymentsContent() {
         active: response.data.subscription?.status === 'active' || false,
         currentPeriodEnd: response.data.subscription?.currentPeriodEnd ? convertFirestoreTimestampToDate(response.data.subscription.currentPeriodEnd).toISOString() : undefined,
         stripeAccountStatus: response.data.status || 'not_created',
+        cancelAtPeriodEnd: response.data.subscription?.cancelAtPeriodEnd || false,
         details: response.data.details
       };
 
@@ -131,6 +136,61 @@ export function PaymentsContent() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle subscription cancellation
+  const handleCancelSubscription = async () => {
+    if (!user || !user.uid) {
+      toast({
+        title: "Error",
+        description: "User information not available",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setCancelLoading(true);
+    try {
+      // Refresh the token before making the request
+      const idToken = await auth.currentUser?.getIdToken(true);
+      
+      // Call the Express API endpoint to cancel subscription
+      const response = await axios.post(
+        `${API_BASE_URL}/cancel-subscription`,
+        { userId: user.uid },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          }
+        }
+      );
+      
+      // Show success message
+      toast({
+        title: "Subscription Canceled",
+        description: "Your subscription will end at the end of the current billing period.",
+        variant: "default"
+      });
+      
+      // Update local state
+      setStatus(prev => prev ? {
+        ...prev,
+        cancelAtPeriodEnd: true
+      } : null);
+      
+      // Close the dialog
+      setCancelDialogOpen(false);
+    } catch (error) {
+      console.error('Error canceling subscription:', error);
+      toast({
+        title: "Error",
+        description: "Failed to cancel subscription. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -212,6 +272,11 @@ export function PaymentsContent() {
               <CheckCircle className="w-5 h-5 mt-0.5" />
               <div>
                 <p className="font-medium">Your subscription is active</p>
+                {status.cancelAtPeriodEnd && (
+                  <p className="text-sm mt-1 text-amber-600">
+                    Your subscription will end at the end of the current billing period.
+                  </p>
+                )}
                 {status.currentPeriodEnd && !isNaN(new Date(status.currentPeriodEnd).getTime()) ? (
                   <p className="text-sm mt-1">
                     Next payment due: {new Date(status.currentPeriodEnd).toLocaleDateString()}
@@ -232,6 +297,50 @@ export function PaymentsContent() {
                   A subscription is required to use the BraidsNow platform
                 </p>
               </div>
+            </div>
+          )}
+          
+          {/* Subscription Management Buttons */}
+          {status?.active && !status.cancelAtPeriodEnd && (
+            <div className="mt-4">
+              <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600">
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Cancel Subscription
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Cancel Subscription</DialogTitle>
+                    <DialogDescription>
+                      Are you sure you want to cancel your subscription? You will lose access to premium features at the end of your current billing period.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
+                      Keep Subscription
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      onClick={handleCancelSubscription}
+                      disabled={cancelLoading}
+                    >
+                      {cancelLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Yes, Cancel Subscription
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
+          
+          {/* Reactivate Subscription Button */}
+          {status?.active && status.cancelAtPeriodEnd && (
+            <div className="mt-4">
+              <Button variant="default" className="bg-[#3F0052] hover:bg-[#2A0038]">
+                Reactivate Subscription
+              </Button>
             </div>
           )}
         </div>

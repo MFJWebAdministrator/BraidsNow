@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StripeConnect } from '@/components/StylistCommunity/StripeConnect';
+import { loadStripe, StripeConnect } from '@/components/StylistCommunity/StripeConnect';
 import { Card } from '@/components/ui/card';
 import { DollarSign, Loader2, CheckCircle, AlertCircle, CreditCard, XCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
@@ -192,12 +192,12 @@ export function PaymentsContent() {
       });
       return;
     }
-
+  
     setReactivateLoading(true);
     try {
       // Refresh the token before making the request
       const idToken = await auth.currentUser?.getIdToken(true);
-
+  
       // Call the Express API endpoint to reactivate subscription
       const response = await axios.post(
         `${API_BASE_URL}/reactivate-subscription`,
@@ -212,14 +212,23 @@ export function PaymentsContent() {
           }
         }
       );
-
-      // Show success message
+  
+      // Check if we need to create a new subscription instead of reactivating
+      if (response.data.needsNewSubscription) {
+        console.log('Need to create a new subscription:', response.data.message);
+        
+        // Redirect to subscription creation flow
+        await handleSubscribe();
+        return;
+      }
+  
+      // Show success message for reactivation
       toast({
         title: "Subscription Reactivated",
         description: "Your subscription has been reactivated and will continue at the end of the current billing period.",
         variant: "default"
       });
-
+  
       // Update local state
       setStatus(prev => prev ? {
         ...prev,
@@ -236,6 +245,15 @@ export function PaymentsContent() {
           errorMessage = "Authentication error. Please log out and log back in.";
         } else if (error.message.includes('network')) {
           errorMessage = "Network error. Please check your internet connection.";
+        } else if (error.message.includes('No subscription found')) {
+          // If there's no subscription, redirect to subscription creation
+          toast({
+            title: "No Active Subscription",
+            description: "You need to create a new subscription.",
+            variant: "default"
+          });
+          await handleSubscribe();
+          return;
         }
       }
       
@@ -332,6 +350,97 @@ export function PaymentsContent() {
       setLoading(false);
     }
   }, [user]);
+
+
+  const handleSubscribe = async () => {
+    if (!user || !user.uid) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to subscribe.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Remove this check to allow creating a new subscription when needed
+    // We'll handle subscription state in the backend
+    
+    setReactivateLoading(true);
+    try {
+      console.log('Setting up subscription for user ID:', user.uid);
+      
+      // Get fresh ID token
+      const idToken = await auth.currentUser?.getIdToken(true);
+      if (!idToken) {
+        throw new Error('Failed to get authentication token');
+      }
+      
+      // Get properly formatted origin URL
+      const originUrl = getFormattedOriginUrl();
+      
+      // Call the Express API endpoint
+      const response = await axios.post(
+        `${API_BASE_URL}/create-checkout-session`,
+        {
+          userId: user.uid,
+          email: user.email || '',
+          successUrl: `${originUrl}/dashboard/stylist/payments?success=true`,
+          cancelUrl: `${originUrl}/dashboard/stylist/payments?canceled=true`,
+          mode: 'subscription', // Explicitly set mode to subscription
+          priceId: import.meta.env.VITE_STRIPE_PRICE_ID // Use the price ID from environment variables
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          }
+        }
+      );
+      
+      console.log('Checkout session created:', response.data);
+      
+      // Show processing toast before redirect
+      toast({
+        title: "Processing Subscription",
+        description: "You're being redirected to the secure payment page.",
+        variant: "default"
+      });
+      
+      // Redirect to Stripe Checkout
+      const { sessionId } = response.data;
+      const stripe = await loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+      if (stripe) {
+        await stripe.redirectToCheckout({ sessionId });
+      } else {
+        throw new Error('Failed to load Stripe');
+      }
+    } catch (error) {
+      console.error('Error setting up subscription:', error);
+      
+      // Provide more specific error messages based on the error type
+      let errorMessage = "Failed to set up subscription. Please try again.";
+      
+      if (error instanceof Error) {
+        if (error.message.includes('authentication')) {
+          errorMessage = "Authentication error. Please log out and log back in.";
+        } else if (error.message.includes('network')) {
+          errorMessage = "Network error. Please check your internet connection.";
+        } else if (error.message.includes('Stripe')) {
+          errorMessage = "Payment processor error. Please try again later.";
+        } else if (error.message.includes('recurring price')) {
+          errorMessage = "Subscription configuration error. Please contact support.";
+        }
+      }
+      
+      toast({
+        title: "Subscription Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setReactivateLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">

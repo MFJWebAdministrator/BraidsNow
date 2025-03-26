@@ -312,7 +312,7 @@ app.post(
       }
 
       // Use environment variable or fallback to a default price ID
-      const subscriptionPriceId = priceId || 'price_1R58ZdJLOzBZfrz5ZZuxBFZ3';
+      const subscriptionPriceId =await ensureValidPriceId()
 
       // Check if user already exists in Stripe
       const stylistRef = db.collection('stylists').doc(userId);
@@ -1605,9 +1605,14 @@ app.post(
 
       const stylistData = stylistDoc.data();
       
-      // Verify subscription exists and has valid status
+      // Check if there's an existing subscription
       if (!stylistData?.subscription?.stripeSubscriptionId) {
-        return res.status(400).json({ error: 'No subscription found' });
+        // No subscription found - redirect to create a new subscription
+        return res.status(200).json({ 
+          success: false, 
+          needsNewSubscription: true,
+          message: "No active subscription found. Please create a new subscription."
+        });
       }
 
       // Verify subscription status allows reactivation
@@ -1621,8 +1626,11 @@ app.post(
       );
 
       if (currentSubscription.status !== 'active') {
-        return res.status(400).json({ 
-          error: 'Cannot reactivate subscription - current status is ' + currentSubscription.status 
+        // Subscription exists but is not active (e.g., canceled, unpaid)
+        return res.status(200).json({ 
+          success: false, 
+          needsNewSubscription: true,
+          message: `Cannot reactivate subscription - current status is ${currentSubscription.status}. Please create a new subscription.`
         });
       }
 
@@ -1671,7 +1679,6 @@ app.post(
     }
   }
 );
-
 
 
 // Export the Express app as a Firebase Function

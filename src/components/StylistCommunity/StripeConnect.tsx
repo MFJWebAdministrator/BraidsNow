@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { Loader2 } from 'lucide-react';
-import { Card } from '@/components/ui/card';
+
 import axios from 'axios';
 import { auth } from '@/lib/firebase/config';
 
@@ -36,6 +36,8 @@ export function StripeConnect({
   const { toast } = useToast();
   const { user } = useAuth();
 
+
+
   const handleSubscribe = async () => {
     if (!user || !user.uid) {
       toast({
@@ -45,7 +47,14 @@ export function StripeConnect({
       });
       return;
     }
-
+  // If subscription is already active, don't show the subscription button
+  if (subscriptionActive) {
+    return toast({
+      title: "Subscription Error",
+      description: "You already have an active subscription.",
+      variant: "destructive",
+    });;
+  }
     setLoading('subscription');
     try {
       console.log('Setting up subscription for user ID:', user.uid);
@@ -146,7 +155,7 @@ export function StripeConnect({
 }
 
 // Helper function to load Stripe
-async function loadStripe(key: string) {
+export async function loadStripe(key: string) {
   if (!window.Stripe) {
     const script = document.createElement('script');
     script.src = 'https://js.stripe.com/v3/';

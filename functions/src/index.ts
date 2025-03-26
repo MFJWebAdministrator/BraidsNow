@@ -889,7 +889,6 @@ app.post(
           }
           break;
         }
-
         case 'customer.subscription.updated': {
           const subscription = event.data.object as Stripe.Subscription;
           const customerId = subscription.customer as string;
@@ -919,8 +918,23 @@ app.post(
 
             console.log(`Updated subscription status for stylist ${stylistId} to ${subscription.status}`);
 
-            // If subscription was canceled, add a notification
-            if (subscription.cancel_at_period_end) {
+            // Handle subscription status notifications
+            if (stylistDoc.data()?.subscription?.cancelAtPeriodEnd === true && 
+                subscription.cancel_at_period_end === false) {
+              // Subscription was reactivated
+              await db.collection('notifications').add({
+                userId: stylistId,
+                type: 'subscription_reactivated',
+                title: 'Subscription Reactivated',
+                message: 'Your subscription has been reactivated and will continue at the end of the current billing period.',
+                read: false,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                data: {
+                  subscriptionId: subscription.id
+                }
+              });
+            } else if (subscription.cancel_at_period_end) {
+              // Subscription was canceled
               await db.collection('notifications').add({
                 userId: stylistId,
                 type: 'subscription_cancellation_scheduled',
@@ -937,7 +951,6 @@ app.post(
           }
           break;
         }
-
         case 'customer.subscription.deleted': {
           const subscription = event.data.object as Stripe.Subscription;
           const customerId = subscription.customer as string;
@@ -1552,6 +1565,83 @@ app.get(
     }
   }
 );
+
+// Reactivate subscription endpoint
+app.post(
+  '/reactivate-subscription',
+  validateFirebaseIdToken,
+  async (
+    req: RequestWithRawBody & { body: { userId: string }, user?: admin.auth.DecodedIdToken },
+    res: Response
+  ) => {
+    try {
+      const { userId } = req.body;
+
+      if (!userId) {
+        return res.status(400).json({ error: 'User ID is required' });
+      }
+
+      // Verify that the authenticated user is requesting their own data
+      if (userId !== req.user?.uid) {
+        return res.status(403).json({ error: 'Unauthorized access to user data' });
+      }
+
+      // Get the stylist document
+      const stylistDoc = await db.collection('stylists').doc(userId).get();
+      if (!stylistDoc.exists) {
+        return res.status(404).json({ error: 'Stylist not found' });
+      }
+
+      const stylistData = stylistDoc.data();
+      
+      // Check if the stylist has a subscription
+      if (!stylistData?.subscription || !stylistData.subscription.stripeSubscriptionId) {
+        return res.status(400).json({ error: 'No active subscription found' });
+      }
+
+      // Check if the subscription is set to cancel at period end
+      if (!stylistData.subscription.cancelAtPeriodEnd) {
+        return res.status(400).json({ error: 'Subscription is not scheduled for cancellation' });
+      }
+
+      // Reactivate the subscription in Stripe
+      const subscription = await stripe.subscriptions.update(
+        stylistData.subscription.stripeSubscriptionId,
+        { cancel_at_period_end: false }
+      );
+
+      // Update the subscription in Firestore
+      await stylistDoc.ref.update({
+        'subscription.cancelAtPeriodEnd': false,
+        'subscription.updatedAt': admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Add a notification for the stylist
+      await db.collection('notifications').add({
+        userId: userId,
+        type: 'subscription_reactivated',
+        title: 'Subscription Reactivated',
+        message: 'Your subscription has been reactivated and will continue at the end of the current billing period.',
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        data: {
+          subscriptionId: subscription.id
+        }
+      });
+
+      console.log(`Reactivated subscription for stylist ${userId}`);
+
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      console.error('Error reactivating subscription:', error);
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      });
+    }
+  }
+);
+
+
 
 
 // Export the Express app as a Firebase Function

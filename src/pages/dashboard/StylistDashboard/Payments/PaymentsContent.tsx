@@ -31,23 +31,24 @@ export function PaymentsContent() {
   const [status, setStatus] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [reactivateLoading, setReactivateLoading] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  
+
   // Check for success or error in URL params
   useEffect(() => {
     const success = searchParams.get('success');
     const canceled = searchParams.get('canceled');
     const refresh = searchParams.get('refresh');
-    
+
     if (success === 'true') {
       toast({
         title: "Success",
         description: "Your payment was processed successfully! Your subscription will be active shortly.",
         variant: "default"
       });
-      
+
       // Force an immediate status check after successful payment
       if (user) {
         setTimeout(() => {
@@ -66,7 +67,7 @@ export function PaymentsContent() {
         description: "Please complete your Stripe account setup.",
         variant: "default"
       });
-      
+
       // Force an immediate status check after refresh
       if (user) {
         setTimeout(() => {
@@ -86,18 +87,18 @@ export function PaymentsContent() {
 
     try {
       console.log('Fetching status for user ID:', user.uid);
-      
+
       // Ensure user is authenticated and token is fresh
       if (!auth.currentUser) {
         console.log('No current user in auth object');
         setLoading(false);
         return;
       }
-      
+
       // Refresh the token before making the request
       const idToken = await auth.currentUser.getIdToken(forceRefresh);
       console.log('Token refreshed successfully');
-      
+
       // Call the Express API endpoint with the user ID
       const response = await axios.post(
         `${API_BASE_URL}/check-account-status`,
@@ -109,9 +110,9 @@ export function PaymentsContent() {
           }
         }
       );
-      
+
       console.log('Subscription status response:', response.data);
-      
+
       // Transform the response data to match our SubscriptionStatus interface
       // Convert Firestore timestamp to JavaScript Date
       const convertFirestoreTimestampToDate = (timestamp: { _seconds: number, _nanoseconds: number }) => {
@@ -139,6 +140,57 @@ export function PaymentsContent() {
     }
   };
 
+  // Handle subscription reactivation
+  const handleReactivateSubscription = async () => {
+    if (!user || !user.uid) {
+      toast({
+        title: "Error",
+        description: "User information not available",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setReactivateLoading(true);
+    try {
+      // Refresh the token before making the request
+      const idToken = await auth.currentUser?.getIdToken(true);
+
+      // Call the Express API endpoint to reactivate subscription
+      const response = await axios.post(
+        `${API_BASE_URL}/reactivate-subscription`,
+        { userId: user.uid },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          }
+        }
+      );
+
+      // Show success message
+      toast({
+        title: "Subscription Reactivated",
+        description: "Your subscription has been reactivated and will continue at the end of the current billing period.",
+        variant: "default"
+      });
+
+      // Update local state
+      setStatus(prev => prev ? {
+        ...prev,
+        cancelAtPeriodEnd: false
+      } : null);
+    } catch (error) {
+      console.error('Error reactivating subscription:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reactivate subscription. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setReactivateLoading(false);
+    }
+  };
   // Handle subscription cancellation
   const handleCancelSubscription = async () => {
     if (!user || !user.uid) {
@@ -154,7 +206,7 @@ export function PaymentsContent() {
     try {
       // Refresh the token before making the request
       const idToken = await auth.currentUser?.getIdToken(true);
-      
+
       // Call the Express API endpoint to cancel subscription
       const response = await axios.post(
         `${API_BASE_URL}/cancel-subscription`,
@@ -166,20 +218,20 @@ export function PaymentsContent() {
           }
         }
       );
-      
+
       // Show success message
       toast({
         title: "Subscription Canceled",
         description: "Your subscription will end at the end of the current billing period.",
         variant: "default"
       });
-      
+
       // Update local state
       setStatus(prev => prev ? {
         ...prev,
         cancelAtPeriodEnd: true
       } : null);
-      
+
       // Close the dialog
       setCancelDialogOpen(false);
     } catch (error) {
@@ -198,10 +250,10 @@ export function PaymentsContent() {
   useEffect(() => {
     if (user) {
       fetchStatus();
-      
+
       // Refresh status every 30 seconds if page is kept open
       const intervalId = setInterval(() => fetchStatus(), 30000);
-      
+
       return () => clearInterval(intervalId);
     } else {
       setLoading(false);
@@ -245,6 +297,8 @@ export function PaymentsContent() {
     );
   }
 
+
+
   return (
     <div className="space-y-8">
       {/* Subscription Status */}
@@ -266,7 +320,7 @@ export function PaymentsContent() {
               <p className="text-lg font-medium text-[#3F0052]">$19.99</p>
             </div>
           </div>
-          
+
           {status?.active ? (
             <div className="bg-green-50 text-green-700 p-4 rounded-lg flex items-start gap-3">
               <CheckCircle className="w-5 h-5 mt-0.5" />
@@ -299,7 +353,7 @@ export function PaymentsContent() {
               </div>
             </div>
           )}
-          
+
           {/* Subscription Management Buttons */}
           {status?.active && !status.cancelAtPeriodEnd && (
             <div className="mt-4">
@@ -321,8 +375,8 @@ export function PaymentsContent() {
                     <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
                       Keep Subscription
                     </Button>
-                    <Button 
-                      variant="destructive" 
+                    <Button
+                      variant="destructive"
                       onClick={handleCancelSubscription}
                       disabled={cancelLoading}
                     >
@@ -334,11 +388,17 @@ export function PaymentsContent() {
               </Dialog>
             </div>
           )}
-          
-          {/* Reactivate Subscription Button */}
+
+          {/* Reactivate Subscription Button - Update this part */}
           {status?.active && status.cancelAtPeriodEnd && (
             <div className="mt-4">
-              <Button variant="default" className="bg-[#3F0052] hover:bg-[#2A0038]">
+              <Button
+                variant="default"
+                className="bg-[#3F0052] hover:bg-[#2A0038]"
+                onClick={handleReactivateSubscription}
+                disabled={reactivateLoading}
+              >
+                {reactivateLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Reactivate Subscription
               </Button>
             </div>
@@ -355,7 +415,7 @@ export function PaymentsContent() {
               Payment Account
             </h2>
           </div>
-          
+
           {status.stripeAccountStatus === 'active' ? (
             <div className="bg-green-50 text-green-700 p-4 rounded-lg flex items-start gap-3">
               <CheckCircle className="w-5 h-5 mt-0.5" />
@@ -392,12 +452,14 @@ export function PaymentsContent() {
 
       {/* Stripe Connect Section - Show if no subscription or if subscription is active but no Connect account */}
       {(!status?.active || (status?.active && !status?.stripeAccountStatus)) && (
-        <StripeConnect 
-          subscriptionActive={status?.active || false} 
-          connectAccountStatus={status?.stripeAccountStatus || 'not_created'} 
+        <StripeConnect
+          subscriptionActive={status?.active || false}
+          connectAccountStatus={status?.stripeAccountStatus || 'not_created'}
           useExpressApi={true} // Add this prop to indicate we're using Express API
         />
       )}
     </div>
   );
 }
+
+

@@ -30,16 +30,41 @@ const getFormattedOriginUrl = () => {
 
 // Update the SubscriptionStatus interface to better match the response structure
 interface SubscriptionStatus {
-  active: boolean;
-  currentPeriodEnd?: string;
-  stripeAccountStatus?: string;
-  cancelAtPeriodEnd?: string;
+  status?: string;
+  subscription?: {
+    id?: string;
+    status?: string;
+    currentPeriodStart?: {
+      _seconds: number;
+      _nanoseconds: number;
+    };
+    currentPeriodEnd?: {
+      _seconds: number;
+      _nanoseconds: number;
+    };
+    priceId?: string;
+    cancelAtPeriodEnd?: boolean;
+    canceledAt?: {
+      _seconds: number;
+      _nanoseconds: number;
+    };
+    updatedAt?: {
+      _seconds: number;
+      _nanoseconds: number;
+    };
+  };
   details?: {
     chargesEnabled?: boolean;
     payoutsEnabled?: boolean;
     requirementsPending?: boolean;
     requirementsCurrentlyDue?: string[];
     detailsSubmitted?: boolean;
+  };
+  statusChanged?: boolean;
+  priceInfo?: {
+    amount?: number;
+    currency?: string;
+    interval?: string;
   };
 }
 
@@ -48,7 +73,7 @@ export function PaymentsContent() {
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<SubscriptionStatus |null|any>(null);
+  const [status, setStatus] = useState<SubscriptionStatus | null | any>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [reactivateLoading, setReactivateLoading] = useState(false);
@@ -99,10 +124,10 @@ export function PaymentsContent() {
 
       try {
         setLoading(true);
-        
+
         // Get fresh ID token
         const idToken = await auth.currentUser?.getIdToken(true);
-        
+
         // Call the Express API endpoint
         const response = await axios.post(
           `${API_BASE_URL}/check-account-status`,
@@ -114,34 +139,11 @@ export function PaymentsContent() {
             }
           }
         );
-        
+
         // Process the response data to ensure it matches our expected format
         const responseData = response.data;
-        
-        // Convert Firestore timestamp objects to Date objects
-        const currentPeriodEnd = responseData.subscription?.currentPeriodEnd?._seconds 
-          ? new Date(responseData.subscription.currentPeriodEnd._seconds * 1000).toISOString()
-          : undefined;
-          
-        const currentPeriodStart = responseData.subscription?.currentPeriodStart?._seconds
-          ? new Date(responseData.subscription.currentPeriodStart._seconds * 1000).toISOString()
-          : undefined;
-        
         // Make sure we have a properly structured status object
-        setStatus({
-          active: responseData.subscription?.status === 'active' || false,
-          currentPeriodEnd: currentPeriodEnd,
-          currentPeriodStart: currentPeriodStart,
-          stripeAccountStatus: responseData.status || 'not_created',
-          cancelAtPeriodEnd: responseData.subscription?.cancelAtPeriodEnd || false,
-          details: {
-            chargesEnabled: responseData.details?.chargesEnabled || false,
-            payoutsEnabled: responseData.details?.payoutsEnabled || false,
-            requirementsPending: responseData.details?.requirementsPending || false,
-            requirementsCurrentlyDue: responseData.details?.requirementsCurrentlyDue || [],
-            detailsSubmitted: responseData.details?.detailsSubmitted || false
-          }
-        });
+        setStatus(responseData);
       } catch (error) {
         console.error('Error fetching subscription status:', error);
         toast({
@@ -172,7 +174,7 @@ export function PaymentsContent() {
     try {
       // Get fresh ID token
       const idToken = await auth.currentUser?.getIdToken(true);
-      
+
       // Call the Express API endpoint
       await axios.post(
         `${API_BASE_URL}/cancel-subscription`,
@@ -184,16 +186,16 @@ export function PaymentsContent() {
           }
         }
       );
-      
+
       // Update local state
-      setStatus(prev => prev ? { 
-        ...prev, 
-        cancelAtPeriodEnd: true 
+      setStatus(prev => prev ? {
+        ...prev,
+        cancelAtPeriodEnd: true
       } : null);
-      
+
       // Close the dialog
       setCancelDialogOpen(false);
-      
+
       toast({
         title: 'Subscription Canceled',
         description: 'Your subscription has been canceled and will end at the current billing period.',
@@ -211,56 +213,6 @@ export function PaymentsContent() {
     }
   };
 
-  // Handle reactivating a subscription
-  const handleReactivateSubscription = async () => {
-    if (!user || !user.uid) {
-      toast({
-        title: 'Authentication Error',
-        description: 'User information not available. Please log out and log back in.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setReactivateLoading(true);
-    try {
-      // Get fresh ID token
-      const idToken = await auth.currentUser?.getIdToken(true);
-      
-      // Call the Express API endpoint
-      await axios.post(
-        `${API_BASE_URL}/reactivate-subscription`,
-        { userId: user.uid },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${idToken}`
-          }
-        }
-      );
-      
-      // Update local state
-      setStatus(prev => prev ? { 
-        ...prev, 
-        cancelAtPeriodEnd: false 
-      } : null);
-      
-      toast({
-        title: 'Subscription Reactivated',
-        description: 'Your subscription has been reactivated and will continue at the end of the current billing period.',
-        variant: 'default',
-      });
-    } catch (error) {
-      console.error('Error reactivating subscription:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to reactivate subscription. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setReactivateLoading(false);
-    }
-  };
 
   // Format requirement strings to be more user-friendly
   const formatRequirement = (requirement: string): string => {
@@ -306,7 +258,7 @@ export function PaymentsContent() {
       // Call the Express API endpoint to create a Connect account
       const response = await axios.post(
         `${API_BASE_URL}/create-connect-account`,
-        { 
+        {
           userId: user.uid,
           email: user.email || '',
           origin: getFormattedOriginUrl()
@@ -323,10 +275,10 @@ export function PaymentsContent() {
       window.location.href = response.data.url;
     } catch (error) {
       console.error('Error creating Connect account:', error);
-      
+
       // Provide more specific error messages
       let errorMessage = "Failed to set up payout account. Please try again.";
-      
+
       if (error instanceof Error) {
         if (error.message.includes('authentication')) {
           errorMessage = "Authentication error. Please log out and log back in.";
@@ -336,7 +288,7 @@ export function PaymentsContent() {
           errorMessage = "Active subscription required to set up payouts.";
         }
       }
-      
+
       toast({
         title: "Setup Failed",
         description: errorMessage,
@@ -366,7 +318,7 @@ export function PaymentsContent() {
       // Call the Express API endpoint to get a dashboard link
       const response = await axios.post(
         `${API_BASE_URL}/create-account-link`,
-        { 
+        {
           userId: user.uid,
           origin: getFormattedOriginUrl()
         },
@@ -382,7 +334,7 @@ export function PaymentsContent() {
       window.location.href = response.data.url;
     } catch (error) {
       console.error('Error getting account dashboard:', error);
-      
+
       toast({
         title: "Error",
         description: "Failed to access your payout account dashboard. Please try again.",
@@ -396,26 +348,26 @@ export function PaymentsContent() {
   // Improved function to determine account setup status
   const getAccountSetupStatus = () => {
     if (!status) return 'not_created';
-    
+
     if (status.stripeAccountStatus === 'active') {
       return 'active';
     }
-    
+
     if (status.details?.detailsSubmitted) {
       return 'pending_verification';
     }
-    
+
     if (status.details?.requirementsPending) {
       return 'incomplete';
     }
-    
+
     return 'not_created';
   };
 
   // Get button text based on account status
   const getConnectButtonText = () => {
     const setupStatus = getAccountSetupStatus();
-    
+
     switch (setupStatus) {
       case 'incomplete':
         return 'Complete Account Setup';
@@ -423,6 +375,99 @@ export function PaymentsContent() {
         return 'Continue Account Setup';
       default:
         return 'Set Up Payout Account';
+    }
+  };
+
+
+  const handleReactivateSubscription = async () => {
+    if (!user || !user.uid) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to subscribe.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // If subscription is already active, don't allow subscribing again
+    if (status?.status === 'active') {
+      toast({
+        title: "Subscription Active",
+        description: "You already have an active subscription.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setReactivateLoading(true);
+    try {
+      console.log('Setting up subscription for user ID:', user.uid);
+
+      // Get fresh ID token
+      const idToken = await auth.currentUser?.getIdToken(true);
+      if (!idToken) {
+        throw new Error('Failed to get authentication token');
+      }
+
+      // Get properly formatted origin URL
+      const originUrl = getFormattedOriginUrl();
+
+      // Call the Express API endpoint
+      const response = await axios.post(
+        `${API_BASE_URL}/create-checkout-session`,
+        {
+          userId: user.uid,
+          email: user.email || '',
+          successUrl: `${originUrl}/dashboard/stylist/payments?success=true`,
+          cancelUrl: `${originUrl}/dashboard/stylist/payments?canceled=true`,
+          mode: 'subscription', // Explicitly set mode to subscription
+          priceId: import.meta.env.VITE_STRIPE_PRICE_ID // Use the price ID from environment variables
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          }
+        }
+      );
+
+      console.log('Checkout session created:', response.data);
+
+      // Show processing toast before redirect
+      toast({
+        title: "Processing Subscription",
+        description: "You're being redirected to the secure payment page.",
+        variant: "default"
+      });
+
+      // Redirect to Stripe Checkout
+      const { sessionId } = response.data;
+      const stripe = await loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+      if (stripe) {
+        await stripe.redirectToCheckout({ sessionId });
+      } else {
+        throw new Error('Failed to load Stripe');
+      }
+    } catch (error) {
+      console.error('Error setting up subscription:', error);
+
+      // Provide more specific error messages based on the error type
+      let errorMessage = "Failed to set up subscription. Please try again.";
+
+      if (error instanceof Error) {
+        if (error.message.includes('authentication')) {
+          errorMessage = "Authentication error. Please log out and log back in.";
+        } else if (error.message.includes('network')) {
+          errorMessage = "Network error. Please check your internet connection.";
+        } else if (error.message.includes('Stripe')) {
+          errorMessage = "Payment processor error. Please try again later.";
+        } else if (error.message.includes('recurring price')) {
+          errorMessage = "Subscription configuration error. Please contact support.";
+        }
+      }
+
+    } finally {
+      setReactivateLoading(false);
     }
   };
 
@@ -436,13 +481,13 @@ export function PaymentsContent() {
         <>
           <Card className="p-6">
             <h2 className="text-2xl font-semibold mb-4">Subscription Status</h2>
-            {status?.active ? (
+            {status?.subscription?.status === 'active' ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="text-green-500" />
                   <span className="font-medium">Your subscription is active</span>
                 </div>
-                
+
                 {/* Subscription details card */}
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <div className="flex justify-between items-center mb-2">
@@ -451,33 +496,35 @@ export function PaymentsContent() {
                   </div>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-gray-700">Price:</span>
-                    <span className="font-medium">$19.99/month</span>
+                    <span className="font-medium">{formatPrice(status?.priceInfo?.amount, status?.priceInfo?.currency)}/{status?.priceInfo?.interval || 'month'}</span>
                   </div>
-                  {status.currentPeriodEnd && (
+                  {status?.subscription?.currentPeriodEnd && (
                     <div className="flex justify-between items-center">
                       <span className="text-gray-700">Next billing date:</span>
-                      <span className="font-medium">{new Date(status.currentPeriodEnd).toLocaleDateString()}</span>
+                      <span className="font-medium">
+                        {convertTimestampToDate(status.subscription.currentPeriodEnd)?.toLocaleDateString()}
+                      </span>
                     </div>
                   )}
                 </div>
-                
-                {status.cancelAtPeriodEnd ? (
+
+                {status?.subscription?.cancelAtPeriodEnd ? (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-amber-600">
                       <AlertCircle />
-                      <span>Your subscription will end on {status.currentPeriodEnd ? new Date(status.currentPeriodEnd).toLocaleDateString() : 'the current billing period'}</span>
+                      <span>Your subscription will end on {convertTimestampToDate(status.subscription.currentPeriodEnd)?.toLocaleDateString() || 'the current billing period'}</span>
                     </div>
                     <Button
                       onClick={handleReactivateSubscription}
                       disabled={reactivateLoading}
-                      className="bg-green-600 hover:bg-green-700"
+                      variant="default"
                     >
                       {reactivateLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                       ) : (
-                        <CreditCard className="h-4 w-4 mr-2" />
+                        <CheckCircle className="h-4 w-4 mr-2" />
                       )}
-                      Continue Subscription
+                      Reactivate Subscription
                     </Button>
                   </div>
                 ) : (
@@ -496,14 +543,14 @@ export function PaymentsContent() {
                         </DialogDescription>
                       </DialogHeader>
                       <div className="bg-amber-50 p-3 rounded-md border border-amber-200 text-amber-800 text-sm mb-4">
-                        <p>Your subscription will remain active until {status.currentPeriodEnd ? new Date(status.currentPeriodEnd).toLocaleDateString() : 'the end of your current billing period'}.</p>
+                        <p>Your subscription will remain active until {convertTimestampToDate(status?.subscription?.currentPeriodEnd)?.toLocaleDateString() || 'the end of your current billing period'}.</p>
                       </div>
                       <DialogFooter>
                         <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
                           Keep Subscription
                         </Button>
-                        <Button 
-                          variant="destructive" 
+                        <Button
+                          variant="destructive"
                           onClick={handleCancelSubscription}
                           disabled={cancelLoading}
                         >
@@ -525,21 +572,21 @@ export function PaymentsContent() {
                   <AlertCircle />
                   <span>No active subscription</span>
                 </div>
-                <StripeConnect 
-                  subscriptionActive={false} 
-                  subscriptionPrice={19.99}
-                  subscriptionInterval="month"
+                <StripeConnect
+                  subscriptionActive={false}
+                  subscriptionPrice={status?.priceInfo?.amount ? status.priceInfo.amount / 100 : 19.99}
+                  subscriptionInterval={status?.priceInfo?.interval || "month"}
                 />
               </div>
             )}
           </Card>
-          
+
           {/* Only show Stripe Connect account section if subscription is active */}
-          {status?.active && (
+          {status?.subscription?.status === 'active' && (
             <Card className="p-6">
               <h2 className="text-2xl font-semibold mb-4">Payout Account</h2>
               <div className="space-y-4">
-                {status.stripeAccountStatus === 'active' ? (
+                {status.status === 'active' ? (
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-green-600">
                       <CheckCircle />
@@ -560,8 +607,8 @@ export function PaymentsContent() {
                         )}
                       </div>
                     </div>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={handleViewStripeAccount}
                       className="w-full"
                     >
@@ -574,14 +621,14 @@ export function PaymentsContent() {
                     <div className="flex items-center gap-2 text-amber-600">
                       <AlertCircle />
                       <span>
-                        {getAccountSetupStatus() === 'pending_verification' 
-                          ? 'Your account is pending verification' 
+                        {getAccountSetupStatus() === 'pending_verification'
+                          ? 'Your account is pending verification'
                           : getAccountSetupStatus() === 'incomplete'
                             ? 'Your payout account setup is incomplete'
                             : 'No payout account set up'}
                       </span>
                     </div>
-                    
+
                     {status.details?.requirementsPending && status.details.requirementsCurrentlyDue && status.details.requirementsCurrentlyDue.length > 0 && (
                       <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
                         <h3 className="font-medium mb-2 text-amber-800">Required Information</h3>
@@ -600,7 +647,7 @@ export function PaymentsContent() {
                         </ul>
                       </div>
                     )}
-                    
+
                     {getAccountSetupStatus() === 'pending_verification' && (
                       <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                         <h3 className="font-medium mb-2 text-blue-800">Verification in Progress</h3>
@@ -609,8 +656,8 @@ export function PaymentsContent() {
                         </p>
                       </div>
                     )}
-                    
-                    <Button 
+
+                    <Button
                       onClick={handleConnectStripeAccount}
                       disabled={connectLoading}
                       className="w-full"
@@ -632,6 +679,23 @@ export function PaymentsContent() {
     </div>
   );
 }
+
+// Helper function to convert Firestore timestamp to Date
+const convertTimestampToDate = (timestamp: { _seconds: number; _nanoseconds: number } | undefined) => {
+  if (!timestamp || !timestamp._seconds) return undefined;
+  return new Date(timestamp._seconds * 1000);
+};
+
+// Helper function to format price
+const formatPrice = (amount?: number, currency?: string) => {
+  if (!amount) return '$19.99';
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency || 'usd',
+    minimumFractionDigits: 2
+  }).format(amount / 100);
+};
 
 
 

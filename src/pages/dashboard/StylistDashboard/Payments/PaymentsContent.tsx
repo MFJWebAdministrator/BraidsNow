@@ -28,16 +28,18 @@ const getFormattedOriginUrl = () => {
   return origin;
 };
 
+// Update the SubscriptionStatus interface to better match the response structure
 interface SubscriptionStatus {
   active: boolean;
   currentPeriodEnd?: string;
   stripeAccountStatus?: string;
-  cancelAtPeriodEnd?: boolean;
+  cancelAtPeriodEnd?: string;
   details?: {
     chargesEnabled?: boolean;
     payoutsEnabled?: boolean;
     requirementsPending?: boolean;
     requirementsCurrentlyDue?: string[];
+    detailsSubmitted?: boolean;
   };
 }
 
@@ -46,7 +48,7 @@ export function PaymentsContent() {
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<SubscriptionStatus | null>(null);
+  const [status, setStatus] = useState<SubscriptionStatus |null|any>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [reactivateLoading, setReactivateLoading] = useState(false);
@@ -113,7 +115,33 @@ export function PaymentsContent() {
           }
         );
         
-        setStatus(response.data);
+        // Process the response data to ensure it matches our expected format
+        const responseData = response.data;
+        
+        // Convert Firestore timestamp objects to Date objects
+        const currentPeriodEnd = responseData.subscription?.currentPeriodEnd?._seconds 
+          ? new Date(responseData.subscription.currentPeriodEnd._seconds * 1000).toISOString()
+          : undefined;
+          
+        const currentPeriodStart = responseData.subscription?.currentPeriodStart?._seconds
+          ? new Date(responseData.subscription.currentPeriodStart._seconds * 1000).toISOString()
+          : undefined;
+        
+        // Make sure we have a properly structured status object
+        setStatus({
+          active: responseData.subscription?.status === 'active' || false,
+          currentPeriodEnd: currentPeriodEnd,
+          currentPeriodStart: currentPeriodStart,
+          stripeAccountStatus: responseData.status || 'not_created',
+          cancelAtPeriodEnd: responseData.subscription?.cancelAtPeriodEnd || false,
+          details: {
+            chargesEnabled: responseData.details?.chargesEnabled || false,
+            payoutsEnabled: responseData.details?.payoutsEnabled || false,
+            requirementsPending: responseData.details?.requirementsPending || false,
+            requirementsCurrentlyDue: responseData.details?.requirementsCurrentlyDue || [],
+            detailsSubmitted: responseData.details?.detailsSubmitted || false
+          }
+        });
       } catch (error) {
         console.error('Error fetching subscription status:', error);
         toast({
@@ -365,6 +393,39 @@ export function PaymentsContent() {
     }
   };
 
+  // Improved function to determine account setup status
+  const getAccountSetupStatus = () => {
+    if (!status) return 'not_created';
+    
+    if (status.stripeAccountStatus === 'active') {
+      return 'active';
+    }
+    
+    if (status.details?.detailsSubmitted) {
+      return 'pending_verification';
+    }
+    
+    if (status.details?.requirementsPending) {
+      return 'incomplete';
+    }
+    
+    return 'not_created';
+  };
+
+  // Get button text based on account status
+  const getConnectButtonText = () => {
+    const setupStatus = getAccountSetupStatus();
+    
+    switch (setupStatus) {
+      case 'incomplete':
+        return 'Complete Account Setup';
+      case 'pending_verification':
+        return 'Continue Account Setup';
+      default:
+        return 'Set Up Payout Account';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {loading ? (
@@ -508,27 +569,47 @@ export function PaymentsContent() {
                       Manage Payout Settings
                     </Button>
                   </div>
-                ) : status.stripeAccountStatus === 'pending' ? (
+                ) : (
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-amber-600">
                       <AlertCircle />
-                      <span>Your payout account setup is incomplete</span>
+                      <span>
+                        {getAccountSetupStatus() === 'pending_verification' 
+                          ? 'Your account is pending verification' 
+                          : getAccountSetupStatus() === 'incomplete'
+                            ? 'Your payout account setup is incomplete'
+                            : 'No payout account set up'}
+                      </span>
                     </div>
-                    {status.details?.requirementsPending && (
+                    
+                    {status.details?.requirementsPending && status.details.requirementsCurrentlyDue && status.details.requirementsCurrentlyDue.length > 0 && (
                       <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
                         <h3 className="font-medium mb-2 text-amber-800">Required Information</h3>
                         <p className="text-sm text-amber-700 mb-2">
                           Please complete your account setup to receive payments from clients.
                         </p>
-                        {status.details.requirementsCurrentlyDue && status.details.requirementsCurrentlyDue.length > 0 && (
-                          <ul className="list-disc pl-5 text-sm text-amber-700 space-y-1">
-                            {status.details.requirementsCurrentlyDue.map((req, index) => (
-                              <li key={index}>{formatRequirement(req)}</li>
-                            ))}
-                          </ul>
-                        )}
+                        <ul className="list-disc pl-5 text-sm text-amber-700 space-y-1">
+                          {status.details.requirementsCurrentlyDue.slice(0, 5).map((req, index) => (
+                            <li key={index}>{formatRequirement(req)}</li>
+                          ))}
+                          {status.details.requirementsCurrentlyDue.length > 5 && (
+                            <li className="font-medium">
+                              +{status.details.requirementsCurrentlyDue.length - 5} more requirements
+                            </li>
+                          )}
+                        </ul>
                       </div>
                     )}
+                    
+                    {getAccountSetupStatus() === 'pending_verification' && (
+                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <h3 className="font-medium mb-2 text-blue-800">Verification in Progress</h3>
+                        <p className="text-sm text-blue-700">
+                          Your account information has been submitted and is being verified. This process may take 1-2 business days.
+                        </p>
+                      </div>
+                    )}
+                    
                     <Button 
                       onClick={handleConnectStripeAccount}
                       disabled={connectLoading}
@@ -539,31 +620,7 @@ export function PaymentsContent() {
                       ) : (
                         <DollarSign className="h-4 w-4 mr-2" />
                       )}
-                      {status.stripeAccountStatus === 'not_created' 
-                        ? 'Set Up Payout Account' 
-                        : 'Complete Account Setup'}
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-amber-600">
-                      <AlertCircle />
-                      <span>No payout account set up</span>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      Set up a payout account to receive payments from clients directly to your bank account.
-                    </p>
-                    <Button 
-                      onClick={handleConnectStripeAccount}
-                      disabled={connectLoading}
-                      className="w-full"
-                    >
-                      {connectLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <DollarSign className="h-4 w-4 mr-2" />
-                      )}
-                      Set Up Payout Account
+                      {getConnectButtonText()}
                     </Button>
                   </div>
                 )}

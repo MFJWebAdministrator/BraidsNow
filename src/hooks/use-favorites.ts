@@ -58,8 +58,9 @@ export function useFavorites() {
           description: `${stylist.businessName} has been removed from your favorites`
         });
       } else {
-        await addToFavorites(user.uid, stylist.id);
         setFavorites(prev => [...prev, { ...stylist, isFavorite: true }]);
+        await addToFavorites(user.uid, stylist.id);
+      
         toast({
           title: "Added to favorites",
           description: `${stylist.businessName} has been added to your favorites`

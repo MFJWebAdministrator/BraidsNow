@@ -31,6 +31,9 @@ import { LoginPage } from '@/pages/Login';
 import { StyleShowPage } from '@/pages/StyleShow';
 import { BookingPage } from '@/pages/Booking';
 import { ScrollToTop } from '@/components/ScrollToTop';
+import { PaymentSuccess } from '@/pages/Payment/PaymentSuccess';
+import { PaymentCancel } from './pages/Payment/PaymentCancel';
+
 
 export function App() {
   return (
@@ -121,6 +124,8 @@ export function App() {
               <StyleBoardPage />
             </ProtectedRoute>
           } />
+          <Route path="/payment-success" element={<PaymentSuccess />} />
+          <Route path="/payment-cancel" element={<PaymentCancel />} />
         </Routes>
       </div>
     </Router>

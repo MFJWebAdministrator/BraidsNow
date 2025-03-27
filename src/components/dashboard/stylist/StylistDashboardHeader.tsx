@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useUserData } from '@/hooks/use-user-data';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { NotificationPopup } from '@/components/Header/NotificationPopup';
+import { BalanceDisplay } from '@/components/Header/BalanceDisplay';
 
 export function StylistDashboardHeader() {
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
@@ -43,11 +44,14 @@ export function StylistDashboardHeader() {
           >
             <LogOut className="h-5 w-5 text-[#3F0052]" />
           </Button>
-
-          <Avatar className="h-10 w-10 border-2 border-[#3F0052]">
-            <AvatarImage src={userData.profileImage} alt={userData.firstName} />
-            <AvatarFallback>{userData.firstName[0]}</AvatarFallback>
-          </Avatar>
+          <div className="flex items-center gap-2">
+            
+            <BalanceDisplay  />
+            <Avatar className="h-10 w-10 border-2 border-[#3F0052]">
+              <AvatarImage src={userData.profileImage} alt={userData.firstName} />
+              <AvatarFallback>{userData.firstName[0]}</AvatarFallback>
+            </Avatar>
+          </div>
         </div>
       </div>
 

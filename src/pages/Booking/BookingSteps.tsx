@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ServiceSelection } from './steps/ServiceSelection';
 import { DateTimeSelection } from './steps/DateTimeSelection';
 import { ClientInformation } from './steps/ClientInformation';
 import { BookingConfirmation } from './steps/BookingConfirmation';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+
+import type { BookingForm } from '@/lib/schemas/booking';
 import type { ServiceSelection as ServiceSelectionType, DateTimeSelection as DateTimeSelectionType, ClientInformation as ClientInformationType } from '@/lib/schemas/booking';
+import { useStylist } from '@/hooks/use-stylist';
 
 interface BookingStepsProps {
   stylistId: string;
@@ -20,6 +24,25 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
     clientInfo: null as ClientInformationType | null,
   });
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
+  const { stylist, loading } = useStylist(stylistId);
+  
+  // Check for pre-selected service from location state
+  useEffect(() => {
+    if (location.state?.selectedService) {
+      setBookingData(prev => ({ 
+        ...prev, 
+        service: {
+          serviceId: location.state.selectedService.serviceId,
+          stylistId: location.state.selectedService.stylistId,
+          price: location.state.selectedService.price,
+          depositAmount: location.state.selectedService.depositAmount
+        } 
+      }));
+      setStep(2);
+    }
+  }, [location.state]);
 
   const handleServiceSelect = (service: ServiceSelectionType) => {
     setBookingData(prev => ({ ...prev, service }));
@@ -42,6 +65,40 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
     } else {
       navigate(`/stylist/${stylistId}`);
     }
+  };
+
+  // Prepare complete booking data for the confirmation step
+  const prepareBookingData = (): BookingForm | null => {
+    if (!bookingData.service || !bookingData.dateTime || !bookingData.clientInfo || !user || !stylist) {
+      return null;
+    }
+  
+    return {
+      // Service details
+      service: bookingData.service,
+      dateTime: bookingData.dateTime,
+      clientInfo: bookingData.clientInfo,
+      
+      // Additional required fields for API and database
+      stylistId: stylistId,
+      clientId: user.uid,
+      serviceName: bookingData.service.serviceId,
+      stylistName: `${stylist.firstName} ${stylist.lastName}`,
+      businessName: stylist.businessName || '',
+      date: bookingData.dateTime.date,
+      time: bookingData.dateTime.time,
+      clientName: `${bookingData.clientInfo.firstName} ${bookingData.clientInfo.lastName}`,
+      clientEmail: bookingData.clientInfo.email,
+      clientPhone: bookingData.clientInfo.phone,
+      notes: bookingData.clientInfo.specialRequests || '',
+      status: 'pending',
+      depositAmount: bookingData.service.depositAmount,
+      totalAmount: bookingData.service.price,
+      paymentStatus: 'pending',
+      // Additional metadata for tracking
+      bookingSource: 'website',
+      createdAt: new Date()
+    };
   };
 
   return (
@@ -116,11 +173,7 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
           )}
           {step === 4 && bookingData.service && bookingData.dateTime && bookingData.clientInfo && (
             <BookingConfirmation
-              booking={{
-                service: bookingData.service,
-                dateTime: bookingData.dateTime,
-                clientInfo: bookingData.clientInfo
-              }}
+              booking={prepareBookingData()!}
               onComplete={() => navigate(`/dashboard/client`)}
             />
           )}

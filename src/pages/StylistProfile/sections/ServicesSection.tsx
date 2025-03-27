@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Clock, Info, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/use-auth';
 import {
   Tooltip,
   TooltipContent,
@@ -10,6 +11,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import type { StylistService } from '@/lib/schemas/stylist-service';
+import { useToast } from '@/hooks/use-toast';
 
 interface ServicesSectionProps {
   services: StylistService[];
@@ -22,8 +24,26 @@ export function ServicesSection({ services, depositAmount, stylistId }: Services
   const displayedServices = showAll ? services : services.slice(0, 3);
   const hasMoreServices = services.length > 3;
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   const handleBookService = (service: StylistService) => {
+    // Check if user is logged in
+    if (!user) {
+      navigate('/login', { 
+        state: { 
+          from: `/book/${stylistId}`,
+          selectedService: {
+            serviceId: service.name,
+            stylistId,
+            price: service.price,
+            depositAmount
+          }
+        } 
+      });
+      return;
+    }
+    
     // Navigate to booking page with service pre-selected
     navigate(`/book/${stylistId}`, {
       state: {
@@ -34,6 +54,13 @@ export function ServicesSection({ services, depositAmount, stylistId }: Services
           depositAmount
         }
       }
+    });
+    
+    // Show confirmation toast
+    toast({
+      title: "Service Selected",
+      description: `You've selected ${service.name}. Complete your booking details.`,
+      variant: "default"
     });
   };
 

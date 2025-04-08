@@ -99,8 +99,8 @@ export function BookingConfirmation({ booking, onComplete }: BookingConfirmation
         
         // Get the current URL for success/cancel redirects
         const origin = window.location.origin;
-        const successUrl = `${origin}/booking-success`;
-        const cancelUrl = `${origin}/booking-cancel`;
+        const successUrl = `${origin}/payment-success`;
+        const cancelUrl = `${origin}/payment-failed`;
         
         // Call the API to create a payment checkout session with booking data
         try {

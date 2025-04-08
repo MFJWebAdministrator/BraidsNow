@@ -17,16 +17,20 @@ export function ClientInformation({ service, dateTime, onSubmit }: ClientInforma
   const { userData } = useUserData(user?.uid);
   const [paymentType, setPaymentType] = useState<'deposit' | 'full'>('deposit');
 
+  // In handleSubmit function
   const handleSubmit = () => {
     if (!userData) return;
-
+  
+    const paymentAmount = paymentType === 'deposit' ? service.depositAmount : service.price;
+  
     onSubmit({
       firstName: userData.firstName,
       lastName: userData.lastName,
       email: userData.email,
       phone: userData.phone,
       specialRequests: '',
-      paymentType
+      paymentType,
+      paymentAmount // Add this
     });
   };
 

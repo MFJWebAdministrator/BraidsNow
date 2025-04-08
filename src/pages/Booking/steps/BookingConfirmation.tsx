@@ -22,13 +22,14 @@ export function BookingConfirmation({ booking, onComplete }: BookingConfirmation
   const { user } = useAuth();
   const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-  // Calculate the deposit amount (in cents for Stripe)
-  const depositAmount = booking.depositAmount ? booking.depositAmount * 100 : 0;
-  const isDepositRequired = depositAmount > 0;
-  
+  // Calculate payment amount based on payment type (in cents for Stripe)
+  const paymentAmount = booking.paymentType === 'deposit' 
+    ? (booking.depositAmount * 100) 
+    : (booking.totalAmount * 100);
+  const isPaymentRequired = paymentAmount > 0;
+
   const handleConfirm = async () => {
     try {
-      // Reset error state
       setErrorMessage(null);
       setIsProcessing(true);
       
@@ -37,28 +38,27 @@ export function BookingConfirmation({ booking, onComplete }: BookingConfirmation
         throw new Error("Missing required booking information");
       }
       
-      // Check if user is authenticated
       if (!user || !user.uid) {
         throw new Error("You must be logged in to complete this booking");
       }
       
-      // Format date for API
       const formattedDate = booking.date instanceof Date 
         ? format(booking.date, 'yyyy-MM-dd')
         : typeof booking.date === 'string' ? booking.date : format(new Date(booking.date), 'yyyy-MM-dd');
       
-      // Prepare complete booking details
       const completeBookingData = {
         ...booking,
         date: formattedDate,
         clientId: user.uid,
         status: 'pending',
-        paymentStatus: isDepositRequired ? 'pending' : 'not_required',
+        paymentStatus: isPaymentRequired ? 'pending' : 'not_required',
+        paymentAmount: paymentAmount / 100, // Store in dollars
+        paymentType: booking.paymentType,
         createdAt: new Date().toISOString()
       };
       
-      // If no deposit required, create booking directly
-      if (!isDepositRequired) {
+      if (!isPaymentRequired) {
+        // Handle free booking
         try {
           // Get fresh ID token
           const idToken = await user.getIdToken(true);
@@ -90,64 +90,39 @@ export function BookingConfirmation({ booking, onComplete }: BookingConfirmation
           throw apiError;
         }
       } else {
-        // If deposit is required, process payment with booking data
-        // Get fresh ID token
         const idToken = await user.getIdToken(true);
         if (!idToken) {
           throw new Error("Authentication error. Please log in again.");
         }
         
-        // Get the current URL for success/cancel redirects
         const origin = window.location.origin;
         const successUrl = `${origin}/payment-success`;
         const cancelUrl = `${origin}/payment-failed`;
         
-        // Call the API to create a payment checkout session with booking data
-        try {
-          const response = await axios.post(
-            `${API_BASE_URL}/create-payment-to-stylist`,
-            {
-              userId: user.uid,
-              stylistId: booking.stylistId,
-              amount: depositAmount,
-              serviceDescription: `Deposit for ${booking.serviceName} with ${booking.stylistName}`,
-              successUrl,
-              cancelUrl,
-              bookingData: completeBookingData // Send complete booking data instead of bookingId
+        const response = await axios.post(
+          `${API_BASE_URL}/create-payment-to-stylist`,
+          {
+            userId: user.uid,
+            stylistId: booking.stylistId,
+            amount: paymentAmount,
+            serviceDescription: `${booking.paymentType === 'deposit' ? 'Deposit' : 'Full payment'} for ${booking.serviceName} with ${booking.stylistName}`,
+            successUrl,
+            cancelUrl,
+            bookingData: completeBookingData
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
             },
-            {
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idToken}`
-              },
-              timeout: 10000
-            }
-          );
-          
-          // Redirect to Stripe Checkout
-          if (response.data?.url) {
-            window.location.href = response.data.url;
-          } else {
-            throw new Error("Payment session creation failed - no URL returned");
+            timeout: 10000
           }
-        } catch (apiError: any) {
-          console.error('API error details:', apiError);
-          
-          // Handle specific API errors
-          if (axios.isAxiosError(apiError)) {
-            if (apiError.response?.status === 403) {
-              throw new Error("Permission denied. You don't have access to complete this action.");
-            } else if (apiError.response?.status === 401) {
-              throw new Error("Authentication error. Please log in again.");
-            } else if (apiError.response?.data?.error) {
-              throw new Error(apiError.response.data.error);
-            } else if (apiError.code === 'ECONNABORTED') {
-              throw new Error("Request timed out. Please try again.");
-            }
-          }
-          
-          // If we got here, it's an unhandled error
-          throw apiError;
+        );
+        
+        if (response.data?.url) {
+          window.location.href = response.data.url;
+        } else {
+          throw new Error("Payment session creation failed - no URL returned");
         }
       }
     } catch (error) {
@@ -226,21 +201,13 @@ export function BookingConfirmation({ booking, onComplete }: BookingConfirmation
 
         <div>
           <h3 className="font-medium mb-2">Payment Details</h3>
-          <p>Total Price: ${booking.totalAmount || booking.service.price}</p>
-          {isDepositRequired && (
-            <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
-              <div className="flex items-start">
-                <AlertCircle className="h-5 w-5 mr-2 text-amber-600 flex-shrink-0" />
-                <div>
-                  <p className="text-amber-800 font-medium">
-                    A deposit of ${booking.depositAmount} is required to secure this booking.
-                  </p>
-                  <p className="text-sm text-amber-700 mt-1">
-                    You'll be redirected to our secure payment page after confirming.
-                  </p>
-                </div>
-              </div>
-            </div>
+          <p>Total Service Price: ${booking.totalAmount}</p>
+          <p>Payment Type: {booking.paymentType === 'deposit' ? 'Deposit' : 'Full Payment'}</p>
+          <p>Amount Due Now: ${booking.paymentType === 'deposit' ? booking.depositAmount : booking.totalAmount}</p>
+          {booking.paymentType === 'deposit' && (
+            <p className="text-sm text-gray-600">
+              Remaining Balance: ${booking.totalAmount - booking.depositAmount}
+            </p>
           )}
         </div>
       </Card>
@@ -264,7 +231,7 @@ export function BookingConfirmation({ booking, onComplete }: BookingConfirmation
               Processing...
             </>
           ) : (
-            isDepositRequired ? "Confirm & Pay Deposit" : "Confirm Booking"
+            isPaymentRequired ? `Confirm & Pay ${booking.paymentType === 'deposit' ? 'Deposit' : 'Full Amount'}` : "Confirm Booking"
           )}
         </Button>
       </div>

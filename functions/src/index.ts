@@ -480,6 +480,7 @@ async function updateStylistBalance(
     throw error;
   }
 }
+
 app.post(
   '/create-payment-to-stylist',
   validateFirebaseIdToken,
@@ -491,225 +492,24 @@ app.post(
       const { 
         userId, 
         stylistId, 
-        amount, 
-        serviceDescription, 
-        successUrl, 
-        cancelUrl,
-        bookingId,
-        bookingDetails
-      } = req.body;
-
-      if (!userId || !stylistId || !amount || !serviceDescription) {
-        return res.status(400).json({ error: 'Missing required parameters' });
-      }
-
-      // Verify that the authenticated user is requesting their own data
-      if (userId !== req.user?.uid) {
-        return res.status(403).json({ error: 'Unauthorized access to user data' });
-      }
-
-      // Get the stylist document to check if they have an active Connect account
-      const stylistRef = db.collection('stylists').doc(stylistId);
-      const stylistDoc = await stylistRef.get();
-
-      if (!stylistDoc.exists) {
-        return res.status(404).json({ error: 'Stylist not found' });
-      }
-
-      const stylistData = stylistDoc.data();
-
-      // Check if stylist has an active Stripe Connect account
-      if (
-        !stylistData?.stripeAccountId ||
-        stylistData.stripeAccountStatus !== 'active'
-      ) {
-        return res.status(400).json({
-          error: 'Stylist does not have an active payment account',
-        });
-      }
-
-      // Get or create customer for the client
-      const clientRef = db.collection('clients').doc(userId);
-      const clientDoc = await clientRef.get();
-      const clientData = clientDoc.data();
-
-      let stripeCustomerId: string;
-
-      // Get user email from Firebase Auth
-      const userRecord = await admin.auth().getUser(userId);
-      const email = userRecord.email;
-
-      if (!email) {
-        return res.status(400).json({ error: 'User email not found' });
-      }
-
-      if (!clientDoc.exists || !clientData?.stripeCustomerId) {
-        // Create a new customer in Stripe
-        const customer = await stripe.customers.create({
-          email,
-          metadata: { userId },
-        });
-
-        // Update or create the client document
-        await clientRef.set(
-          {
-            email,
-            stripeCustomerId: customer.id,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-
-        stripeCustomerId = customer.id;
-      } else {
-        stripeCustomerId = clientData.stripeCustomerId as string;
-      }
-
-      // Calculate application fee (platform takes 10%)
-      const applicationFeeAmount = Math.round(amount * 0.1);
-
-      // Prepare metadata with booking information
-      const metadata: Record<string, string> = {
-        userId,
-        stylistId,
-        serviceDescription
-      };
-      
-      // Add booking details to metadata if available
-      if (bookingId) {
-        metadata.bookingId = bookingId;
-      }
-      
-      if (bookingDetails) {
-        // Add flattened booking details to metadata
-        // Note: Stripe metadata values must be strings and keys must be <= 40 characters
-        metadata.bookingDate = bookingDetails.date;
-        metadata.bookingTime = bookingDetails.time;
-        metadata.serviceName = bookingDetails.serviceName;
-        metadata.clientName = bookingDetails.clientName;
-        metadata.clientEmail = bookingDetails.clientEmail;
-        metadata.clientPhone = bookingDetails.clientPhone;
-        
-        if (bookingDetails.notes) {
-          // Truncate notes if too long for metadata
-          metadata.notes = bookingDetails.notes.substring(0, 500);
-        }
-        
-        if (bookingDetails.totalAmount) {
-          metadata.totalAmount = bookingDetails.totalAmount.toString();
-        }
-        
-        if (bookingDetails.depositAmount) {
-          metadata.depositAmount = bookingDetails.depositAmount.toString();
-        }
-      }
-
-      // Create a checkout session for the payment
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        mode: 'payment',
-        customer: stripeCustomerId,
-        payment_intent_data: {
-          application_fee_amount: applicationFeeAmount,
-          transfer_data: {
-            destination: stylistData.stripeAccountId as string,
-          },
-          metadata
-        },
-        line_items: [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: serviceDescription,
-                metadata
-              },
-              unit_amount: amount,
-            },
-            quantity: 1,
-          },
-        ],
-        success_url:
-          successUrl ||
-          `${req.headers.origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url:
-          cancelUrl ||
-          `${req.headers.origin}/payment-canceled?booking_id=${bookingId}`,
-        metadata
-      });
-
-      // Create a record of the payment in Firestore
-      const paymentRef = await db.collection('payments').add({
-        clientId: userId,
-        stylistId,
         amount,
-        applicationFeeAmount,
-        serviceDescription,
-        status: 'pending',
-        stripeSessionId: session.id,
-        stripePaymentIntentId: session.payment_intent,
-        bookingId: bookingId || null,
-        bookingDetails: bookingDetails || null,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      // If we have a booking ID, update the booking with payment information
-      if (bookingId) {
-        await db.collection('bookings').doc(bookingId).update({
-          paymentStatus: 'pending',
-          paymentId: paymentRef.id,
-          stripeSessionId: session.id,
-          depositAmount: amount / 100, // Store in dollars in the booking
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          // Add additional tracking information
-          paymentCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          paymentMetadata: metadata
-        });
-      }
-
-      return res.status(200).json({ 
-        sessionId: session.id,
-        url: session.url,
-        paymentId: paymentRef.id
-      });
-    } catch (error) {
-      console.error('Error creating payment to stylist:', error);
-      return res.status(500).json({
-        error:
-          error instanceof Error ? error.message : 'Unknown error occurred',
-      });
-    }
-  }
-);
-
-app.post(
-  '/create-payment-to-stylist',
-  validateFirebaseIdToken,
-  async (
-    req: RequestWithRawBody & { body: PaymentToStylistRequest, user?: admin.auth.DecodedIdToken },
-    res: Response
-  ) => {
-    try {
-      const { 
-        userId, 
-        stylistId, 
-        amount, 
         serviceDescription, 
         successUrl, 
         cancelUrl,
-        bookingData // Changed from bookingId and bookingDetails
+        bookingData
       } = req.body;
 
-      if (!userId || !stylistId || !amount || !serviceDescription) {
+      // Validate required fields
+      if (!userId || !stylistId || !amount || !serviceDescription || !bookingData) {
         return res.status(400).json({ error: 'Missing required parameters' });
       }
 
-      // Verify that the authenticated user is requesting their own data
+      // Verify authenticated user
       if (userId !== req.user?.uid) {
         return res.status(403).json({ error: 'Unauthorized access to user data' });
       }
 
-      // Get the stylist document to check if they have an active Connect account
+      // Get stylist data
       const stylistRef = db.collection('stylists').doc(stylistId);
       const stylistDoc = await stylistRef.get();
 
@@ -719,24 +519,14 @@ app.post(
 
       const stylistData = stylistDoc.data();
 
-      // Check if stylist has an active Stripe Connect account
-      if (
-        !stylistData?.stripeAccountId ||
-        stylistData.stripeAccountStatus !== 'active'
-      ) {
+      // Verify stylist's Stripe account
+      if (!stylistData?.stripeAccountId || stylistData.stripeAccountStatus !== 'active') {
         return res.status(400).json({
           error: 'Stylist does not have an active payment account',
         });
       }
 
-      // Get or create customer for the client
-      const clientRef = db.collection('clients').doc(userId);
-      const clientDoc = await clientRef.get();
-      const clientData = clientDoc.data();
-
-      let stripeCustomerId: string;
-
-      // Get user email from Firebase Auth
+      // Get user email and handle customer creation
       const userRecord = await admin.auth().getUser(userId);
       const email = userRecord.email;
 
@@ -744,120 +534,93 @@ app.post(
         return res.status(400).json({ error: 'User email not found' });
       }
 
+      // Get or create Stripe customer
+      const clientRef = db.collection('clients').doc(userId);
+      const clientDoc = await clientRef.get();
+      const clientData = clientDoc.data();
+
+      let stripeCustomerId: string;
+
       if (!clientDoc.exists || !clientData?.stripeCustomerId) {
-        // Create a new customer in Stripe
         const customer = await stripe.customers.create({
           email,
-          metadata: { userId },
+          metadata: { userId }
         });
 
-        // Update or create the client document
-        await clientRef.set(
-          {
-            email,
-            stripeCustomerId: customer.id,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
+        await clientRef.set({
+          email,
+          stripeCustomerId: customer.id,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
 
         stripeCustomerId = customer.id;
       } else {
-        stripeCustomerId = clientData.stripeCustomerId as string;
+        stripeCustomerId = clientData.stripeCustomerId;
       }
 
-      // Calculate application fee (platform takes 10%)
-      const applicationFeeAmount = Math.round(amount * 0.1);
-
-      // Generate a unique ID for the booking that will be created after payment
+      // Generate booking ID and prepare metadata
       const pendingBookingId = db.collection('bookings').doc().id;
 
-      // Prepare metadata with booking information
       const metadata: Record<string, string> = {
         userId,
         stylistId,
         serviceDescription,
-        pendingBookingId // Store the ID that will be used for the booking
+        pendingBookingId,
+        paymentType: bookingData.paymentType,
+        totalAmount: bookingData.totalAmount.toString(),
+        depositAmount: bookingData.depositAmount?.toString() || '0'
       };
-      
-      // Add booking details to metadata if available
-      if (bookingData) {
-        // Add flattened booking details to metadata
-        // Note: Stripe metadata values must be strings and keys must be <= 40 characters
-        metadata.bookingDate = bookingData.date;
-        metadata.bookingTime = bookingData.time;
-        metadata.serviceName = bookingData.serviceName;
-        metadata.clientName = bookingData.clientName;
-        metadata.clientEmail = bookingData.clientEmail;
-        metadata.clientPhone = bookingData.clientPhone;
-        
-        if (bookingData.notes) {
-          // Truncate notes if too long for metadata
-          metadata.notes = bookingData.notes.substring(0, 500);
-        }
-        
-        if (bookingData.totalAmount) {
-          metadata.totalAmount = bookingData.totalAmount.toString();
-        }
-        
-        if (bookingData.depositAmount) {
-          metadata.depositAmount = bookingData.depositAmount.toString();
-        }
-      }
 
-      // Store the booking data in a temporary collection
+      // Store pending booking
       await db.collection('pendingBookings').doc(pendingBookingId).set({
         bookingData,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 3600000) // 1 hour expiry
+        expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 3600000)
       });
 
-      // Create a checkout session for the payment
+      // Create Stripe checkout session
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         mode: 'payment',
         customer: stripeCustomerId,
         payment_intent_data: {
-          application_fee_amount: applicationFeeAmount,
           transfer_data: {
-            destination: stylistData.stripeAccountId as string,
+            destination: stylistData.stripeAccountId,
           },
           metadata
         },
-        line_items: [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: serviceDescription,
-                metadata
-              },
-              unit_amount: amount,
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `${bookingData.paymentType === 'deposit' ? 'Deposit for' : 'Full payment for'} ${serviceDescription}`,
+              metadata
             },
-            quantity: 1,
+            unit_amount: amount,
           },
-        ],
-        success_url:
-          successUrl ? `${successUrl}?session_id={CHECKOUT_SESSION_ID}&booking_id=${pendingBookingId}` :
-          `${req.headers.origin}/payment-success?session_id={CHECKOUT_SESSION_ID}&booking_id=${pendingBookingId}`,
-        cancel_url:
-          cancelUrl ? `${cancelUrl}?booking_id=${pendingBookingId}` :
-          `${req.headers.origin}/payment-canceled?booking_id=${pendingBookingId}`,
+          quantity: 1,
+        }],
+        success_url: successUrl 
+          ? `${successUrl}?session_id={CHECKOUT_SESSION_ID}&booking_id=${pendingBookingId}`
+          : `${req.headers.origin}/payment-success?session_id={CHECKOUT_SESSION_ID}&booking_id=${pendingBookingId}`,
+        cancel_url: cancelUrl
+          ? `${cancelUrl}?booking_id=${pendingBookingId}`
+          : `${req.headers.origin}/payment-canceled?booking_id=${pendingBookingId}`,
         metadata
       });
 
-      // Create a record of the payment in Firestore
+      // Create payment record
       const paymentRef = await db.collection('payments').add({
         clientId: userId,
         stylistId,
         amount,
-        applicationFeeAmount,
         serviceDescription,
         status: 'pending',
         stripeSessionId: session.id,
         stripePaymentIntentId: session.payment_intent,
         pendingBookingId,
         bookingData,
+        paymentType: bookingData.paymentType,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -867,11 +630,11 @@ app.post(
         paymentId: paymentRef.id,
         pendingBookingId
       });
+
     } catch (error) {
       console.error('Error creating payment to stylist:', error);
       return res.status(500).json({
-        error:
-          error instanceof Error ? error.message : 'Unknown error occurred',
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
       });
     }
   }

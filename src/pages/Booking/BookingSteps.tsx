@@ -73,6 +73,10 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
       return null;
     }
   
+    const paymentAmount = bookingData.clientInfo.paymentType === 'deposit' 
+      ? bookingData.service.depositAmount 
+      : bookingData.service.price;
+  
     return {
       // Service details
       service: bookingData.service,
@@ -92,6 +96,8 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
       clientPhone: bookingData.clientInfo.phone,
       notes: bookingData.clientInfo.specialRequests || '',
       status: 'pending',
+      paymentType: bookingData.clientInfo.paymentType,
+      paymentAmount: paymentAmount,
       depositAmount: bookingData.service.depositAmount,
       totalAmount: bookingData.service.price,
       paymentStatus: 'pending',
@@ -100,6 +106,9 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
       createdAt: new Date()
     };
   };
+
+
+  console.log(bookingData,"Password123")
 
   return (
     <div className="bg-white rounded-2xl shadow-lg p-8 relative overflow-hidden">

@@ -419,7 +419,12 @@ interface PaymentToStylistRequest {
 }
 
 // Helper function to update stylist balance
-async function updateStylistBalance(stylistId: string, amountChange: number, description: string = 'Payment received') {
+async function updateStylistBalance(
+  stylistId: string,
+  amountInCents: number,
+  description: string = 'Payment received',
+  platformFeePercent: number = 2.9 + 0.30 // Stripe's standard fee of 2.9% + $0.30
+) {
   try {
     const stylistRef = db.collection('stylists').doc(stylistId);
     let newBalance = 0;
@@ -429,39 +434,51 @@ async function updateStylistBalance(stylistId: string, amountChange: number, des
 
       if (stylistDoc.exists) {
         const stylistData = stylistDoc.data();
-        const currentBalance = stylistData?.balance || 0;
-        newBalance = currentBalance + amountChange;
+        // Convert current balance to cents for calculation
+        const currentBalanceInCents = (stylistData?.balance || 0) * 100;
+        
+        // Calculate platform fee
+        const platformFeeAmount = Math.round(amountInCents * (platformFeePercent / 100));
+        // Calculate net amount after fee
+        const netAmountInCents = amountInCents - platformFeeAmount;
+        
+        // Calculate new balance in cents
+        const newBalanceInCents = currentBalanceInCents + netAmountInCents;
 
         // Prevent negative balance for withdrawals
-        if (amountChange < 0 && newBalance < 0) {
+        if (amountInCents < 0 && newBalanceInCents < 0) {
           throw new Error('Insufficient balance for withdrawal');
         }
+
+        // Convert back to dollars for storage
+        newBalance = newBalanceInCents / 100;
 
         const updateData: any = {
           balance: newBalance,
           balanceUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
         };
 
-        // If this is the first balance update, set the creation timestamp
         if (!stylistData?.balanceCreatedAt) {
           updateData.balanceCreatedAt = admin.firestore.FieldValue.serverTimestamp();
         }
 
         transaction.update(stylistRef, updateData);
 
-        console.log(`Updated balance for stylist ${stylistId}: ${currentBalance} -> ${newBalance}`);
+        console.log(`Updated balance for stylist ${stylistId}: ${currentBalanceInCents / 100} -> ${newBalance}`);
       } else {
         console.error(`Stylist ${stylistId} not found when updating balance`);
         throw new Error('Stylist not found');
       }
     });
 
-    // Add a balance history record
+    // Add a balance history record with fee information
     await stylistRef.collection('balanceHistory').add({
-      amount: amountChange,
+      amount: amountInCents / 100, // Original amount in dollars
+      platformFee: (amountInCents * (platformFeePercent / 100)) / 100, // Fee in dollars
+      netAmount: (amountInCents - (amountInCents * (platformFeePercent / 100))) / 100, // Net amount in dollars
       balanceAfter: newBalance,
-      type: amountChange > 0 ? 'credit' : 'debit',
-      description: description,
+      type: amountInCents > 0 ? 'credit' : 'debit',
+      description,
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
@@ -471,64 +488,6 @@ async function updateStylistBalance(stylistId: string, amountChange: number, des
     throw error;
   }
 }
-
-
-
-// Helper function to update stylist balance
-async function updateStylistBalance(stylistId: string, amountChange: number) {
-  try {
-    const stylistRef = db.collection('stylists').doc(stylistId);
-
-    await db.runTransaction(async (transaction) => {
-      const stylistDoc = await transaction.get(stylistRef);
-
-      if (stylistDoc.exists) {
-        const stylistData = stylistDoc.data();
-        const currentBalance = stylistData?.balance || 0;
-        const newBalance = currentBalance + amountChange;
-
-        const updateData: any = {
-          balance: newBalance,
-          balanceUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
-        };
-
-        // If this is the first balance update, set the creation timestamp
-        if (!stylistData?.balanceCreatedAt) {
-          updateData.balanceCreatedAt = admin.firestore.FieldValue.serverTimestamp();
-        }
-
-        transaction.update(stylistRef, updateData);
-
-        console.log(`Updated balance for stylist ${stylistId}: ${currentBalance} -> ${newBalance}`);
-      } else {
-        console.error(`Stylist ${stylistId} not found when updating balance`);
-      }
-    });
-
-    // Add a balance history record
-    await stylistRef.collection('balanceHistory').add({
-      amount: amountChange,
-      balanceAfter: admin.firestore.FieldValue.serverTimestamp(), // This will be updated in the next step
-      type: amountChange > 0 ? 'credit' : 'debit',
-      description: amountChange > 0 ? 'Payment received' : 'Transfer to bank account',
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    }).then(async (docRef) => {
-      // Get the current balance to update the balanceAfter field
-      const stylistDoc = await stylistRef.get();
-      if (stylistDoc.exists) {
-        const currentBalance = stylistDoc.data()?.balance || 0;
-        await docRef.update({
-          balanceAfter: currentBalance
-        });
-      }
-    });
-
-  } catch (error) {
-    console.error('Error updating stylist balance:', error);
-    throw error;
-  }
-}
-
 app.post(
   '/create-payment-to-stylist',
   validateFirebaseIdToken,
@@ -1085,7 +1044,8 @@ app.post('/webhook', async (req: RequestWithRawBody, res: Response) => {
                 await updateStylistBalance(
                   stylistId,
                   netAmount,
-                  `Deposit payment for booking #${pendingBookingId.substring(0, 8)} - ${bookingData.serviceName}`
+                  `Deposit payment for booking #${pendingBookingId.substring(0, 8)} - ${bookingData.serviceName}`,
+                  
                 );
                 
                 // Update stylist's earnings statistics

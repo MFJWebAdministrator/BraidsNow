@@ -87,7 +87,9 @@ export function StylistCard({ stylist, onToggleFavorite, onViewProfile }: Stylis
   const handleProceedToPayment = async () => {
     setIsLoading(true);
     setPaymentError(null); // Clear previous errors
-    
+    console.log(amount)
+
+    return
     try {
       // Get fresh ID token
       const idToken = await auth.currentUser?.getIdToken(true);

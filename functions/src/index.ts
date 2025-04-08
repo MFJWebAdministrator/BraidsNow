@@ -422,8 +422,7 @@ interface PaymentToStylistRequest {
 async function updateStylistBalance(
   stylistId: string,
   amountInCents: number,
-  description: string = 'Payment received',
-  platformFeePercent: number = 2.9 + 0.30 // Stripe's standard fee of 2.9% + $0.30
+  description: string = 'Payment received'
 ) {
   try {
     const stylistRef = db.collection('stylists').doc(stylistId);
@@ -437,13 +436,8 @@ async function updateStylistBalance(
         // Convert current balance to cents for calculation
         const currentBalanceInCents = (stylistData?.balance || 0) * 100;
         
-        // Calculate platform fee
-        const platformFeeAmount = Math.round(amountInCents * (platformFeePercent / 100));
-        // Calculate net amount after fee
-        const netAmountInCents = amountInCents - platformFeeAmount;
-        
         // Calculate new balance in cents
-        const newBalanceInCents = currentBalanceInCents + netAmountInCents;
+        const newBalanceInCents = currentBalanceInCents + amountInCents;
 
         // Prevent negative balance for withdrawals
         if (amountInCents < 0 && newBalanceInCents < 0) {
@@ -471,11 +465,9 @@ async function updateStylistBalance(
       }
     });
 
-    // Add a balance history record with fee information
+    // Add a balance history record
     await stylistRef.collection('balanceHistory').add({
       amount: amountInCents / 100, // Original amount in dollars
-      platformFee: (amountInCents * (platformFeePercent / 100)) / 100, // Fee in dollars
-      netAmount: (amountInCents - (amountInCents * (platformFeePercent / 100))) / 100, // Net amount in dollars
       balanceAfter: newBalance,
       type: amountInCents > 0 ? 'credit' : 'debit',
       description,

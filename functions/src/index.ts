@@ -418,7 +418,8 @@ interface PaymentToStylistRequest {
   cancelUrl?: string;
 }
 
-async function updateStylistBalance(stylistId: string, amountInCents: number, description: string = 'Payment received') {
+// Helper function to update stylist balance
+async function updateStylistBalance(stylistId: string, amountChange: number, description: string = 'Payment received') {
   try {
     const stylistRef = db.collection('stylists').doc(stylistId);
     let newBalance = 0;
@@ -428,44 +429,39 @@ async function updateStylistBalance(stylistId: string, amountInCents: number, de
 
       if (stylistDoc.exists) {
         const stylistData = stylistDoc.data();
-        // Convert current balance from dollars to cents for calculation
-        const currentBalanceInCents = (stylistData?.balance || 0) * 100;
-        // Calculate new balance in cents
-        const newBalanceInCents = currentBalanceInCents + amountInCents;
+        const currentBalance = stylistData?.balance || 0;
+        newBalance = currentBalance + amountChange;
 
         // Prevent negative balance for withdrawals
-        if (amountInCents < 0 && newBalanceInCents < 0) {
+        if (amountChange < 0 && newBalance < 0) {
           throw new Error('Insufficient balance for withdrawal');
         }
-
-        // Convert back to dollars for storage
-        newBalance = newBalanceInCents / 100;
 
         const updateData: any = {
           balance: newBalance,
           balanceUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
         };
 
+        // If this is the first balance update, set the creation timestamp
         if (!stylistData?.balanceCreatedAt) {
           updateData.balanceCreatedAt = admin.firestore.FieldValue.serverTimestamp();
         }
 
         transaction.update(stylistRef, updateData);
 
-        console.log(`Updated balance for stylist ${stylistId}: ${currentBalanceInCents / 100} -> ${newBalance}`);
+        console.log(`Updated balance for stylist ${stylistId}: ${currentBalance} -> ${newBalance}`);
       } else {
         console.error(`Stylist ${stylistId} not found when updating balance`);
         throw new Error('Stylist not found');
       }
     });
 
-    // Add a balance history record (store amount in dollars)
+    // Add a balance history record
     await stylistRef.collection('balanceHistory').add({
-      amount: amountInCents / 100,
+      amount: amountChange,
       balanceAfter: newBalance,
-      type: amountInCents > 0 ? 'credit' : 'debit',
-      description,
-      amountInCents, // Store original amount in cents for reference
+      type: amountChange > 0 ? 'credit' : 'debit',
+      description: description,
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
@@ -476,6 +472,62 @@ async function updateStylistBalance(stylistId: string, amountInCents: number, de
   }
 }
 
+
+
+// Helper function to update stylist balance
+async function updateStylistBalance(stylistId: string, amountChange: number) {
+  try {
+    const stylistRef = db.collection('stylists').doc(stylistId);
+
+    await db.runTransaction(async (transaction) => {
+      const stylistDoc = await transaction.get(stylistRef);
+
+      if (stylistDoc.exists) {
+        const stylistData = stylistDoc.data();
+        const currentBalance = stylistData?.balance || 0;
+        const newBalance = currentBalance + amountChange;
+
+        const updateData: any = {
+          balance: newBalance,
+          balanceUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+
+        // If this is the first balance update, set the creation timestamp
+        if (!stylistData?.balanceCreatedAt) {
+          updateData.balanceCreatedAt = admin.firestore.FieldValue.serverTimestamp();
+        }
+
+        transaction.update(stylistRef, updateData);
+
+        console.log(`Updated balance for stylist ${stylistId}: ${currentBalance} -> ${newBalance}`);
+      } else {
+        console.error(`Stylist ${stylistId} not found when updating balance`);
+      }
+    });
+
+    // Add a balance history record
+    await stylistRef.collection('balanceHistory').add({
+      amount: amountChange,
+      balanceAfter: admin.firestore.FieldValue.serverTimestamp(), // This will be updated in the next step
+      type: amountChange > 0 ? 'credit' : 'debit',
+      description: amountChange > 0 ? 'Payment received' : 'Transfer to bank account',
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    }).then(async (docRef) => {
+      // Get the current balance to update the balanceAfter field
+      const stylistDoc = await stylistRef.get();
+      if (stylistDoc.exists) {
+        const currentBalance = stylistDoc.data()?.balance || 0;
+        await docRef.update({
+          balanceAfter: currentBalance
+        });
+      }
+    });
+
+  } catch (error) {
+    console.error('Error updating stylist balance:', error);
+    throw error;
+  }
+}
 
 app.post(
   '/create-payment-to-stylist',
@@ -638,9 +690,8 @@ app.post(
       // Create a record of the payment in Firestore
       const paymentRef = await db.collection('payments').add({
         clientId: userId,
-        userId: userId,
         stylistId,
-        amount:amount / 100,
+        amount,
         applicationFeeAmount,
         serviceDescription,
         status: 'pending',
@@ -680,6 +731,200 @@ app.post(
   }
 );
 
+app.post(
+  '/create-payment-to-stylist',
+  validateFirebaseIdToken,
+  async (
+    req: RequestWithRawBody & { body: PaymentToStylistRequest, user?: admin.auth.DecodedIdToken },
+    res: Response
+  ) => {
+    try {
+      const { 
+        userId, 
+        stylistId, 
+        amount, 
+        serviceDescription, 
+        successUrl, 
+        cancelUrl,
+        bookingData // Changed from bookingId and bookingDetails
+      } = req.body;
+
+      if (!userId || !stylistId || !amount || !serviceDescription) {
+        return res.status(400).json({ error: 'Missing required parameters' });
+      }
+
+      // Verify that the authenticated user is requesting their own data
+      if (userId !== req.user?.uid) {
+        return res.status(403).json({ error: 'Unauthorized access to user data' });
+      }
+
+      // Get the stylist document to check if they have an active Connect account
+      const stylistRef = db.collection('stylists').doc(stylistId);
+      const stylistDoc = await stylistRef.get();
+
+      if (!stylistDoc.exists) {
+        return res.status(404).json({ error: 'Stylist not found' });
+      }
+
+      const stylistData = stylistDoc.data();
+
+      // Check if stylist has an active Stripe Connect account
+      if (
+        !stylistData?.stripeAccountId ||
+        stylistData.stripeAccountStatus !== 'active'
+      ) {
+        return res.status(400).json({
+          error: 'Stylist does not have an active payment account',
+        });
+      }
+
+      // Get or create customer for the client
+      const clientRef = db.collection('clients').doc(userId);
+      const clientDoc = await clientRef.get();
+      const clientData = clientDoc.data();
+
+      let stripeCustomerId: string;
+
+      // Get user email from Firebase Auth
+      const userRecord = await admin.auth().getUser(userId);
+      const email = userRecord.email;
+
+      if (!email) {
+        return res.status(400).json({ error: 'User email not found' });
+      }
+
+      if (!clientDoc.exists || !clientData?.stripeCustomerId) {
+        // Create a new customer in Stripe
+        const customer = await stripe.customers.create({
+          email,
+          metadata: { userId },
+        });
+
+        // Update or create the client document
+        await clientRef.set(
+          {
+            email,
+            stripeCustomerId: customer.id,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        stripeCustomerId = customer.id;
+      } else {
+        stripeCustomerId = clientData.stripeCustomerId as string;
+      }
+
+      // Calculate application fee (platform takes 10%)
+      const applicationFeeAmount = Math.round(amount * 0.1);
+
+      // Generate a unique ID for the booking that will be created after payment
+      const pendingBookingId = db.collection('bookings').doc().id;
+
+      // Prepare metadata with booking information
+      const metadata: Record<string, string> = {
+        userId,
+        stylistId,
+        serviceDescription,
+        pendingBookingId // Store the ID that will be used for the booking
+      };
+      
+      // Add booking details to metadata if available
+      if (bookingData) {
+        // Add flattened booking details to metadata
+        // Note: Stripe metadata values must be strings and keys must be <= 40 characters
+        metadata.bookingDate = bookingData.date;
+        metadata.bookingTime = bookingData.time;
+        metadata.serviceName = bookingData.serviceName;
+        metadata.clientName = bookingData.clientName;
+        metadata.clientEmail = bookingData.clientEmail;
+        metadata.clientPhone = bookingData.clientPhone;
+        
+        if (bookingData.notes) {
+          // Truncate notes if too long for metadata
+          metadata.notes = bookingData.notes.substring(0, 500);
+        }
+        
+        if (bookingData.totalAmount) {
+          metadata.totalAmount = bookingData.totalAmount.toString();
+        }
+        
+        if (bookingData.depositAmount) {
+          metadata.depositAmount = bookingData.depositAmount.toString();
+        }
+      }
+
+      // Store the booking data in a temporary collection
+      await db.collection('pendingBookings').doc(pendingBookingId).set({
+        bookingData,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 3600000) // 1 hour expiry
+      });
+
+      // Create a checkout session for the payment
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        mode: 'payment',
+        customer: stripeCustomerId,
+        payment_intent_data: {
+          application_fee_amount: applicationFeeAmount,
+          transfer_data: {
+            destination: stylistData.stripeAccountId as string,
+          },
+          metadata
+        },
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: serviceDescription,
+                metadata
+              },
+              unit_amount: amount,
+            },
+            quantity: 1,
+          },
+        ],
+        success_url:
+          successUrl ? `${successUrl}?session_id={CHECKOUT_SESSION_ID}&booking_id=${pendingBookingId}` :
+          `${req.headers.origin}/payment-success?session_id={CHECKOUT_SESSION_ID}&booking_id=${pendingBookingId}`,
+        cancel_url:
+          cancelUrl ? `${cancelUrl}?booking_id=${pendingBookingId}` :
+          `${req.headers.origin}/payment-canceled?booking_id=${pendingBookingId}`,
+        metadata
+      });
+
+      // Create a record of the payment in Firestore
+      const paymentRef = await db.collection('payments').add({
+        clientId: userId,
+        stylistId,
+        amount,
+        applicationFeeAmount,
+        serviceDescription,
+        status: 'pending',
+        stripeSessionId: session.id,
+        stripePaymentIntentId: session.payment_intent,
+        pendingBookingId,
+        bookingData,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return res.status(200).json({ 
+        sessionId: session.id,
+        url: session.url,
+        paymentId: paymentRef.id,
+        pendingBookingId
+      });
+    } catch (error) {
+      console.error('Error creating payment to stylist:', error);
+      return res.status(500).json({
+        error:
+          error instanceof Error ? error.message : 'Unknown error occurred',
+      });
+    }
+  }
+);
 
 // Add a new endpoint to create a booking without payment
 app.post(
@@ -736,7 +981,6 @@ app.post(
   }
 );
 
-
 // Add a webhook handler to create the booking when payment is successful
 app.post('/webhook', async (req: RequestWithRawBody, res: Response) => {
   const sig = req.headers['stripe-signature'] as string;
@@ -759,162 +1003,254 @@ app.post('/webhook', async (req: RequestWithRawBody, res: Response) => {
         const stylistId = session.metadata?.stylistId;
         const subscriptionId = session.subscription as string;
         const paymentIntentId = session.payment_intent as string;
-        const pendingBookingId = session.metadata?.pendingBookingId;
-      
-        if (pendingBookingId) {
+        
+        // Check if this is a booking-related payment
+        if (session.metadata?.pendingBookingId) {
+          const pendingBookingId = session.metadata.pendingBookingId;
+          
+          // Get the pending booking data
           const pendingBookingRef = db.collection('pendingBookings').doc(pendingBookingId);
           const pendingBookingDoc = await pendingBookingRef.get();
-      
+          
           if (pendingBookingDoc.exists) {
             const pendingBookingData = pendingBookingDoc.data();
             const bookingData = pendingBookingData?.bookingData;
-      
+            
             if (bookingData) {
-              // Create the confirmed booking
+              // Create the actual booking
               const bookingRef = db.collection('bookings').doc(pendingBookingId);
               await bookingRef.set({
                 ...bookingData,
                 status: 'confirmed',
                 paymentStatus: 'paid',
-                paymentId: paymentIntentId,
+                paymentId: session.payment_intent,
                 stripeSessionId: session.id,
                 depositAmount: session.amount_total ? session.amount_total / 100 : null,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 paymentCompletedAt: admin.firestore.FieldValue.serverTimestamp()
               });
-      
-              // Update payment record
+              
+              console.log(`Created booking ${pendingBookingId} after successful payment`);
+              
+              // Update the payment record
               const paymentsQuery = await db
                 .collection('payments')
                 .where('stripeSessionId', '==', session.id)
                 .get();
-      
+              
               if (!paymentsQuery.empty) {
                 await paymentsQuery.docs[0].ref.update({
                   status: 'completed',
                   bookingId: pendingBookingId,
-                  completedAt: admin.firestore.FieldValue.serverTimestamp()
+                  completedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  balanceUpdated: true
                 });
               }
-      
-              // Send notifications
-              await Promise.all([
-                // Notify stylist
-                db.collection('notifications').add({
-                  userId: stylistId,
-                  type: 'new_booking',
-                  title: 'New Booking with Deposit',
-                  message: `You have a new booking with deposit paid for ${bookingData.serviceName} on ${bookingData.date} at ${bookingData.time}`,
-                  read: false,
-                  createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                  data: {
-                    bookingId: pendingBookingId,
-                    amount: session.amount_total,
-                    serviceName: bookingData.serviceName
-                  }
-                }),
-                // Notify client
-                db.collection('notifications').add({
-                  userId: userId,
-                  type: 'booking_confirmed',
-                  title: 'Booking Confirmed',
-                  message: `Your booking for ${bookingData.serviceName} on ${bookingData.date} at ${bookingData.time} has been confirmed.`,
-                  read: false,
-                  createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                  data: {
-                    bookingId: pendingBookingId,
-                    serviceName: bookingData.serviceName,
-                    date: bookingData.date,
-                    time: bookingData.time
-                  }
-                })
-              ]);
-      
-              // Update stylist's balance and statistics
-              if (stylistId && session.amount_total) {
-                const platformFee = Math.round(session.amount_total * 0.1); // 10% platform fee
-                const stylistAmountInCents = session.amount_total - platformFee;
-      
-                // Update stylist's balance
+              
+              // Notify the stylist about the new booking
+              await db.collection('notifications').add({
+                userId: bookingData.stylistId,
+                type: 'new_booking',
+                title: 'New Booking with Deposit',
+                message: `You have a new booking with deposit paid for ${bookingData.serviceName} on ${bookingData.date} at ${bookingData.time}`,
+                read: false,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                data: {
+                  bookingId: pendingBookingId,
+                  amount: session.amount_total,
+                  serviceName: bookingData.serviceName
+                }
+              });
+              
+              // Notify the client about the successful booking
+              await db.collection('notifications').add({
+                userId: bookingData.clientId,
+                type: 'booking_confirmed',
+                title: 'Booking Confirmed',
+                message: `Your booking for ${bookingData.serviceName} on ${bookingData.date} at ${bookingData.time} has been confirmed.`,
+                read: false,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                data: {
+                  bookingId: pendingBookingId,
+                  serviceName: bookingData.serviceName,
+                  date: bookingData.date,
+                  time: bookingData.time
+                }
+              });
+              
+              // Update stylist's balance
+              if (stylistId) {
+                const netAmount = (session.amount_total || 0) - (session.amount_total ? Math.round(session.amount_total * 0.1) : 0);
                 await updateStylistBalance(
                   stylistId,
-                  stylistAmountInCents,
+                  netAmount,
                   `Deposit payment for booking #${pendingBookingId.substring(0, 8)} - ${bookingData.serviceName}`
                 );
-      
-                // Update stylist's statistics
+                
+                // Update stylist's earnings statistics
                 const stylistRef = db.collection('stylists').doc(stylistId);
                 await db.runTransaction(async (transaction) => {
                   const stylistDoc = await transaction.get(stylistRef);
                   if (stylistDoc.exists) {
                     const stylistData = stylistDoc.data();
-                    const amountInDollars = stylistAmountInCents / 100;
-      
+                    const currentEarnings = stylistData?.earnings || 0;
+                    const currentMonthlyEarnings = stylistData?.monthlyEarnings || 0;
+                    const currentPaymentCount = stylistData?.paymentCount || 0;
+                    const currentBookingCount = stylistData?.bookingCount || 0;
+
                     transaction.update(stylistRef, {
-                      earnings: (stylistData?.earnings || 0) + amountInDollars,
-                      monthlyEarnings: (stylistData?.monthlyEarnings || 0) + amountInDollars,
-                      paymentCount: (stylistData?.paymentCount || 0) + 1,
-                      bookingCount: (stylistData?.bookingCount || 0) + 1,
+                      earnings: currentEarnings + netAmount,
+                      monthlyEarnings: currentMonthlyEarnings + netAmount,
+                      paymentCount: currentPaymentCount + 1,
+                      bookingCount: currentBookingCount + 1,
                       lastPaymentAt: admin.firestore.FieldValue.serverTimestamp(),
                       lastBookingAt: admin.firestore.FieldValue.serverTimestamp()
                     });
                   }
                 });
-      
-                // Add to client's payment history
-                if (userId) {
-                  await db.collection('clients').doc(userId).collection('paymentHistory').add({
-                    paymentId: paymentIntentId,
-                    stylistId: stylistId,
-                    bookingId: pendingBookingId,
-                    amount: session.amount_total / 100, // Store in dollars
-                    description: `Deposit for ${bookingData.serviceName}`,
-                    status: 'completed',
-                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                    completedAt: admin.firestore.FieldValue.serverTimestamp()
-                  });
-      
-                  // Update client's booking count
-                  const clientRef = db.collection('clients').doc(userId);
-                  await db.runTransaction(async (transaction) => {
-                    const clientDoc = await transaction.get(clientRef);
-                    if (clientDoc.exists) {
-                      const clientData = clientDoc.data();
-                      transaction.update(clientRef, {
-                        bookingCount: (clientData?.bookingCount || 0) + 1,
-                        lastBookingAt: admin.firestore.FieldValue.serverTimestamp()
-                      });
-                    }
-                  });
-                }
               }
-      
-              // Clean up pending booking
+              
+              // Add payment to client's payment history
+              if (userId) {
+                await db.collection('clients').doc(userId).collection('paymentHistory').add({
+                  paymentId: session.payment_intent,
+                  stylistId: stylistId,
+                  bookingId: pendingBookingId,
+                  amount: session.amount_total,
+                  description: `Deposit for ${bookingData.serviceName}`,
+                  status: 'completed',
+                  createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                  completedAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // Update client's booking count
+                const clientRef = db.collection('clients').doc(userId);
+                await db.runTransaction(async (transaction) => {
+                  const clientDoc = await transaction.get(clientRef);
+                  if (clientDoc.exists) {
+                    const clientData = clientDoc.data();
+                    const currentBookingCount = clientData?.bookingCount || 0;
+                    
+                    transaction.update(clientRef, {
+                      bookingCount: currentBookingCount + 1,
+                      lastBookingAt: admin.firestore.FieldValue.serverTimestamp()
+                    });
+                  }
+                });
+              }
+              
+              // Clean up the pending booking
               await pendingBookingRef.delete();
             }
           }
         }
-      
+
+        console.log(`Checkout session completed: ${session.id}`);
+
         // Handle subscription checkout
         if (userId && subscriptionId) {
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-          await db.collection('stylists').doc(userId).update({
-            subscription: {
-              id: subscription.id,
-              status: subscription.status,
-              currentPeriodStart: admin.firestore.Timestamp.fromMillis(
-                subscription.current_period_start * 1000
-              ),
-              currentPeriodEnd: admin.firestore.Timestamp.fromMillis(
-                subscription.current_period_end * 1000
-              ),
-              priceId: subscription.items.data[0].price.id,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            },
-          });
+          // Get subscription details
+          const subscription = await stripe.subscriptions.retrieve(
+            subscriptionId
+          );
+
+          // Update the stylist document with subscription details
+          await db
+            .collection('stylists')
+            .doc(userId)
+            .update({
+              subscription: {
+                id: subscription.id,
+                status: subscription.status,
+                currentPeriodStart: admin.firestore.Timestamp.fromMillis(
+                  subscription.current_period_start * 1000
+                ),
+                currentPeriodEnd: admin.firestore.Timestamp.fromMillis(
+                  subscription.current_period_end * 1000
+                ),
+                priceId: subscription.items.data[0].price.id,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+            });
+
+          console.log(`Updated subscription status for user ${userId} to ${subscription.status}`);
         }
-      
+
+        // Handle payment to stylist checkout
+        if (userId && stylistId && paymentIntentId && !session.metadata?.pendingBookingId) {
+          // Find the payment record
+          const paymentsQuery = await db
+            .collection('payments')
+            .where('stripeSessionId', '==', session.id)
+            .get();
+
+          if (!paymentsQuery.empty) {
+            const paymentDoc = paymentsQuery.docs[0];
+            const paymentData = paymentDoc.data();
+
+            // Update payment status
+            await paymentDoc.ref.update({
+              status: 'completed',
+              completedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            console.log(`Updated payment status for session ${session.id} to completed`);
+
+            // Add a notification for the stylist
+            await db.collection('notifications').add({
+              userId: stylistId,
+              type: 'payment_received',
+              title: 'Payment Received',
+              message: `You received a payment of $${(session.amount_total || 0) / 100} for ${session.metadata?.serviceDescription}`,
+              read: false,
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              data: {
+                paymentId: paymentDoc.id,
+                amount: session.amount_total,
+                clientId: userId
+              }
+            });
+
+            // Update stylist's balance
+            const netAmount = (session.amount_total || 0) - (paymentData.applicationFeeAmount || 0);
+            await updateStylistBalance(
+              stylistId,
+              netAmount,
+              `Payment received for ${session.metadata?.serviceDescription}`
+            );
+
+            // Update stylist's earnings statistics
+            const stylistRef = db.collection('stylists').doc(stylistId);
+            await db.runTransaction(async (transaction) => {
+              const stylistDoc = await transaction.get(stylistRef);
+              if (stylistDoc.exists) {
+                const stylistData = stylistDoc.data();
+                const currentEarnings = stylistData?.earnings || 0;
+                const currentMonthlyEarnings = stylistData?.monthlyEarnings || 0;
+                const currentPaymentCount = stylistData?.paymentCount || 0;
+
+                transaction.update(stylistRef, {
+                  earnings: currentEarnings + netAmount,
+                  monthlyEarnings: currentMonthlyEarnings + netAmount,
+                  paymentCount: currentPaymentCount + 1,
+                  lastPaymentAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+              }
+            });
+
+            // Add payment to client's payment history
+            await db.collection('clients').doc(userId).collection('paymentHistory').add({
+              paymentId: paymentDoc.id,
+              stylistId: stylistId,
+              amount: session.amount_total,
+              description: session.metadata?.serviceDescription,
+              status: 'completed',
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              completedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+          }
+        }
         break;
       }
       
@@ -1896,7 +2232,7 @@ app.get(
       }));
 
       return res.status(200).json({
-        balance: stylistData?.balance || 0,
+        balance: (stylistData?.balance/100) || 0,
         balanceUpdatedAt: stylistData?.balanceUpdatedAt,
         balanceCreatedAt: stylistData?.balanceCreatedAt,
         balanceHistory,

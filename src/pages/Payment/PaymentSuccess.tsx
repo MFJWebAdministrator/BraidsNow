@@ -86,7 +86,11 @@ const API_BASE_URL = import.meta.env.VITE_API_URL;
         )}
         
         <div className="space-y-3">
-  
+          <Button asChild className="w-full">
+            <Link to={stylistId ? `/stylist/${stylistId}` : "/find-stylists"}>
+              {stylistId ? "Back to Stylist" : "View All Stylists"} <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
           <Button asChild variant="outline" className="w-full">
             <Link to="/dashboard/appointments">
               View My Appointments

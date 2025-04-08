@@ -2160,8 +2160,6 @@ app.get(
 
       const balanceHistory = balanceHistoryQuery.docs.map(doc => ({
         id: doc.id,
-        amount:doc?.amount/100,
-        balanceAfter:doc?.balanceAfter/100,
         ...doc.data()
       }));
 
@@ -2176,8 +2174,6 @@ app.get(
 
       const transfers = transfersQuery.docs.map(doc => ({
         id: doc.id,
-        amount:doc?.amount/100,
-        balanceAfter:doc?.balanceAfter/100,
         ...doc.data()
       }));
 
@@ -2192,13 +2188,11 @@ app.get(
 
       const payouts = payoutsQuery.docs.map(doc => ({
         id: doc.id,
-        amount:doc?.amount/100,
-        balanceAfter:doc?.balanceAfter/100,
         ...doc.data()
       }));
 
       return res.status(200).json({
-        balance: (stylistData?.balance/100) || 0,
+        balance:stylistData?.balance || 0,
         balanceUpdatedAt: stylistData?.balanceUpdatedAt,
         balanceCreatedAt: stylistData?.balanceCreatedAt,
         balanceHistory,

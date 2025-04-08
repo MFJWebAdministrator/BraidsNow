@@ -72,7 +72,7 @@ export function BalanceDisplay() {
       <Tooltip>
         <TooltipTrigger asChild>
           <div className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#F8F0FC] text-[#3F0052] cursor-pointer hover:bg-[#F3D9FA] transition-colors">
-            <DollarSign className="h-4 w-4" />
+  
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : error ? (

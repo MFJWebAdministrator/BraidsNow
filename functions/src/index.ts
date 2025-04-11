@@ -772,7 +772,7 @@ app.post('/webhook', async (req: RequestWithRawBody, res: Response) => {
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 data: {
                   bookingId: pendingBookingId,
-                  amount: session.amount_total,
+                  amount: session.amount_total / 100,
                   serviceName: bookingData.serviceName
                 }
               });
@@ -832,7 +832,7 @@ app.post('/webhook', async (req: RequestWithRawBody, res: Response) => {
                   paymentId: session.payment_intent,
                   stylistId: stylistId,
                   bookingId: pendingBookingId,
-                  amount: session.amount_total,
+                  amount:session.amount_total / 100,
                   description: `Deposit for ${bookingData.serviceName}`,
                   status: 'completed',
                   createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -922,7 +922,7 @@ app.post('/webhook', async (req: RequestWithRawBody, res: Response) => {
               createdAt: admin.firestore.FieldValue.serverTimestamp(),
               data: {
                 paymentId: paymentDoc.id,
-                amount: session.amount_total,
+                amount: session.amount_total / 100,
                 clientId: userId
               }
             });
@@ -958,7 +958,7 @@ app.post('/webhook', async (req: RequestWithRawBody, res: Response) => {
             await db.collection('clients').doc(userId).collection('paymentHistory').add({
               paymentId: paymentDoc.id,
               stylistId: stylistId,
-              amount: session.amount_total,
+              amount: session.amount_total / 100,
               description: session.metadata?.serviceDescription,
               status: 'completed',
               createdAt: admin.firestore.FieldValue.serverTimestamp(),

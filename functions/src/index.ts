@@ -795,7 +795,7 @@ app.post('/webhook', async (req: RequestWithRawBody, res: Response) => {
               
               // Update stylist's balance
               if (stylistId) {
-                const netAmount = (session.amount_total || 0) - (session.amount_total ? Math.round(session.amount_total * 0.1) : 0);
+                const netAmount = session.amount_total || 0;
                 await updateStylistBalance(
                   stylistId,
                   netAmount,
@@ -928,7 +928,7 @@ app.post('/webhook', async (req: RequestWithRawBody, res: Response) => {
             });
 
             // Update stylist's balance
-            const netAmount = (session.amount_total || 0) - (paymentData.applicationFeeAmount || 0);
+            const netAmount = session.amount_total || 0;
             await updateStylistBalance(
               stylistId,
               netAmount,
@@ -1106,7 +1106,7 @@ app.post('/webhook', async (req: RequestWithRawBody, res: Response) => {
 
               // Update stylist's balance - only if not already processed in checkout.session.completed
               if (!paymentData.balanceUpdated) {
-                const netAmount = paymentIntent.amount - (paymentData.applicationFeeAmount || 0);
+                const netAmount =session.amount_total || 0;
                 await updateStylistBalance(
                   stylistId,
                   netAmount,

@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { Key, useEffect, useState } from 'react';
 import { loadStripe, StripeConnect } from '@/components/StylistCommunity/StripeConnect';
 import { Card } from '@/components/ui/card';
-import { DollarSign, Loader2, CheckCircle, AlertCircle, CreditCard, XCircle } from 'lucide-react';
+import { DollarSign, Loader2, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -188,7 +188,7 @@ export function PaymentsContent() {
       );
 
       // Update local state
-      setStatus(prev => prev ? {
+      setStatus((prev: any) => prev ? {
         ...prev,
         cancelAtPeriodEnd: true
       } : null);
@@ -466,6 +466,7 @@ export function PaymentsContent() {
         }
       }
 
+      console.error('Error message:', errorMessage);
     } finally {
       setReactivateLoading(false);
     }
@@ -636,7 +637,7 @@ export function PaymentsContent() {
                           Please complete your account setup to receive payments from clients.
                         </p>
                         <ul className="list-disc pl-5 text-sm text-amber-700 space-y-1">
-                          {status.details.requirementsCurrentlyDue.slice(0, 5).map((req, index) => (
+                          {status.details.requirementsCurrentlyDue.slice(0, 5).map((req: string, index: Key | null | undefined) => (
                             <li key={index}>{formatRequirement(req)}</li>
                           ))}
                           {status.details.requirementsCurrentlyDue.length > 5 && (

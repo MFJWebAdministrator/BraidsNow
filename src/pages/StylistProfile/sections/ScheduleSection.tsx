@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Clock } from 'lucide-react';
 import type { Schedule } from '@/lib/schemas/schedule';

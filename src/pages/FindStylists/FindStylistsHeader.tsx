@@ -1,5 +1,3 @@
-import React from 'react';
-
 export function FindStylistsHeader() {
   return (
     <div className="relative bg-[#3F0052] pt-32 pb-16">

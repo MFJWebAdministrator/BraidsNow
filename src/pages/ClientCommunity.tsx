@@ -1,4 +1,3 @@
-import React from 'react';
 import { ClientCommunityHeader } from '@/components/ClientCommunity/ClientCommunityHeader';
 import { ClientRegistrationForm } from '@/components/ClientCommunity/ClientRegistrationForm';
 

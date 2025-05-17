@@ -1,28 +1,28 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { LoginForm } from '@/components/auth/LoginForm';
-import { useLogin } from '@/components/auth/hooks/useLogin';
+// import { useLogin } from '@/components/auth/hooks/useLogin';
 import { ArrowLeft } from 'lucide-react';
 
 export function LoginPage() {
-  const navigate = useNavigate();
-  const { handleLogin, isLoading, error } = useLogin();
+  // const navigate = useNavigate();
+  // const { handleLogin, isLoading, error } = useLogin();
 
-  const handleLoginWithRedirect = async (credentials: any) => {
-    try {
-      // Perform login
-      const user = await handleLogin(credentials);
+  // const handleLoginWithRedirect = async (credentials: any) => {
+  //   try {
+  //     // Perform login
+  //     const user = await handleLogin(credentials);
+  //     // await handleLogin(credentials);
 
-      // Determine the redirect path based on the user's role
-      if (user.role === 'stylist') {
-        navigate('/stylist-dashboard'); // Redirect to stylist dashboard
-      } else {
-        navigate('/client-dashboard'); // Redirect to client dashboard
-      }
-    } catch (err) {
-      console.error('Login failed:', err);
-    }
-  };
+  //     // Determine the redirect path based on the user's role
+  //     if (user.role === 'stylist') {
+  //       navigate('/stylist-dashboard'); // Redirect to stylist dashboard
+  //     } else {
+  //       navigate('/client-dashboard'); // Redirect to client dashboard
+  //     }
+  //   } catch (err) {
+  //     console.error('Login failed:', err);
+  //   }
+  // };
 
   return (
     <div className="min-h-screen flex">
@@ -58,9 +58,9 @@ export function LoginPage() {
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl">
           <div className="bg-gray-50 py-8 px-4 sm:px-10">
             <LoginForm
-              onSubmit={handleLoginWithRedirect} // Updated function
-              isLoading={isLoading}
-              error={error}
+              // onSubmit={handleLoginWithRedirect} // Updated function
+              // isLoading={isLoading}
+              // error={error}
             />
           </div>
         </div>

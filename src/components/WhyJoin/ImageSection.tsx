@@ -1,5 +1,3 @@
-import React from 'react';
-
 export function ImageSection() {
   return (
     <div className="relative lg:h-[700px]">

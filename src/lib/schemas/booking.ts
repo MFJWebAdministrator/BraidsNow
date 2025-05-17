@@ -6,6 +6,10 @@ export const serviceSelectionSchema = z.object({
   stylistId: z.string().min(1, 'Stylist ID is required'),
   price: z.number().min(0, 'Price must be positive'),
   depositAmount: z.number().min(0, 'Deposit must be positive'),
+  duration: z.object({
+    hours: z.number().min(0).max(12),
+    minutes: z.number().min(0).max(59)
+  }),
 });
 
 // Date and time selection schema
@@ -26,6 +30,7 @@ export const clientInformationSchema = z.object({
     .regex(/^\d+$/, 'Phone number must contain only digits'),
   specialRequests: z.string().optional(),
   paymentType: z.enum(['deposit', 'full']),
+  paymentAmount: z.number().min(0).optional(),
 });
 
 // Combined booking schema
@@ -33,6 +38,25 @@ export const bookingSchema = z.object({
   service: serviceSelectionSchema,
   dateTime: dateTimeSelectionSchema,
   clientInfo: clientInformationSchema,
+  stylistId: z.string().min(1).optional(),
+  clientId: z.string().min(1).optional(),
+  serviceName: z.string().min(1).optional(),
+  stylistName: z.string().min(1).optional(),
+  businessName: z.string().min(1).optional(),
+  date: z.date().optional(),
+  time: z.string().min(1).optional(),
+  clientName: z.string().min(1).optional(),
+  clientEmail: z.string().email().optional(),
+  clientPhone: z.string().min(1).optional(),
+  notes: z.string().optional(),
+  status: z.enum(['pending', 'confirmed', 'cancelled']).optional(),
+  paymentType: z.enum(['deposit', 'full']).optional(),
+  paymentAmount: z.number().min(0).optional(),
+  depositAmount: z.number().min(0).optional(),
+  totalAmount: z.number().min(0).optional(),
+  paymentStatus: z.enum(['pending', 'paid', 'failed']).optional(),
+  bookingSource: z.enum(['website', 'app']).optional(),
+  createdAt: z.date().optional(),
 });
 
 export type ServiceSelection = z.infer<typeof serviceSelectionSchema>;
@@ -43,6 +67,5 @@ export type BookingForm = z.infer<typeof bookingSchema>;
 export interface Booking extends BookingForm {
   id: string;
   status: 'pending' | 'confirmed' | 'cancelled';
-  createdAt: string;
-  updatedAt: string;
+  updatedAt: Date;
 }

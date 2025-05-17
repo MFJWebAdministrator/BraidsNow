@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useStyleBoard } from '@/hooks/use-style-board';
 import { Card } from '@/components/ui/card';
@@ -15,6 +15,7 @@ export function StyleBoardContent() {
   const { styleBoard, loading } = useStyleBoard(user?.uid || '');
   const [showUpload, setShowUpload] = useState(false);
   const [uploadCategory, setUploadCategory] = useState<StyleImage['category']>('current');
+  console.log("uploadCategory", uploadCategory);
   const { toast } = useToast();
 
   if (loading) {
@@ -26,12 +27,13 @@ export function StyleBoardContent() {
   }
 
   if (!styleBoard) return null;
-
+  
   const handleUpload = async (file: File) => {
     try {
       if (!user) {
         throw new Error('You must be logged in to upload images');
       }
+      console.log("handleUpload file name", file.name)
       // Upload logic will be handled by the parent component
       setShowUpload(false);
     } catch (error: any) {
@@ -44,6 +46,8 @@ export function StyleBoardContent() {
   };
 
   const handleDelete = async (imageId: string, category: StyleImage['category']) => {
+    console.log("handleDelete imageId", imageId)
+    console.log("handleDelete category", category)
     try {
       // Delete logic will be handled by the parent component
       toast({

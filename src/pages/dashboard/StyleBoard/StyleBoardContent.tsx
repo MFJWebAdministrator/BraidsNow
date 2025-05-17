@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useStyleBoard } from '@/hooks/use-style-board';
 import { Card } from '@/components/ui/card';

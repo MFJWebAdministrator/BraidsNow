@@ -1,4 +1,3 @@
-import React from 'react';
 import { SuccessStoriesHeader } from '@/components/SuccessStories/SuccessStoriesHeader';
 import { StoriesList } from '@/components/SuccessStories/StoriesList';
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Share2, Heart, MapPin, Star, Home, Scissors, Store, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -26,13 +26,13 @@ export function ProfileHeader({ stylist }: ProfileHeaderProps) {
     navigator.clipboard.writeText(`https://braidsnow.com/${stylist.username}`);
   };
 
-  const handleBookNow = () => {
-    if (!user) {
-      navigate('/login', { state: { from: `/book/${stylist.id}` } });
-      return;
-    }
-    navigate(`/book/${stylist.id}`);
-  };
+  // const handleBookNow = () => {
+  //   if (!user) {
+  //     navigate('/login', { state: { from: `/book/${stylist.id}` } });
+  //     return;
+  //   }
+  //   navigate(`/book/${stylist.id}`);
+  // };
 
   const handleMessageClick = () => {
     if (!user) {

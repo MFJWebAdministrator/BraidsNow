@@ -1,12 +1,8 @@
-import React from 'react';
-import { Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+// interface StyleShowHeaderProps {
+//   onSearch?: (query: string) => void;
+// }
 
-interface StyleShowHeaderProps {
-  onSearch?: (query: string) => void;
-}
-
-export function StyleShowHeader({ onSearch }: StyleShowHeaderProps) {
+export function StyleShowHeader() {
   return (
     <div className="relative bg-[#3F0052] pt-32 pb-16">
       <div className="absolute inset-0">

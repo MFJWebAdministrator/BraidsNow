@@ -1,4 +1,3 @@
-import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { BookingSteps } from './BookingSteps';
 import { useAuth } from '@/hooks/use-auth';

@@ -53,7 +53,7 @@ export function useClientSettings() {
       
       const currentValues = form.getValues();
       const hasChanged = Object.keys(currentValues).some(
-        key => currentValues[key] !== userData[key]
+        key => currentValues[key as keyof ClientSettingsForm] !== userData[key]
       );
       setHasChanges(hasChanged);
     });

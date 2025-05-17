@@ -1,4 +1,3 @@
-import React from 'react';
 import { Form } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
@@ -8,9 +7,9 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/comp
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ImageUpload } from '@/components/ClientCommunity/ImageUpload';
 import { Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 import { useStylistSettings } from '@/hooks/use-stylist-settings';
 import { Textarea } from '@/components/ui/textarea';
+import { StylistSettingsForm } from '@/lib/schemas/stylist-settings';
 
 export function SettingsForm() {
   const { 
@@ -21,7 +20,6 @@ export function SettingsForm() {
     handleImageChange,
     userData
   } = useStylistSettings();
-  const { toast } = useToast();
 
   if (isLoading) {
     return (

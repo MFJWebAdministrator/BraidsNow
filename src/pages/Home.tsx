@@ -1,4 +1,3 @@
-import React from 'react';
 import { Hero } from '@/components/Hero';
 import { WhyJoin } from '@/components/WhyJoin';
 import { HowItWorks } from '@/components/HowItWorks';

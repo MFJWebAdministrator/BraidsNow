@@ -61,7 +61,7 @@ export function useStylistSettings() {
         if (key === 'depositAmount') {
           return currentValues[key]?.toString() !== userData[key]?.toString();
         }
-        return currentValues[key] !== userData[key];
+        return currentValues[key as keyof StylistSettingsForm] !== userData[key];
       });
       setHasChanges(hasChanged);
     });
@@ -76,7 +76,7 @@ export function useStylistSettings() {
       setIsLoading(true);
       await updateStylistProfile(user.uid, {
         ...data,
-        depositAmount: data.depositAmount ? parseFloat(data.depositAmount) : 0,
+        depositAmount: data.depositAmount ?? "0" // data.depositAmount ? parseFloat(data.depositAmount) : 0
       });
       
       toast({

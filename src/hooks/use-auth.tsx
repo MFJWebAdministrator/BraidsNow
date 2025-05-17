@@ -7,7 +7,7 @@ import {
   signOut, 
   sendPasswordResetEmail 
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase/config';
+import { auth } from './../lib/firebase/config';
 
 interface AuthContextType {
   user: User | null;

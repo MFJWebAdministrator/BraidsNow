@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { DollarSign, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { auth } from '@/lib/firebase/config';
 import axios from 'axios';

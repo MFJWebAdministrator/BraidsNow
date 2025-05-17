@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
@@ -18,7 +18,8 @@ export function NotificationIcon() {
     const messagesQuery = query(
       collection(db, 'messages'),
       where('participants', 'array-contains', user.uid),
-      where('readBy', 'array-contains', user.uid, '!=', true)
+      // where('readBy', 'array-contains', user.uid, '!=', true)
+      where('readBy', 'array-contains', user.uid)
     );
 
     const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {

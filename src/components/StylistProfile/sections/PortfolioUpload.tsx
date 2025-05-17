@@ -73,7 +73,7 @@ export function PortfolioUpload({ images, onImageAdded, onImageDeleted }: Portfo
     
     try {
       setIsDeleting(imageId);
-      await deletePortfolioImage(user.uid, imageId, url);
+      await deletePortfolioImage(user.uid, imageId);
       onImageDeleted(imageId);
       toast({
         title: "Success",
@@ -81,6 +81,7 @@ export function PortfolioUpload({ images, onImageAdded, onImageDeleted }: Portfo
       });
     } catch (error) {
       console.error('Error deleting image:', error);
+      console.log("ImageUrl", url)
       toast({
         title: "Error",
         description: "Failed to delete image",

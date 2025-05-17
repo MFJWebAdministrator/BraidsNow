@@ -1,4 +1,3 @@
-import React from 'react';
 import { FAQHeader } from '@/components/FAQs/FAQHeader';
 import { FAQList } from '@/components/FAQs/FAQList';
 

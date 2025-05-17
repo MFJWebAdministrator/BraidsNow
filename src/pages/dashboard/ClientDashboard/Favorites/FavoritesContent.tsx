@@ -1,4 +1,3 @@
-import React from 'react';
 import { Heart } from 'lucide-react';
 import { useFavorites } from '@/hooks/use-favorites';
 import { StylistCard } from '@/pages/FindStylists/StylistCard';

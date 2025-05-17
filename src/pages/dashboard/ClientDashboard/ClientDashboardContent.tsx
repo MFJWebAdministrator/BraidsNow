@@ -1,4 +1,3 @@
-import React from 'react';
 import { Calendar, MessageSquare, Heart } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useUserData } from '@/hooks/use-user-data';

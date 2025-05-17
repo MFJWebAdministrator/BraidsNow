@@ -24,7 +24,7 @@ export function useLogin() {
       );
 
       // Check user type
-      const clientDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      // const clientDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
       const stylistDoc = await getDoc(doc(db, 'stylists', userCredential.user.uid));
 
       let dashboardPath = '/dashboard/client';

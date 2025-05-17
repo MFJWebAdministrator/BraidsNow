@@ -1,5 +1,5 @@
 // src/pages/dashboard/ClientDashboard/Messages/MessagesContent.tsx
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';

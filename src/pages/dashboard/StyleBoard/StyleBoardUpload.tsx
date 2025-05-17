@@ -104,8 +104,8 @@ export function StyleBoardUpload({ open, onClose, onUpload }: StyleBoardUploadPr
               onCropComplete={handleCropComplete}
               onCancel={() => setSelectedFile(null)}
               cropShape="square"
-              zoom={zoom}
-              onZoomChange={setZoom}
+              // zoom={zoom}
+              // onZoomChange={setZoom}
             />
             
             <div className="flex items-center gap-4 py-4 px-1">

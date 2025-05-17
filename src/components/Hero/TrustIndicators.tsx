@@ -1,5 +1,3 @@
-import React from 'react';
-
 const indicators = [
   ['500+', 'Expert Stylists'],
   ['25K+', 'Happy Clients'],

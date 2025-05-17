@@ -1,4 +1,3 @@
-import React from 'react';
 import { privacyData } from '@/data/privacyData';
 
 export function PrivacyContent() {

@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { addDays, format, isAfter, isBefore, setHours, setMinutes, parse, addMinutes } from 'date-fns';
+import { format, isAfter, isBefore, setHours, setMinutes, parse, addMinutes } from 'date-fns';
 import { getBookingsForDate } from '@/lib/firebase/booking/getBookings';
 import type { ServiceSelection, DateTimeSelection as DateTimeSelectionType } from '@/lib/schemas/booking';
 import type { Schedule } from '@/lib/schemas/schedule';
-import type { Booking } from '@/lib/schemas/booking';
+import { Matcher } from 'react-day-picker';
 
 interface DateTimeSelectionProps {
   stylistId: string;
@@ -146,7 +146,7 @@ export function DateTimeSelection({ stylistId, selectedService, onSelect }: Date
             onSelect={setSelectedDate}
             className="rounded-md border shadow-sm"
             modifiers={{
-              selected: selectedDate,
+              selected: selectedDate as Matcher | Matcher[],
             }}
             modifiersStyles={{
               selected: {

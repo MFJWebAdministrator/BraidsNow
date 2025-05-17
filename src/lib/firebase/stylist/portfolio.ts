@@ -1,5 +1,5 @@
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { doc, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { storage, db } from '../config';
 
 export interface PortfolioImage {
@@ -49,7 +49,7 @@ export async function uploadPortfolioImage(userId: string, file: File): Promise<
   }
 }
 
-export async function deletePortfolioImage(userId: string, imageId: string, url: string) {
+export async function deletePortfolioImage(userId: string, imageId: string) {
   try {
     // Delete from Storage
     const imagePath = `portfolio-images/${userId}/${imageId}`;
@@ -62,7 +62,7 @@ export async function deletePortfolioImage(userId: string, imageId: string, url:
     
     if (stylistDoc.exists()) {
       const currentPortfolio = stylistDoc.data().portfolio || [];
-      const updatedPortfolio = currentPortfolio.filter(img => img.id !== imageId);
+      const updatedPortfolio = currentPortfolio.filter((img: { id: string; }) => img.id !== imageId);
       
       await updateDoc(stylistRef, {
         portfolio: updatedPortfolio

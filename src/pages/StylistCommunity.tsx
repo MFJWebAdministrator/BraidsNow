@@ -1,4 +1,3 @@
-import React from 'react';
 import { StylistCommunityHeader } from '@/components/StylistCommunity/StylistCommunityHeader';
 import { StylistRegistrationForm } from '@/components/StylistCommunity/StylistRegistrationForm';
 

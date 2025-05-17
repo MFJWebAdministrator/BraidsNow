@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface PrivacySectionProps {
   title: string;
   content: string;

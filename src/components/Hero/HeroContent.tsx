@@ -1,4 +1,3 @@
-import React from 'react';
 import { Button } from '@/components/ui/button';
 import { TrustIndicators } from './TrustIndicators';
 import { Link } from 'react-router-dom';

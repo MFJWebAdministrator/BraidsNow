@@ -1,4 +1,3 @@
-import React from 'react';
 import { useSchedule } from '@/hooks/use-schedule';
 import { WorkHoursSection } from './sections/WorkHoursSection';
 import { BreaksSection } from './sections/BreaksSection';

@@ -1,17 +1,15 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Scissors, Bell, LogOut } from 'lucide-react';
+import { Scissors, LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { UserProfile } from './Header/UserProfile';
 import { LogoutConfirmation } from './Header/LogoutConfirmation';
 import { NotificationPopup } from './Header/NotificationPopup';
-import { BalanceDisplay } from './Header/BalanceDisplay';
 
 export function Header() {
   const { user } = useAuth();
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
-  const navigate = useNavigate();
 
   return (
     <header className="fixed w-full top-0 z-50 bg-white/80 backdrop-blur-md border-b">

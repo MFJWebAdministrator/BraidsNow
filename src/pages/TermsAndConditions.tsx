@@ -1,4 +1,3 @@
-import React from 'react';
 import { TermsHeader } from '@/components/Terms/TermsHeader';
 import { TermsContent } from '@/components/Terms/TermsContent';
 

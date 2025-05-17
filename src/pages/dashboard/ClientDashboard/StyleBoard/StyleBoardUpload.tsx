@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { ImageCropper } from '@/components/ClientCommunity/ImageCropper';
 import { Upload, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { StyleImage } from '@/lib/schemas/style-board';
 
 interface StyleBoardUploadProps {
   open: boolean;

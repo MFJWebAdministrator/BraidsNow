@@ -1,4 +1,3 @@
-import React from 'react';
 import { Heart, Mail } from 'lucide-react';
 import { useStylistFavorites } from '@/hooks/use-stylist-favorites';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Loader2, Search } from 'lucide-react';
 import { StylistCard } from './StylistCard';
 import type { Stylist } from './types';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { PrivacySection } from './PrivacySection';
 import { privacyData } from '@/data/privacyData';
 
@@ -11,7 +10,7 @@ export function PrivacyContent() {
             key={section.title} 
             title={section.title} 
             content={section.content}
-            isMainTitle={section.title === "Privacy Policy"}
+            isMainTitle={section.title === "Privacy Policy Changes"}
           />
         ))}
       </div>

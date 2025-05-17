@@ -80,7 +80,8 @@ export function ServiceSelection({ stylistId, onSelect }: ServiceSelectionProps)
               serviceId: service.name,
               stylistId,
               price: service.price,
-              depositAmount: stylist.depositAmount
+              depositAmount: stylist.depositAmount,
+              duration: service.duration
             })}
           >
             <div className="flex items-center justify-between">

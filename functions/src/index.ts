@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Load environment variables from .env file
 import * as dotenv from 'dotenv';
 dotenv.config();
@@ -16,8 +15,9 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // Initialize Stripe with your secret key
-// @ts-ignore
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+  // @ts-expect-error this is a workaround for the Stripe library
   apiVersion: '2022-11-15',
 });
 
@@ -111,7 +111,7 @@ interface CheckoutSessionRequest {
 }
 
 // Add middleware to verify Firebase Auth token
-const validateFirebaseIdToken = async (req: RequestWithRawBody, res: Response, next: Function) => {
+const validateFirebaseIdToken = async (req: RequestWithRawBody, res: Response, next) => {
   console.log('Check if request is authorized with Firebase ID token');
 
   if ((!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) &&

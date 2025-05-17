@@ -1,4 +1,3 @@
-import React from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useUserData } from '@/hooks/use-user-data';
 import { ClientSidebar } from '../client/ClientSidebar';

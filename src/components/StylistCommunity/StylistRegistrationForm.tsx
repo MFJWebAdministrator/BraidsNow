@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form } from '@/components/ui/form';
@@ -41,7 +41,7 @@ export function StylistRegistrationForm() {
       providesHair: false,
       stylesMensHair: false,
       stylesChildrensHair: false,
-      depositAmount: '',
+      depositAmount: 0,
       couponCode: '',
       businessAddress: '',
       city: '',
@@ -82,7 +82,8 @@ export function StylistRegistrationForm() {
           <BusinessSection form={form} />
           <ServicesSection form={form} />
           <LocationSection form={form} />
-          <TermsAgreement form={form} />
+          {/* <TermsAgreement form={form} /> this is the previous one that is not working */}
+          <TermsAgreement form={form as any} />
 
           <div className="space-y-4">
             <p className="text-sm text-black tracking-normal text-center">

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { ImageUpload } from '@/components/ClientCommunity/ImageUpload';
 import type { UseFormReturn } from 'react-hook-form';
@@ -9,7 +8,7 @@ interface ProfileSectionProps {
   onImageChange: (file: File) => void;
 }
 
-export function ProfileSection({ form, onImageChange }: ProfileSectionProps) {
+export function ProfileSection({ onImageChange }: ProfileSectionProps) {
   return (
     <Card>
       <CardHeader>

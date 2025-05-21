@@ -6,14 +6,14 @@ export function Hero() {
     <div className="relative min-h-screen flex items-center pt-16">
       {/* Background Image with Overlay */}
       <div className="absolute inset-0 z-0">
-        <img 
-          src="https://images.unsplash.com/photo-1605980776566-0486c3ac7617?auto=format&fit=crop&q=80"
+        <img
+          src="/images/Hero Image.jpeg"
           alt="Professional hair braiding"
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-br from-[#3F0052]/95 via-[#3F0052]/80 to-[#DFA801]/50" />
       </div>
-      
+
       {/* Hero Content */}
       <div className="relative z-10 w-full py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

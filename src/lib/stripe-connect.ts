@@ -1,7 +1,7 @@
-import { loadStripe } from '@stripe/stripe-js';
-import { doc, getDoc, } from 'firebase/firestore';
-import { db } from './firebase/config';
-import { getAuth } from 'firebase/auth';
+import { loadStripe } from "@stripe/stripe-js";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "./firebase/config";
+import { getAuth } from "firebase/auth";
 
 // Initialize Stripe with your publishable key
 export const stripe = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -14,33 +14,33 @@ export async function createConnectAccount() {
   try {
     const auth = getAuth();
     const user = auth.currentUser;
-    
+
     if (!user) {
-      throw new Error('User not authenticated');
+      throw new Error("User not authenticated");
     }
-    
+
     // Redirect to your backend endpoint that handles Stripe Connect
     const response = await fetch(`${API_URL}/create-connect-account`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         userId: user.uid,
         email: user.email,
-        origin: window.location.origin
-      })
+        origin: window.location.origin,
+      }),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create Connect account');
+      throw new Error(errorData.error || "Failed to create Connect account");
     }
 
     const { url } = await response.json();
     window.location.href = url;
   } catch (error) {
-    console.error('Error creating Connect account:', error);
+    console.error("Error creating Connect account:", error);
     throw error;
   }
 }
@@ -50,40 +50,40 @@ export async function setupSubscription() {
   try {
     const auth = getAuth();
     const user = auth.currentUser;
-    
+
     if (!user) {
-      throw new Error('User not authenticated');
+      throw new Error("User not authenticated");
     }
-    
+
     // Redirect to your backend endpoint that creates Stripe Checkout session
     const response = await fetch(`${API_URL}/create-checkout-session`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         userId: user.uid,
         email: user.email,
         successUrl: `${window.location.origin}/dashboard/stylist/payments?success=true`,
-        cancelUrl: `${window.location.origin}/dashboard/stylist/payments?canceled=true`
-      })
+        cancelUrl: `${window.location.origin}/dashboard/stylist/payments?canceled=true`,
+      }),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to set up subscription');
+      throw new Error(errorData.error || "Failed to set up subscription");
     }
 
     const { sessionId } = await response.json();
-    
+
     // Redirect to Stripe Checkout
     const stripeInstance = await stripe;
     if (!stripeInstance) {
-      throw new Error('Stripe not initialized');
+      throw new Error("Stripe not initialized");
     }
-    
+
     const { error } = await stripeInstance.redirectToCheckout({
-      sessionId
+      sessionId,
     });
 
     if (error) {
@@ -92,7 +92,7 @@ export async function setupSubscription() {
 
     return sessionId;
   } catch (error) {
-    console.error('Error setting up subscription:', error);
+    console.error("Error setting up subscription:", error);
     throw error;
   }
 }
@@ -101,7 +101,7 @@ export async function setupSubscription() {
 export async function checkSubscriptionStatus(userId: string) {
   try {
     // Check subscription status in Firestore
-    const stylistRef = doc(db, 'stylists', userId);
+    const stylistRef = doc(db, "stylists", userId);
     const stylistDoc = await getDoc(stylistRef);
 
     if (!stylistDoc.exists()) {
@@ -116,7 +116,7 @@ export async function checkSubscriptionStatus(userId: string) {
     }
 
     // Check if subscription is active
-    if (subscription.status === 'active' && subscription.currentPeriodEnd) {
+    if (subscription.status === "active" && subscription.currentPeriodEnd) {
       const periodEndDate = new Date(subscription.currentPeriodEnd);
       if (periodEndDate > new Date()) {
         return {
@@ -127,12 +127,12 @@ export async function checkSubscriptionStatus(userId: string) {
       }
     }
 
-    return { 
+    return {
       active: false,
-      stripeAccountStatus: data.stripeAccountStatus 
+      stripeAccountStatus: data.stripeAccountStatus,
     };
   } catch (error) {
-    console.error('Error checking subscription status:', error);
+    console.error("Error checking subscription status:", error);
     throw error;
   }
 }

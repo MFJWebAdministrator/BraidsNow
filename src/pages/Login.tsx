@@ -1,7 +1,7 @@
-import { Link } from 'react-router-dom';
-import { LoginForm } from '@/components/auth/LoginForm';
+import { Link } from "react-router-dom";
+import { LoginForm } from "@/components/auth/LoginForm";
 // import { useLogin } from '@/components/auth/hooks/useLogin';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from "lucide-react";
 
 export function LoginPage() {
   // const navigate = useNavigate();
@@ -28,8 +28,8 @@ export function LoginPage() {
     <div className="min-h-screen flex">
       {/* Left Side - Gradient Overlay */}
       <div className="hidden lg:flex lg:w-1/2 relative">
-        <img 
-          src="https://images.unsplash.com/photo-1605980776566-0486c3ac7617?auto=format&fit=crop&q=80"
+        <img
+          src="/images/Sign-In.jpg"
           alt="Hair styling"
           className="w-full h-full object-cover"
         />
@@ -39,8 +39,8 @@ export function LoginPage() {
       {/* Right Side - Login Form */}
       <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="sm:mx-auto sm:w-full sm:max-w-xl">
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className="inline-flex items-center text-[#3F0052] hover:text-[#DFA801] transition-colors mb-8 group"
           >
             <ArrowLeft className="h-4 w-4 mr-2 transition-transform group-hover:-translate-x-1" />
@@ -58,9 +58,9 @@ export function LoginPage() {
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl">
           <div className="bg-gray-50 py-8 px-4 sm:px-10">
             <LoginForm
-              // onSubmit={handleLoginWithRedirect} // Updated function
-              // isLoading={isLoading}
-              // error={error}
+            // onSubmit={handleLoginWithRedirect} // Updated function
+            // isLoading={isLoading}
+            // error={error}
             />
           </div>
         </div>

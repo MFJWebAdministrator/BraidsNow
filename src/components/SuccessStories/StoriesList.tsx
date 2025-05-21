@@ -3,7 +3,7 @@ import { StoryCard } from './StoryCard';
 
 const stories = [
   {
-    name: "Sarah Johnson",
+    name: "Sarah Johnson2",
     business: "Crown & Glory Braids",
     location: "Brooklyn, NY",
     image: "https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",

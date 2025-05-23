@@ -5,13 +5,13 @@ import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDkih6TdooYj47OMbkSDn_7Ebu-PK6Z-kI",
-    authDomain: "braidsnow-25.firebaseapp.com",
-    databaseURL: "https://braidsnow-25-default-rtdb.firebaseio.com",
-    projectId: "braidsnow-25",
-    storageBucket: "braidsnow-25.firebasestorage.app",
-    messagingSenderId: "791602996493",
-    appId: "1:791602996493:web:946f7256d1e615014bbc44",
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 // Initialize Firebase

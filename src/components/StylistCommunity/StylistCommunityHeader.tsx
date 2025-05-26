@@ -1,4 +1,3 @@
-import React from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Shield, Clock, DollarSign, Users } from 'lucide-react';
 import { BenefitCard } from '@/components/BenefitCard';
 

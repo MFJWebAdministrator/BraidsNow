@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { MessageSquare, Star } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ interface ReviewsSectionProps {
 export function ReviewsSection({ stylistId }: ReviewsSectionProps) {
   const { user } = useAuth();
   const { userData } = useUserData(user?.uid);
-  const { reviews, loading, averageRating, addReview, respondToReview } = useReviews(stylistId);
+  const { reviews, loading, addReview, respondToReview } = useReviews(stylistId);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [showResponseDialog, setShowResponseDialog] = useState<string | null>(null);
 

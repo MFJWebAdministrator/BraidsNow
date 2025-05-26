@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Calendar, Heart, Image, Settings, LogOut, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';

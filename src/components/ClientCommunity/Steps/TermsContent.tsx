@@ -1,4 +1,3 @@
-import React from 'react';
 import { termsData } from '@/data/termsData';
 
 export function TermsContent() {

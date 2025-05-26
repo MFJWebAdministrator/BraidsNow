@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { collection, query, getDocs } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StyleGrid } from './StyleGrid';
@@ -28,7 +28,7 @@ export function StyleShowContent() {
           const data = doc.data();
           
           // Process current styles
-          data.currentStyles?.forEach((style: any) => {
+          data.currentStyles?.forEach((style: StyleImage) => {
             allImages.push({
               ...style,
               userId: doc.id,
@@ -37,7 +37,7 @@ export function StyleShowContent() {
           });
 
           // Process past styles
-          data.pastStyles?.forEach((style: any) => {
+          data.pastStyles?.forEach((style: StyleImage) => {
             allImages.push({
               ...style,
               userId: doc.id,
@@ -46,7 +46,7 @@ export function StyleShowContent() {
           });
 
           // Process wishlist
-          data.wishlist?.forEach((style: any) => {
+          data.wishlist?.forEach((style: StyleImage) => {
             allImages.push({
               ...style,
               userId: doc.id,
@@ -55,7 +55,7 @@ export function StyleShowContent() {
           });
 
           // Process natural hair
-          data.naturalHair?.forEach((style: any) => {
+          data.naturalHair?.forEach((style: StyleImage) => {
             allImages.push({
               ...style,
               userId: doc.id,

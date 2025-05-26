@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface WelcomeBannerProps {
   name: string;
   userType: 'client' | 'stylist';

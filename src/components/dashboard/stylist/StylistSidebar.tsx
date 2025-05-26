@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Calendar, 
-  Users, 
+  // Users, 
   Scissors, 
   Image, 
   Settings,
@@ -23,7 +23,7 @@ const links = [
   { href: '/dashboard/stylist/appointments', label: 'Appointments', icon: Calendar },
   { href: '/dashboard/stylist/schedule', label: 'Schedule', icon: Clock },
   { href: '/dashboard/stylist/messages', label: 'Messages', icon: MessageSquare },
-  { href: '/dashboard/stylist/clients', label: 'Clients', icon: Users },
+  // { href: '/dashboard/stylist/clients', label: 'Clients', icon: Users },
   { href: '/dashboard/stylist/services', label: 'My Services', icon: Scissors },
   { href: '/dashboard/stylist/favorites', label: 'My Favorites', icon: Heart },
   { href: '/dashboard/stylist/styleboard', label: 'Style Board', icon: Image },

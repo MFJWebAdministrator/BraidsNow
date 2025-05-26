@@ -1,4 +1,3 @@
-import React from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { StylistDashboardHeader } from '@/components/dashboard/stylist/StylistDashboardHeader';
 import { SettingsForm } from './SettingsForm';

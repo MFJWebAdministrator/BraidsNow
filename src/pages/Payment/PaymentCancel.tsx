@@ -1,4 +1,3 @@
-import React from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { XCircle, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';

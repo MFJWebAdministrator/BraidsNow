@@ -1,4 +1,3 @@
-import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Step } from './Step';
 import { Link } from 'react-router-dom';

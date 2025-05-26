@@ -1,4 +1,3 @@
-import React from 'react';
 import { BusinessToolsHeader } from '@/components/BusinessTools/BusinessToolsHeader';
 import { ToolsGrid } from '@/components/BusinessTools/ToolsGrid';
 import { CTASection } from '@/components/BusinessTools/CTASection';

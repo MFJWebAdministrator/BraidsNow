@@ -1,4 +1,3 @@
-import React from 'react';
 import { Calendar, DollarSign, MessageSquare, BarChart2, Users, Image } from 'lucide-react';
 import { ToolCard } from './ToolCard';
 

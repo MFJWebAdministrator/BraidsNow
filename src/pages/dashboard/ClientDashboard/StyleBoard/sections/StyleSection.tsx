@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -21,8 +21,8 @@ export function StyleSection({
   onShowUpload,
   onDelete
 }: StyleSectionProps) {
-  const [selectedImage, setSelectedImage] = React.useState<StyleImage | null>(null);
-  const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<StyleImage | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleDelete = async (image: StyleImage) => {
     try {

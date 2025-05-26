@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ export function PaymentSuccess() {
   const [loading, setLoading] = useState(true);
   const sessionId = searchParams.get('session_id');
   const stylistId = searchParams.get('stylistId');
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
   useEffect(() => {
     const fetchPaymentDetails = async () => {
       if (!user || !sessionId) {

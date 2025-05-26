@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface TermsSectionProps {
   title: string;
   content: string;

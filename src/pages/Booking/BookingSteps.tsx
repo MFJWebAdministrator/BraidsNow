@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ServiceSelection } from './steps/ServiceSelection';
 import { DateTimeSelection } from './steps/DateTimeSelection';
@@ -26,7 +26,7 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { stylist, loading } = useStylist(stylistId);
+  const { stylist } = useStylist(stylistId);
   
   // Check for pre-selected service from location state
   useEffect(() => {
@@ -37,7 +37,8 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
           serviceId: location.state.selectedService.serviceId,
           stylistId: location.state.selectedService.stylistId,
           price: location.state.selectedService.price,
-          depositAmount: location.state.selectedService.depositAmount
+          depositAmount: location.state.selectedService.depositAmount,
+          duration: location.state.selectedService.duration
         } 
       }));
       setStep(2);

@@ -1,13 +1,9 @@
-import { 
-  collection,
+import {
   doc,
   getDoc,
-  getDocs,
   setDoc,
   updateDoc,
   deleteDoc,
-  query,
-  where,
   DocumentData
 } from 'firebase/firestore';
 import { db } from './config';
@@ -34,7 +30,7 @@ export const updateDocument = async <T extends DocumentData>(
   docId: string,
   data: Partial<T>
 ): Promise<void> => {
-  await updateDoc(doc(db, collectionName, docId), data);
+  await updateDoc(doc(db, collectionName, docId), <T>data);
 };
 
 export const deleteDocument = async (

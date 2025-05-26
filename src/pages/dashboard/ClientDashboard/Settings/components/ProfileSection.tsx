@@ -1,4 +1,3 @@
-import React from 'react';
 import { ImageUpload } from '@/components/ClientCommunity/ImageUpload';
 
 interface ProfileSectionProps {

@@ -1,5 +1,3 @@
-import React from 'react';
-
 export function HeroCards() {
   return (
     <div className="hidden lg:block lg:w-1/2 relative">

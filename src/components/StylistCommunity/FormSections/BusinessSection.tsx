@@ -1,6 +1,4 @@
-import React from 'react';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import type { UseFormReturn } from 'react-hook-form';
 import type { StylistRegistrationForm } from '@/lib/schemas/stylist-registration';
@@ -10,7 +8,7 @@ interface BusinessSectionProps {
 }
 
 export function BusinessSection({ form }: BusinessSectionProps) {
-  const inputClasses = "form-input border-[#3F0052] focus:ring-[#3F0052]/20 focus:border-[#3F0052]";
+  // const inputClasses = "form-input border-[#3F0052] focus:ring-[#3F0052]/20 focus:border-[#3F0052]";
   const textareaClasses = "min-h-[100px] border-[#3F0052] focus:ring-[#3F0052]/20 focus:border-[#3F0052] rounded-lg";
 
   return (

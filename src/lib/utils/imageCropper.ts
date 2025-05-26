@@ -21,10 +21,10 @@ export async function getCroppedImg(
   ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
   // Draw the image with scaling to fit 800x800
-  const scale = Math.max(
-    canvas.width / image.width,
-    canvas.height / image.height
-  );
+  // const scale = Math.max(
+  //   canvas.width / image.width,
+  //   canvas.height / image.height
+  // );
 
   ctx.drawImage(
     image,

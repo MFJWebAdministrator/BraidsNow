@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Share2, Heart, MapPin, Star, Home, Scissors, Store, Clock, DollarSign, Loader2, X, CreditCard } from 'lucide-react';
+import { useState } from 'react';
+import { Heart, MapPin, Star, Home, Scissors, Store, Clock, Loader2, X, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useFavorites } from '@/hooks/use-favorites';
@@ -46,9 +46,9 @@ export function StylistCard({ stylist, onToggleFavorite, onViewProfile }: Stylis
   const totalAmount = amount;
   const depositAmount = stylist.depositAmount || (stylist.price?.from ? Math.round(stylist.price.from * 0.2) : 10);
   
-  const handleShare = () => {
-    navigator.clipboard.writeText(`https://braidsnow.com/${stylist.username}`);
-  };
+  // const handleShare = () => {
+  //   navigator.clipboard.writeText(`https://braidsnow.com/${stylist.username}`);
+  // };
 
   const handleFavoriteToggle = () => {
     if (!user) {
@@ -60,7 +60,7 @@ export function StylistCard({ stylist, onToggleFavorite, onViewProfile }: Stylis
     onToggleFavorite(stylist.id);
     
     // Also update local state through the hook for immediate UI feedback
-    toggleFavorite(stylist.id);
+    toggleFavorite(stylist);
   };
 
   // Updated to use the same approach as ServicesSection

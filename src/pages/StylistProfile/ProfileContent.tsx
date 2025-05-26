@@ -1,4 +1,3 @@
-import React from 'react';
 import { useStylistProfile } from './hooks/useStylistProfile';
 import { ProfileHeader } from './sections/ProfileHeader';
 import { AboutSection } from './sections/AboutSection';

@@ -149,20 +149,20 @@ export async function checkSubscriptionStatus(userId: string) {
 /**
  * Load Stripe.js dynamically
  */
-async function loadStripe() {
-  if (!window.Stripe) {
-    const script = document.createElement('script');
-    script.src = 'https://js.stripe.com/v3/';
-    script.async = true;
-    document.body.appendChild(script);
+// async function loadStripeX() {
+//   if (!window.Stripe) {
+//     const script = document.createElement('script');
+//     script.src = 'https://js.stripe.com/v3/';
+//     script.async = true;
+//     document.body.appendChild(script);
     
-    await new Promise((resolve) => {
-      script.onload = resolve;
-    });
-  }
+//     await new Promise((resolve) => {
+//       script.onload = resolve;
+//     });
+//   }
   
-  return window.Stripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-}
+//   return window.Stripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+// }
 
 // Add Stripe to the Window interface
 declare global {

@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 // Update the API base URL to the new endpoint
-const API_BASE_URL = 'https://api-5prtp2eqea-uc.a.run.app';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 // Helper function to ensure origin URL is properly formatted for Stripe
 const getFormattedOriginUrl = () => {

@@ -4,7 +4,7 @@ import { auth } from "@/lib/firebase/config";
 import axios from "axios";
 
 // Use the same interface as PaymentsContent.tsx for consistency
-interface SubscriptionStatus {
+export interface SubscriptionStatus {
     status?: string;
     subscription?: {
         id?: string;
@@ -52,7 +52,7 @@ interface UseSubscriptionReturn {
     refetch: () => Promise<void>;
 }
 
-const API_BASE_URL = "https://api-5prtp2eqea-uc.a.run.app";
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export function useSubscription(): UseSubscriptionReturn {
     const { user } = useAuth();

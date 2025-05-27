@@ -1,9 +1,18 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, getDocs, onSnapshot, query, where } from "firebase/firestore";
+import {
+    collection,
+    getDocs,
+    onSnapshot,
+    query,
+    where,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { useFavorites } from "@/hooks/use-favorites";
 import type { SearchParams, Stylist } from "../types";
+import axios from "axios";
+import { SubscriptionStatus } from "@/hooks/use-subscription";
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export function useFindStylists() {
     const navigate = useNavigate();
@@ -27,10 +36,44 @@ export function useFindStylists() {
                 stylistsRef,
                 where("subscription.status", "==", "active")
             );
-            const querySnapshot = await getDocs(q);
 
-            const stylistsData = querySnapshot.docs.map((doc) => {
+            const querySnapshot = await getDocs(q);
+            // Check each stylist's Stripe account status
+            const filteredDocs = [];
+            for (const doc of querySnapshot.docs) {
+                try {
+                    const response = await axios.post(
+                        `${API_BASE_URL}/get-stripe-account-details`,
+                        {
+                            stylistId: doc.id,
+                        },
+                        {
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                        }
+                    );
+
+                    const subscriptionStatus: SubscriptionStatus =
+                        response.data;
+
+                    // Only include stylists with active Stripe accounts
+                    if (subscriptionStatus.status === "active") {
+                        filteredDocs.push(doc);
+                    }
+                } catch (error) {
+                    console.error(
+                        "Error checking Stripe account for stylist:",
+                        doc.id,
+                        error
+                    );
+                    // Skip this stylist if there's an error
+                }
+            }
+
+            const stylistsData = filteredDocs.map((doc) => {
                 const data = doc.data();
+
                 return {
                     id: doc.id,
                     name: `${data.firstName} ${data.lastName}`,

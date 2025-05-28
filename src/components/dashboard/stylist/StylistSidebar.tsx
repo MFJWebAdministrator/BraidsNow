@@ -109,6 +109,7 @@ export function StylistSidebar() {
             <NavLink
                 key={href}
                 to={href}
+                end={href === "/dashboard/stylist"}
                 className={({ isActive }) =>
                     cn(
                         "flex items-center space-x-2 px-3 py-2 rounded-lg text-sm transition-colors",

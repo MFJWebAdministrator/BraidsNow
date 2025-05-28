@@ -33,6 +33,8 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import { PaymentSuccess } from "@/pages/Payment/PaymentSuccess";
 import { PaymentCancel } from "./pages/Payment/PaymentCancel";
 import { Toaster } from "@/components/ui/toaster";
+import { StylistAppointmentsPage } from "./pages/dashboard/StylistDashboard/Appointements";
+import { ClientAppointmentsPage } from "./pages/dashboard/ClientDashboard/Appointements";
 
 export function App() {
     return (
@@ -151,6 +153,14 @@ export function App() {
                         }
                     />
                     <Route
+                        path="/dashboard/client/appointments"
+                        element={
+                            <ProtectedRoute>
+                                <ClientAppointmentsPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/dashboard/client/messages"
                         element={
                             <ProtectedRoute>
@@ -187,6 +197,14 @@ export function App() {
                         element={
                             <ProtectedRoute>
                                 <StylistDashboardPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/dashboard/stylist/appointments"
+                        element={
+                            <ProtectedRoute>
+                                <StylistAppointmentsPage />
                             </ProtectedRoute>
                         }
                     />

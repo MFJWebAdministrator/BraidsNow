@@ -111,10 +111,11 @@ service cloud.firestore {
     
     // Bookings collection rules
     match /bookings/{bookingId} {
-      allow read: if isAuthenticated() && (
-        request.auth.uid == resource.data.get('clientInfo').get('userId') ||
-        request.auth.uid == resource.data.get('service').get('stylistId')
-      );
+      allow read: if isAuthenticated();
+      // && (
+      //  request.auth.uid == resource.data.get('clientInfo').get('userId') ||
+      //  request.auth.uid == resource.data.get('service').get('stylistId')
+      // );
       allow create: if isAuthenticated() &&
               request.resource.data.get('clientInfo') != null &&
               request.resource.data.get('clientInfo').get('userId') == request.auth.uid;

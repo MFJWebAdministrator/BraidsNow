@@ -138,8 +138,6 @@ export function useAppointments() {
                 return bTime - aTime;
             });
 
-            console.log("uniqueAppointments", uniqueAppointments.length);
-
             setAppointments(uniqueAppointments);
             setLoading(false);
         }

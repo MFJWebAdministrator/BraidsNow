@@ -33,7 +33,6 @@ export async function updateProfileImage(
         const timestamp = Date.now();
         const filename = `${timestamp}-${file.name}`;
         const imageRef = ref(storage, `profile-images/${userId}/${filename}`);
-        console.log("imageRef", imageRef);
         await uploadBytes(imageRef, file);
         const downloadUrl = await getDownloadURL(imageRef);
 

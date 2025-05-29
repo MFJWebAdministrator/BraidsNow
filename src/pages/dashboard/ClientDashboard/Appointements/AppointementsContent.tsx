@@ -24,8 +24,7 @@ import {
 import { useNavigate } from "react-router-dom";
 
 export function AppointementsContent() {
-    const { appointments, loading, error, getClientAppointments } =
-        useAppointments();
+    const { loading, error, getClientAppointments } = useAppointments();
 
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState("");

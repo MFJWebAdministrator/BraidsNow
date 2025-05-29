@@ -16,8 +16,7 @@ import { Calendar, Search, CalendarDays, Clock, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export function AppointementsContent() {
-    const { appointments, loading, error, getStylistAppointments } =
-        useAppointments();
+    const { loading, error, getStylistAppointments } = useAppointments();
 
     const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState("");

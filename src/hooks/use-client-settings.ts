@@ -93,7 +93,6 @@ export function useClientSettings() {
 
         try {
             setIsLoading(true);
-            console.log("user.uid", user.uid);
             await updateProfileImage(user.uid, file);
 
             toast({

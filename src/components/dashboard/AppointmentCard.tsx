@@ -28,7 +28,6 @@ interface AppointmentCardProps {
 export function AppointmentCard({
     appointment,
     userRole,
-    onContact,
 }: AppointmentCardProps) {
     const { toast } = useToast();
 
@@ -317,26 +316,6 @@ export function AppointmentCard({
                             </div>
                         </>
                     )}
-
-                {/* Action Buttons */}
-                <div className="flex gap-2 pt-2">
-                    {userRole === "stylist" && onContact && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                                onContact({
-                                    phone: contactPhone,
-                                    email: contactEmail,
-                                })
-                            }
-                            className="flex-1"
-                        >
-                            <Phone className="h-4 w-4 mr-1" />
-                            Contact
-                        </Button>
-                    )}
-                </div>
             </CardContent>
         </Card>
     );

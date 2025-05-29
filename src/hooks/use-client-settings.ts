@@ -89,25 +89,26 @@ export function useClientSettings() {
   const handleImageChange = async (file: File) => {
     if (!user) return;
 
-    try {
-      setIsLoading(true);
-      await updateProfileImage(user.uid, file);
-      
-      toast({
-        title: "Success",
-        description: "Profile image updated successfully.",
-      });
-    } catch (error) {
-      console.error('Error updating profile image:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update profile image. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        try {
+            setIsLoading(true);
+            await updateProfileImage(user.uid, file);
+
+            toast({
+                title: "Success",
+                description: "Profile image updated successfully.",
+            });
+        } catch (error) {
+            console.error("Error updating profile image:", error);
+            toast({
+                title: "Error",
+                description:
+                    "Failed to update profile image. Please try again.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
   return {
     form,

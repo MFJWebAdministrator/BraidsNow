@@ -21,6 +21,18 @@ export function StylistDashboardContent() {
         (appointment) => appointment.date === today
     );
 
+    // monthly earnings
+    const monthlyEarnings = stylistAppointments
+        .filter((a) => {
+            const today = new Date();
+            const appointmentDate = new Date(a.date);
+            return (
+                appointmentDate.getMonth() === today.getMonth() &&
+                appointmentDate.getFullYear() === today.getFullYear()
+            );
+        })
+        .reduce((sum, a) => sum + a.totalAmount, 0);
+
     return (
         <div className="space-y-6">
             <WelcomeBanner name={userData.firstName} userType="stylist" />
@@ -46,7 +58,7 @@ export function StylistDashboardContent() {
                     title="Monthly Earnings"
                     description="Your earnings this month"
                     icon={DollarSign}
-                    value={`$${userData.balance.toFixed(2)}`}
+                    value={`$${monthlyEarnings.toFixed(2)}`}
                 />
             </div>
         </div>

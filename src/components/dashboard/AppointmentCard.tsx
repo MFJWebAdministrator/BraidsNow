@@ -1,3 +1,5 @@
+"use client";
+
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +18,7 @@ import {
     Copy,
 } from "lucide-react";
 import { format } from "date-fns";
-import { Appointment } from "@/hooks/use-appointments";
+import type { Appointment } from "@/hooks/use-appointments";
 import { useToast } from "@/hooks/use-toast";
 
 interface AppointmentCardProps {
@@ -104,7 +106,7 @@ export function AppointmentCard({
         try {
             const [hours, minutes] = timeString.split(":");
             const date = new Date();
-            date.setHours(parseInt(hours), parseInt(minutes));
+            date.setHours(Number.parseInt(hours), Number.parseInt(minutes));
             return format(date, "h:mm a");
         } catch {
             return timeString;
@@ -121,12 +123,12 @@ export function AppointmentCard({
     const contactEmail = userRole === "stylist" ? appointment.clientEmail : "";
 
     return (
-        <Card className="w-full hover:shadow-md transition-shadow">
+        <Card className="w-full border border-gray-200 shadow-sm hover:shadow-md transition-all">
             <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-3">
-                        <Avatar className="h-12 w-12">
-                            <AvatarImage src="" />
+                        <Avatar className="h-12 w-12 ring-2 ring-purple-100">
+                            <AvatarImage src="/placeholder.svg" />
                             <AvatarFallback className="bg-[#3F0052] text-white">
                                 {displayName
                                     .split(" ")
@@ -151,7 +153,7 @@ export function AppointmentCard({
                             appointment.status,
                             appointment.paymentStatus
                         )}
-                        className="flex items-center gap-1"
+                        className="flex items-center gap-1 font-medium shadow-sm"
                     >
                         {getStatusIcon(
                             appointment.status,
@@ -167,7 +169,7 @@ export function AppointmentCard({
 
             <CardContent className="space-y-4">
                 {/* Service Information */}
-                <div className="space-y-2">
+                <div className="space-y-2 bg-gray-50 p-3 rounded-lg">
                     <h4 className="font-medium text-[#3F0052]">
                         {appointment.serviceName}
                     </h4>
@@ -178,10 +180,10 @@ export function AppointmentCard({
                     )}
                 </div>
 
-                <Separator />
+                <Separator className="bg-gray-200" />
 
                 {/* Date and Time */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-lg">
                     <div className="flex items-center space-x-2">
                         <Calendar className="h-4 w-4 text-gray-500" />
                         <span className="text-sm">
@@ -197,7 +199,7 @@ export function AppointmentCard({
                 </div>
 
                 {/* Payment Information */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-lg">
                     <div className="flex items-center space-x-2">
                         <DollarSign className="h-4 w-4 text-gray-500" />
                         <span className="text-sm">
@@ -231,8 +233,8 @@ export function AppointmentCard({
                 {/* Contact Information (for stylists viewing client appointments) */}
                 {userRole === "stylist" && (
                     <>
-                        <Separator />
-                        <div className="space-y-2">
+                        <Separator className="bg-gray-200" />
+                        <div className="space-y-2 bg-gray-50 p-3 rounded-lg">
                             <div
                                 className="flex items-center justify-between group"
                                 onClick={() =>
@@ -251,7 +253,7 @@ export function AppointmentCard({
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-6 w-6 p-0"
+                                    className="h-6 w-6 p-0 hover:bg-gray-200 rounded-full"
                                 >
                                     <Copy className="h-3 w-3" />
                                 </Button>
@@ -273,8 +275,8 @@ export function AppointmentCard({
                                 </div>
                                 <Button
                                     variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0"
+                                    size="icon"
+                                    className="h-6 w-6 p-0 hover:bg-gray-200 rounded-full"
                                 >
                                     <Copy className="h-3 w-3" />
                                 </Button>
@@ -286,8 +288,8 @@ export function AppointmentCard({
                 {/* Special Requests */}
                 {appointment.clientInfo?.specialRequests && (
                     <>
-                        <Separator />
-                        <div>
+                        <Separator className="bg-gray-200" />
+                        <div className="bg-gray-50 p-3 rounded-lg">
                             <h5 className="text-sm font-medium text-gray-700 mb-1">
                                 Special Requests:
                             </h5>
@@ -302,7 +304,7 @@ export function AppointmentCard({
                 {appointment.paymentStatus === "failed" &&
                     appointment.paymentFailureReason && (
                         <>
-                            <Separator />
+                            <Separator className="bg-gray-200" />
                             <div className="bg-red-50 p-3 rounded-lg">
                                 <div className="flex items-center space-x-2 text-red-700">
                                     <AlertCircle className="h-4 w-4" />

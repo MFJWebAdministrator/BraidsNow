@@ -31,7 +31,10 @@ export function StylistDashboardContent() {
                     description="View your schedule for today"
                     icon={Calendar}
                     value={todaysAppointments.length.toString()}
-                    onClick={() => window.location.href = '/dashboard/stylist/appointments'}
+                    onClick={() =>
+                        (window.location.href =
+                            "/dashboard/stylist/appointments")
+                    }
                 />
                 <DashboardCard
                     title="Total Favorites"
@@ -43,7 +46,7 @@ export function StylistDashboardContent() {
                     title="Monthly Earnings"
                     description="Your earnings this month"
                     icon={DollarSign}
-                    value="$0"
+                    value={`$${userData.balance.toFixed(2)}`}
                 />
             </div>
         </div>

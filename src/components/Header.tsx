@@ -1,15 +1,29 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { UserProfile } from "./Header/UserProfile";
 import { LogoutConfirmation } from "./Header/LogoutConfirmation";
 import { NotificationPopup } from "./Header/NotificationPopup";
+import { MobileMenu } from "./Header/MobileMenu";
 
 export function Header() {
     const { user } = useAuth();
     const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    const handleMobileMenuToggle = () => {
+        setIsMobileMenuOpen(!isMobileMenuOpen);
+    };
+
+    const handleMobileMenuClose = () => {
+        setIsMobileMenuOpen(false);
+    };
+
+    const handleMobileLogout = () => {
+        setShowLogoutConfirmation(true);
+    };
 
     return (
         <header className="fixed w-full top-0 z-50 bg-white/80 backdrop-blur-md border-b">
@@ -108,27 +122,27 @@ export function Header() {
                     )}
 
                     {/* Mobile Menu Button */}
-                    <button className="md:hidden p-2 rounded-md text-[#3F0052]">
-                        <svg
-                            className="h-6 w-6"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M4 6h16M4 12h16M4 18h16"
-                            />
-                        </svg>
-                    </button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleMobileMenuToggle}
+                        className="md:hidden p-2 text-[#3F0052]"
+                    >
+                        <Menu className="h-6 w-6" />
+                    </Button>
                 </div>
             </div>
 
             <LogoutConfirmation
                 isOpen={showLogoutConfirmation}
                 onClose={() => setShowLogoutConfirmation(false)}
+            />
+
+            {/* Mobile Menu */}
+            <MobileMenu
+                isOpen={isMobileMenuOpen}
+                onClose={handleMobileMenuClose}
+                onLogout={handleMobileLogout}
             />
         </header>
     );

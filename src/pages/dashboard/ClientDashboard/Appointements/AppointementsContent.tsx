@@ -116,10 +116,12 @@ export function AppointementsContent() {
         <div className="space-y-6">
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card>
+                <Card className="border border-gray-200 shadow-md hover:shadow-lg transition-all">
                     <CardContent className="p-4">
-                        <div className="flex items-center space-x-2">
-                            <CalendarDays className="h-5 w-5 text-[#3F0052]" />
+                        <div className="flex items-center space-x-3">
+                            <div className="p-2 rounded-full bg-purple-100">
+                                <CalendarDays className="h-5 w-5 text-[#3F0052]" />
+                            </div>
                             <div>
                                 <p className="text-sm text-gray-600">
                                     Total Appointments
@@ -132,10 +134,12 @@ export function AppointementsContent() {
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border border-gray-200 shadow-md hover:shadow-lg transition-all">
                     <CardContent className="p-4">
-                        <div className="flex items-center space-x-2">
-                            <Clock className="h-5 w-5 text-green-600" />
+                        <div className="flex items-center space-x-3">
+                            <div className="p-2 rounded-full bg-green-100">
+                                <Clock className="h-5 w-5 text-green-600" />
+                            </div>
                             <div>
                                 <p className="text-sm text-gray-600">
                                     Confirmed
@@ -148,10 +152,12 @@ export function AppointementsContent() {
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border border-gray-200 shadow-md hover:shadow-lg transition-all">
                     <CardContent className="p-4">
-                        <div className="flex items-center space-x-2">
-                            <Clock className="h-5 w-5 text-yellow-600" />
+                        <div className="flex items-center space-x-3">
+                            <div className="p-2 rounded-full bg-yellow-100">
+                                <Clock className="h-5 w-5 text-yellow-600" />
+                            </div>
                             <div>
                                 <p className="text-sm text-gray-600">Pending</p>
                                 <p className="text-2xl font-bold text-yellow-600">
@@ -162,10 +168,12 @@ export function AppointementsContent() {
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border border-gray-200 shadow-md hover:shadow-lg transition-all">
                     <CardContent className="p-4">
-                        <div className="flex items-center space-x-2">
-                            <DollarSign className="h-5 w-5 text-[#3F0052]" />
+                        <div className="flex items-center space-x-3">
+                            <div className="p-2 rounded-full bg-blue-100">
+                                <DollarSign className="h-5 w-5 text-[#3F0052]" />
+                            </div>
                             <div>
                                 <p className="text-sm text-gray-600">
                                     Total Spent
@@ -180,7 +188,7 @@ export function AppointementsContent() {
             </div>
 
             {/* Action Bar */}
-            <Card>
+            <Card className="border border-gray-200 shadow-sm">
                 <CardContent className="p-4">
                     <div className="flex flex-col md:flex-row gap-4 items-center">
                         <div className="flex-1">
@@ -233,21 +241,30 @@ export function AppointementsContent() {
 
             {/* Appointments Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="today">
+                <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 rounded-lg">
+                    <TabsTrigger
+                        className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
+                        value="today"
+                    >
                         Today ({todaysAppointments.length})
                     </TabsTrigger>
-                    <TabsTrigger value="upcoming">
+                    <TabsTrigger
+                        className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
+                        value="upcoming"
+                    >
                         Upcoming ({upcomingAppointments.length})
                     </TabsTrigger>
-                    <TabsTrigger value="past">
+                    <TabsTrigger
+                        className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
+                        value="past"
+                    >
                         Past ({pastAppointments.length})
                     </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="today" className="space-y-4">
                     {todaysAppointments.length === 0 ? (
-                        <Card>
+                        <Card className="border border-gray-200 shadow-sm">
                             <CardContent className="p-8 text-center">
                                 <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                                 <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -282,7 +299,7 @@ export function AppointementsContent() {
 
                 <TabsContent value="upcoming" className="space-y-4">
                     {upcomingAppointments.length === 0 ? (
-                        <Card>
+                        <Card className="border border-gray-200 shadow-sm">
                             <CardContent className="p-8 text-center">
                                 <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                                 <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -316,7 +333,7 @@ export function AppointementsContent() {
 
                 <TabsContent value="past" className="space-y-4">
                     {pastAppointments.length === 0 ? (
-                        <Card>
+                        <Card className="border border-gray-200 shadow-sm">
                             <CardContent className="p-8 text-center">
                                 <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                                 <h3 className="text-lg font-medium text-gray-900 mb-2">

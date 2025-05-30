@@ -126,75 +126,78 @@ export function StylistSidebar() {
     };
 
     return (
-        <nav className="w-64 border-r bg-white pt-24 p-4 space-y-2">
-            {/* Subscription Status Indicator */}
-            {!isLoading && (
-                <div className="mb-4 p-3 rounded-lg bg-gray-50 border">
-                    {hasAccess ? (
-                        <div className="flex items-center space-x-2">
-                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                            <span className="text-sm text-green-700 font-medium">
-                                Account Active
-                            </span>
-                        </div>
-                    ) : subscriptionStatus?.subscription?.status === "active" &&
-                      !subscriptionStatus?.details?.payoutsEnabled ? (
-                        <div className="space-y-2">
+        <nav className="w-64 h-full border-r bg-white pt-4 lg:pt-24 p-4 space-y-2 flex flex-col">
+            <div className="flex-1 space-y-2">
+                {/* Subscription Status Indicator */}
+                {!isLoading && (
+                    <div className="mb-4 p-3 rounded-lg bg-gray-50 border">
+                        {hasAccess ? (
                             <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                                <span className="text-sm text-yellow-700 font-medium">
-                                    Payout Setup Required
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <span className="text-sm text-green-700 font-medium">
+                                    Account Active
                                 </span>
                             </div>
-                            <NavLink
-                                to="/dashboard/stylist/payments"
-                                className="text-xs text-blue-600 hover:text-blue-800 underline"
-                            >
-                                Complete Setup →
-                            </NavLink>
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                                <span className="text-sm text-orange-700 font-medium">
-                                    Subscription Required
-                                </span>
+                        ) : subscriptionStatus?.subscription?.status ===
+                              "active" &&
+                          !subscriptionStatus?.details?.payoutsEnabled ? (
+                            <div className="space-y-2">
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                                    <span className="text-sm text-yellow-700 font-medium">
+                                        Payout Setup Required
+                                    </span>
+                                </div>
+                                <NavLink
+                                    to="/dashboard/stylist/payments"
+                                    className="text-xs text-blue-600 hover:text-blue-800 underline"
+                                >
+                                    Complete Setup →
+                                </NavLink>
                             </div>
-                            <NavLink
-                                to="/dashboard/stylist/payments"
-                                className="text-xs text-blue-600 hover:text-blue-800 underline"
-                            >
-                                Finish Subscription →
-                            </NavLink>
-                        </div>
-                    )}
-                </div>
-            )}
+                        ) : (
+                            <div className="space-y-2">
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                                    <span className="text-sm text-orange-700 font-medium">
+                                        Subscription Required
+                                    </span>
+                                </div>
+                                <NavLink
+                                    to="/dashboard/stylist/payments"
+                                    className="text-xs text-blue-600 hover:text-blue-800 underline"
+                                >
+                                    Finish Subscription →
+                                </NavLink>
+                            </div>
+                        )}
+                    </div>
+                )}
 
-            {/* Navigation Links */}
-            {links.map(renderNavLink)}
+                {/* Navigation Links */}
+                {links.map(renderNavLink)}
 
-            {/* My Profile Link */}
-            <NavLink
-                to={`/stylist/${user?.uid}`}
-                className={({ isActive }) =>
-                    cn(
-                        "flex items-center space-x-2 px-3 py-2 rounded-lg text-sm transition-colors",
-                        isActive
-                            ? "bg-[#3F0052] text-white"
-                            : "text-gray-700 hover:bg-gray-100"
-                    )
-                }
-            >
-                <UserCircle className="h-4 w-4" />
-                <span>My Profile</span>
-            </NavLink>
+                {/* My Profile Link */}
+                <NavLink
+                    to={`/stylist/${user?.uid}`}
+                    className={({ isActive }) =>
+                        cn(
+                            "flex items-center space-x-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                            isActive
+                                ? "bg-[#3F0052] text-white"
+                                : "text-gray-700 hover:bg-gray-100"
+                        )
+                    }
+                >
+                    <UserCircle className="h-4 w-4" />
+                    <span>My Profile</span>
+                </NavLink>
+            </div>
 
             {/* Logout Button */}
             <button
                 onClick={() => setShowLogoutConfirmation(true)}
-                className="flex items-center space-x-2 px-3 py-2 rounded-lg text-sm transition-colors w-full text-red-600 hover:bg-red-50"
+                className="logout-button flex items-center space-x-2 px-3 py-2 rounded-lg text-sm transition-colors w-full text-red-600 hover:bg-red-50"
             >
                 <LogOut className="h-4 w-4" />
                 <span>Logout</span>

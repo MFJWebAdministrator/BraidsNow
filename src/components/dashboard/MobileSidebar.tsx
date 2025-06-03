@@ -65,23 +65,23 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
     );
 }
 
-// Custom mobile sidebar components to avoid import issues
-function ClientMobileSidebar({ onClose }: { onClose: () => void }) {
-    const { user } = useAuth();
+// // Custom mobile sidebar components to avoid import issues
+// function ClientMobileSidebar({ onClose }: { onClose: () => void }) {
+//     const { user } = useAuth();
 
-    return (
-        <div className="flex flex-col h-full">
-            <ClientSidebar />
-        </div>
-    );
-}
+//     return (
+//         <div className="flex flex-col h-full">
+//             <ClientSidebar />
+//         </div>
+//     );
+// }
 
-function StylistMobileSidebar({ onClose }: { onClose: () => void }) {
-    const { user } = useAuth();
+// function StylistMobileSidebar({ onClose }: { onClose: () => void }) {
+//     const { user } = useAuth();
 
-    return (
-        <div className="flex flex-col h-full">
-            <StylistSidebar />
-        </div>
-    );
-}
+//     return (
+//         <div className="flex flex-col h-full">
+//             <StylistSidebar />
+//         </div>
+//     );
+// }

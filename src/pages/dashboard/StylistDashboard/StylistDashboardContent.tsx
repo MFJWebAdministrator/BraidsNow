@@ -1,4 +1,4 @@
-import { Calendar, Users, DollarSign } from "lucide-react";
+import { Calendar, Users } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { useStylistFavorites } from "@/hooks/use-stylist-favorites";
@@ -21,17 +21,17 @@ export function StylistDashboardContent() {
         (appointment) => appointment.date === today
     );
 
-    // monthly earnings
-    const monthlyEarnings = stylistAppointments
-        .filter((a) => {
-            const today = new Date();
-            const appointmentDate = new Date(a.date);
-            return (
-                appointmentDate.getMonth() === today.getMonth() &&
-                appointmentDate.getFullYear() === today.getFullYear()
-            );
-        })
-        .reduce((sum, a) => sum + a.totalAmount, 0);
+    // // monthly earnings
+    // const monthlyEarnings = stylistAppointments
+    //     .filter((a) => {
+    //         const today = new Date();
+    //         const appointmentDate = new Date(a.date);
+    //         return (
+    //             appointmentDate.getMonth() === today.getMonth() &&
+    //             appointmentDate.getFullYear() === today.getFullYear()
+    //         );
+    //     })
+    //     .reduce((sum, a) => sum + a.totalAmount, 0);
 
     return (
         <div className="space-y-6">
@@ -54,12 +54,12 @@ export function StylistDashboardContent() {
                     icon={Users}
                     value={favoriteClients.length.toString()}
                 />
-                <DashboardCard
+                {/* <DashboardCard
                     title="Monthly Earnings"
                     description="Your earnings this month"
                     icon={DollarSign}
                     value={`$${monthlyEarnings.toFixed(2)}`}
-                />
+                /> */}
             </div>
         </div>
     );

@@ -7,7 +7,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { NotificationPopup } from "@/components/Header/NotificationPopup";
-import { BalanceDisplay } from "@/components/Header/BalanceDisplay";
 import { MobileSidebar } from "../MobileSidebar";
 
 export function StylistDashboardHeader() {
@@ -65,7 +64,7 @@ export function StylistDashboardHeader() {
                         <LogOut className="h-5 w-5 text-[#3F0052]" />
                     </Button>
                     <div className="flex items-center gap-1 sm:gap-2">
-                        <BalanceDisplay />
+                        {/* <BalanceDisplay /> */}
                         <Avatar className="h-8 w-8 sm:h-10 sm:w-10 border-2 border-[#3F0052]">
                             <AvatarImage
                                 src={userData.profileImage}

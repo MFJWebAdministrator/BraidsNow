@@ -11,7 +11,7 @@ export function UrlPreview({ username }: UrlPreviewProps) {
     return (
         <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-[#3F0052]/20">
             <p className="text-sm text-gray-600 font-light tracking-normal">
-                Your BraidsNow URL:
+                Your BraidsNow.com URL:
             </p>
             <p className="text-[#3F0052] font-medium tracking-normal break-all">
                 {displayUrl}

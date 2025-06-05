@@ -28,7 +28,8 @@ export function CopyableLink({
 
             toast({
                 title: "Link copied!",
-                description: "Your BraidsNow link has been copied to clipboard",
+                description:
+                    "Your BraidsNow.com link has been copied to clipboard",
             });
 
             // Reset the copied state after 2 seconds

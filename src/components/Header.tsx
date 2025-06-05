@@ -33,11 +33,11 @@ export function Header() {
                     <Link to="/" className="flex items-center space-x-2">
                         <img
                             src="/images/Official BN Favicon.png"
-                            alt="BraidsNow Logo"
+                            alt="BraidsNow.com Logo"
                             className="h-12 w-12 object-contain"
                         />
                         <span className="text-xl font-light tracking-tight text-[#3F0052]">
-                            BraidsNow
+                            BraidsNow.com
                         </span>
                     </Link>
 
@@ -114,7 +114,7 @@ export function Header() {
                                     asChild
                                 >
                                     <Link to="/client-community">
-                                        Join BraidsNow Community
+                                        Join BraidsNow.com Community
                                     </Link>
                                 </Button>
                             </div>

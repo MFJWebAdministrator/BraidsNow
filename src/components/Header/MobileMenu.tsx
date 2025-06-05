@@ -39,11 +39,11 @@ export function MobileMenu({ isOpen, onClose, onLogout }: MobileMenuProps) {
                     <div className="flex items-center space-x-2">
                         {/* <img
                             src="/images/Official BN Favicon.png"
-                            alt="BraidsNow Logo"
+                            alt="BraidsNow.com Logo"
                             className="h-8 w-8 object-contain"
                         />
                         <span className="text-lg font-light tracking-tight text-[#3F0052]">
-                            BraidsNow
+                            BraidsNow.com
                         </span> */}
                     </div>
                     <Button

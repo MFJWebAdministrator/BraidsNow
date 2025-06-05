@@ -57,7 +57,7 @@ export function SettingsForm() {
                     </CardHeader>
 
                     <CardContent className="space-y-8">
-                        {/* Profile Image and BraidsNow Link */}
+                        {/* Profile Image and BraidsNow.com Link */}
                         <div className="flex flex-col md:flex-row md:items-center md:gap-8">
                             <div className="flex items-center gap-8 mb-4 md:mb-0">
                                 {userData?.profileImage && (
@@ -81,7 +81,7 @@ export function SettingsForm() {
                             <div className="flex-1">
                                 <CopyableLink
                                     url={`${VITE_APP_DOMAIN}/stylist/${userData?.uid || ""}`}
-                                    label="Your BraidsNow Unique Link"
+                                    label="Your BraidsNow.com Unique Link"
                                     description="Share this link to promote your services"
                                 />
                             </div>
@@ -405,7 +405,7 @@ export function SettingsForm() {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="text-md text-[#3F0052] font-light">
-                                            BraidsNow Coupon Code
+                                            BraidsNow.com Coupon Code
                                         </FormLabel>
                                         <FormControl>
                                             <Input

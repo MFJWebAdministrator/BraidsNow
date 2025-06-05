@@ -70,7 +70,7 @@ async function ensureValidPriceId() {
         if (!productToUse) {
             // Create a new product if none exists
             const product = await stripe.products.create({
-                name: "BraidsNow Professional Subscription",
+                name: "BraidsNow.com Professional Subscription",
                 description: "Monthly subscription for professional stylists",
             });
             productToUse = product.id;

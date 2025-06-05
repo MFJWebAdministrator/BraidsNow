@@ -37,11 +37,11 @@ export function ClientDashboardHeader() {
                 >
                     <img
                         src="/images/Official BN Favicon.png"
-                        alt="BraidsNow Logo"
+                        alt="BraidsNow.com Logo"
                         className="h-8 w-8 sm:h-12 sm:w-12 object-contain flex-shrink-0"
                     />
                     <span className="hidden sm:block text-lg sm:text-xl font-light tracking-tight text-[#3F0052] whitespace-nowrap">
-                        BraidsNow
+                        BraidsNow.com
                     </span>
                 </Link>
 

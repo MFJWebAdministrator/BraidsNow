@@ -113,7 +113,7 @@ export function Header() {
                                     className="font-light rounded-full tracking-normal"
                                     asChild
                                 >
-                                    <Link to="/client-community">
+                                    <Link to="/stylist-community">
                                         Join BraidsNow.com Community
                                     </Link>
                                 </Button>

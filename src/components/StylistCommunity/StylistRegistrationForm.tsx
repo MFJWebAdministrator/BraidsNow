@@ -90,12 +90,6 @@ export function StylistRegistrationForm() {
                     <TermsAgreement form={form as any} />
 
                     <div className="space-y-4">
-                        <p className="text-sm text-black tracking-normal text-center">
-                            Note: After your 30-day trial, your card will be
-                            charged $19.99/Month to use the BraidsNow.com
-                            Platform.
-                        </p>
-
                         <div className="flex justify-center">
                             <Button
                                 type="submit"

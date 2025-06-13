@@ -31,7 +31,7 @@ export function LoginPage() {
                 <img
                     src="/images/Sign-In.jpg"
                     alt="Hair styling"
-                    className="w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-br from-[#3F0052]/90 to-[#DFA801]/50" />
             </div>

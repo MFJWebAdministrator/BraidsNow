@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { TrustIndicators } from "./TrustIndicators";
 import { Link } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
 
 export function HeroContent() {
     return (
@@ -18,18 +19,52 @@ export function HeroContent() {
                 beauty.
             </p>
 
-            {/* CTA Button */}
-            <div className="flex flex-wrap gap-4">
-                <Button
-                    variant="outline"
-                    size="lg"
-                    className="border-[#DFA801] text-[#FBCC14] hover:text-[#FBCC14] hover:border-[#FBCC14] hover:bg-[#DFA801]/10 font-light"
-                    asChild
-                >
-                    <Link to="/stylist-community">
-                        Join BraidsNow.com Community
-                    </Link>
-                </Button>
+            {/* CTA Buttons */}
+            <div className="space-y-4">
+                {/* Primary CTA - For Clients */}
+                <div>
+                    <Button
+                        variant="outline"
+                        size="lg"
+                        className="border-[#DFA801] text-[#FBCC14] hover:text-[#FBCC14] hover:border-[#FBCC14] hover:bg-[#DFA801]/10 font-light"
+                        asChild
+                    >
+                        <Link to="/client-community">
+                            Join BraidsNow.com Community
+                        </Link>
+                    </Button>
+                </div>
+
+                {/* <div>
+                    <Button
+                        variant="outline"
+                        size="lg"
+                        className="border-[#DFA801] text-[#FBCC14] hover:text-[#FBCC14] hover:border-[#FBCC14] hover:bg-[#DFA801]/10 font-light"
+                        asChild
+                    >
+                        <Link to="/business-tools">
+                            Are You a Stylist? Grow Your Business
+                        </Link>
+                    </Button>
+                </div> */}
+
+                {/* Secondary CTA - For Stylists */}
+                <div className="flex items-center gap-2 group">
+                    <Button
+                        variant="ghost"
+                        size="lg"
+                        className="text-white/80 hover:text-[#DFA801] font-light p-0 h-auto hover:bg-transparent"
+                        asChild
+                    >
+                        <Link
+                            to="/business-tools"
+                            className="flex items-center gap-2"
+                        >
+                            Are You a Stylist? Grow Your Business
+                            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                        </Link>
+                    </Button>
+                </div>
             </div>
 
             <TrustIndicators />

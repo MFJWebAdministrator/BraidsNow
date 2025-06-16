@@ -52,10 +52,10 @@ export function Header() {
                                     Find Stylists
                                 </Link>
                                 <Link
-                                    to="/style-show"
+                                    to="/business-tools"
                                     className="text-[#3F0052] hover:text-[#B98EC1] font-light transition-colors tracking-normal"
                                 >
-                                    StyleShow
+                                    Stylist Business Tools
                                 </Link>
                             </nav>
 
@@ -94,10 +94,10 @@ export function Header() {
                                     Find Stylists
                                 </Link>
                                 <Link
-                                    to="/style-show"
+                                    to="/business-tools"
                                     className="text-[#3F0052] hover:text-[#B98EC1] font-light transition-colors tracking-normal"
                                 >
-                                    StyleShow
+                                    Stylist Business Tools
                                 </Link>
                             </nav>
                             <div className="flex items-center space-x-4">
@@ -114,7 +114,7 @@ export function Header() {
                                     asChild
                                 >
                                     <Link to="/stylist-community">
-                                        Join BraidsNow.com Community
+                                        Register My Business
                                     </Link>
                                 </Button>
                             </div>

@@ -1,7 +1,7 @@
 import { Hero } from "@/components/Hero";
 import { WhyJoin } from "@/components/WhyJoin";
 import { HowItWorks } from "@/components/HowItWorks";
-import { PricingSection } from "@/components/BusinessTools/PricingCard";
+import { HomePricingSection } from "@/components/Pricing/HomePricingSection";
 
 export function HomePage() {
     return (
@@ -9,7 +9,7 @@ export function HomePage() {
             <Hero />
             <WhyJoin />
             <HowItWorks />
-            <PricingSection isHome={true} />
+            <HomePricingSection />
         </main>
     );
 }

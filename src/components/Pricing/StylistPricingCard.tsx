@@ -1,5 +1,4 @@
-import { ArrowRight, Check, Clock, Shield } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Check, Clock, Shield } from "lucide-react";
 
 interface PricingCardProps {
     price?: string;
@@ -7,8 +6,7 @@ interface PricingCardProps {
     isHome?: boolean;
 }
 
-export function PricingSection({
-    isHome = false,
+export function StylistPricingCard({
     price = "$19.99",
     interval = "month",
 }: PricingCardProps) {
@@ -19,7 +17,7 @@ export function PricingSection({
                     <div className="grid md:grid-cols-5 w-full">
                         {/* Left content area (3/5 width) */}
                         <div className="md:col-span-3 p-8 md:p-12">
-                            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                            <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-[#3F0052] to-[#DFA801] bg-clip-text text-transparent">
                                 Professional Stylist Plan
                             </h2>
                             <p className="text-gray-600 mb-8">
@@ -77,17 +75,17 @@ export function PricingSection({
                         {/* Right pricing area (2/5 width) */}
                         <div className="md:col-span-2 bg-gray-50 border  p-8 md:p-12 flex flex-col justify-center">
                             <div className="text-center mb-2">
-                                <p className="text-gray-700 font-medium">
+                                <p className="text-[#3F0052] font-medium">
                                     Professional tools, affordable price
                                 </p>
                             </div>
 
                             <div className="text-center mb-6">
-                                <div className="flex items-center justify-center">
-                                    <span className="text-6xl font-bold text-gray-900">
+                                <div className="flex items-center justify-center bg-gradient-to-r from-[#3F0052] to-[#DFA801] bg-clip-text text-transparent">
+                                    <span className="text-6xl font-bold">
                                         {price}
                                     </span>
-                                    <span className="text-xl text-gray-600 ml-2">
+                                    <span className="text-xl ml-2">
                                         /{interval}
                                     </span>
                                 </div>
@@ -107,18 +105,6 @@ export function PricingSection({
                                     </span>
                                 </div>
                             </div>
-
-                            {isHome && (
-                                <div className="flex items-center justify-center mt-4 mb-4 border-t border-gray-200">
-                                    <Link
-                                        to="/business-tools"
-                                        className="flex items-center gap-2 py-2 text-lg"
-                                    >
-                                        <span>What we have for you </span>
-                                        <ArrowRight className="h-6 w-6 text-[#3F0052] mr-3" />
-                                    </Link>
-                                </div>
-                            )}
                             {/* <p className="text-sm text-gray-500 text-center mt-4">
                                 Invoices and receipts available for easy company
                                 reimbursement

@@ -168,11 +168,11 @@ export function LoginForm() {
                     <p className="text-md text-black tracking-normal">
                         Are You A Professional Stylist?{" "}
                         <Link
-                            to="/stylist-community"
+                            to="/business-tools"
                             state={location.state}
                             className="font-medium text-[#3F0052] tracking-normal hover:text-[#DFA801]"
                         >
-                            Join BraidsNow.com Stylist Community
+                            Register My Business
                         </Link>
                     </p>
                 </div>

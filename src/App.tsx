@@ -35,8 +35,16 @@ import { PaymentCancel } from "./pages/Payment/PaymentCancel";
 import { Toaster } from "@/components/ui/toaster";
 import { StylistAppointmentsPage } from "./pages/dashboard/StylistDashboard/Appointements";
 import { ClientAppointmentsPage } from "./pages/dashboard/ClientDashboard/Appointements";
+import ComingSoon from "./pages/ComingSoon";
+
+const COMING_SOON = import.meta.env.VITE_COMING_SOON;
 
 export function App() {
+    {
+        if (COMING_SOON) {
+            return <ComingSoon />;
+        }
+    }
     return (
         <Router>
             <ScrollToTop />

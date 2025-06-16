@@ -5,10 +5,11 @@ import {
     FormControl,
     FormMessage,
 } from "@/components/ui/form";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import type { UseFormReturn } from "react-hook-form";
 import type { StylistRegistrationForm } from "@/lib/schemas/stylist-registration";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface ServicesSectionProps {
     form: UseFormReturn<StylistRegistrationForm>;
@@ -23,6 +24,10 @@ export function ServicesSection({ form }: ServicesSectionProps) {
         { name: "providesHair", label: "Do You Provide Hair" },
         { name: "stylesMensHair", label: "Do You Style Men's Hair" },
         { name: "stylesChildrensHair", label: "Do You Style Children's Hair" },
+        {
+            name: "isLicensedBraider",
+            label: "Are You A Licensed Braider?",
+        },
     ] as const;
 
     return (
@@ -34,17 +39,37 @@ export function ServicesSection({ form }: ServicesSectionProps) {
                 render={({ field }) => (
                     <FormItem className="space-y-3">
                         <FormLabel className="text-md text-[#3F0052] font-light tracking-normal">
-                            What's Your Style Service Preference
+                            What's Your Style Service Preference{" "}
+                            <span className="text-sm text-gray-500">
+                                (Select all that apply)
+                            </span>
                         </FormLabel>
                         <FormControl>
-                            <RadioGroup
-                                onValueChange={field.onChange}
-                                value={field.value}
-                                className="flex flex-col space-y-2"
-                            >
+                            <div className="flex flex-col space-y-2">
                                 <FormItem className="flex items-center space-x-3 space-y-0">
                                     <FormControl>
-                                        <RadioGroupItem value="shop" />
+                                        <Checkbox
+                                            checked={field.value?.includes(
+                                                "shop"
+                                            )}
+                                            onCheckedChange={(checked) => {
+                                                const currentValue =
+                                                    field.value || [];
+                                                if (checked) {
+                                                    field.onChange([
+                                                        ...currentValue,
+                                                        "shop",
+                                                    ]);
+                                                } else {
+                                                    field.onChange(
+                                                        currentValue.filter(
+                                                            (v: string) =>
+                                                                v !== "shop"
+                                                        )
+                                                    );
+                                                }
+                                            }}
+                                        />
                                     </FormControl>
                                     <FormLabel className="font-light">
                                         I Style Out of A Shop!
@@ -52,7 +77,28 @@ export function ServicesSection({ form }: ServicesSectionProps) {
                                 </FormItem>
                                 <FormItem className="flex items-center space-x-3 space-y-0">
                                     <FormControl>
-                                        <RadioGroupItem value="home" />
+                                        <Checkbox
+                                            checked={field.value?.includes(
+                                                "home"
+                                            )}
+                                            onCheckedChange={(checked) => {
+                                                const currentValue =
+                                                    field.value || [];
+                                                if (checked) {
+                                                    field.onChange([
+                                                        ...currentValue,
+                                                        "home",
+                                                    ]);
+                                                } else {
+                                                    field.onChange(
+                                                        currentValue.filter(
+                                                            (v: string) =>
+                                                                v !== "home"
+                                                        )
+                                                    );
+                                                }
+                                            }}
+                                        />
                                     </FormControl>
                                     <FormLabel className="font-light">
                                         I Style From Home!
@@ -60,14 +106,35 @@ export function ServicesSection({ form }: ServicesSectionProps) {
                                 </FormItem>
                                 <FormItem className="flex items-center space-x-3 space-y-0">
                                     <FormControl>
-                                        <RadioGroupItem value="mobile" />
+                                        <Checkbox
+                                            checked={field.value?.includes(
+                                                "mobile"
+                                            )}
+                                            onCheckedChange={(checked) => {
+                                                const currentValue =
+                                                    field.value || [];
+                                                if (checked) {
+                                                    field.onChange([
+                                                        ...currentValue,
+                                                        "mobile",
+                                                    ]);
+                                                } else {
+                                                    field.onChange(
+                                                        currentValue.filter(
+                                                            (v: string) =>
+                                                                v !== "mobile"
+                                                        )
+                                                    );
+                                                }
+                                            }}
+                                        />
                                     </FormControl>
                                     <FormLabel className="font-light">
                                         I Am A Mobile Stylist That Likes To
                                         Travel!
                                     </FormLabel>
                                 </FormItem>
-                            </RadioGroup>
+                            </div>
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -156,26 +223,6 @@ export function ServicesSection({ form }: ServicesSectionProps) {
                                         {...field}
                                     />
                                 </div>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
-                <FormField
-                    control={form.control}
-                    name="couponCode"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="text-md text-[#3F0052] font-light tracking-normal">
-                                BraidsNow.com Coupon Code
-                            </FormLabel>
-                            <FormControl>
-                                <Input
-                                    placeholder="Enter Coupon Code (Optional)"
-                                    className={inputClasses}
-                                    {...field}
-                                />
                             </FormControl>
                             <FormMessage />
                         </FormItem>

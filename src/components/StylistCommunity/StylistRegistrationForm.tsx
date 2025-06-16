@@ -36,7 +36,7 @@ export function StylistRegistrationForm() {
             introduction: "",
             specialInstructions: "",
             policyAndProcedures: "",
-            servicePreference: "shop",
+            servicePreference: ["shop"],
             washesHair: false,
             providesHair: false,
             stylesMensHair: false,
@@ -103,7 +103,7 @@ export function StylistRegistrationForm() {
                                         Creating Account...
                                     </>
                                 ) : (
-                                    "Join Stylist Community!"
+                                    "Register My Business Now!"
                                 )}
                             </Button>
                         </div>

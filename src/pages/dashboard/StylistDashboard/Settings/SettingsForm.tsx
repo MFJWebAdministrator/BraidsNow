@@ -399,25 +399,6 @@ export function SettingsForm() {
                                     </FormItem>
                                 )}
                             />
-                            <FormField
-                                control={form.control}
-                                name="couponCode"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-md text-[#3F0052] font-light">
-                                            BraidsNow.com Coupon Code
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                placeholder="Enter Coupon Code (Optional)"
-                                                className="form-input"
-                                                {...field}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
                         </div>
 
                         {/* Location Information */}

@@ -29,7 +29,7 @@ export function Footer() {
                                     to="/client-community"
                                     className="text-white hover:text-[#FBCC14] tracking-normal font-light"
                                 >
-                                    Join BN Client Community
+                                    Register as a Client
                                 </Link>
                             </li>
                             <li>
@@ -62,7 +62,7 @@ export function Footer() {
                                     to="/stylist-community"
                                     className="text-white hover:text-[#FBCC14] tracking-normal font-light"
                                 >
-                                    Join BN Stylist Community
+                                    Register My Business
                                 </Link>
                             </li>
                             <li>

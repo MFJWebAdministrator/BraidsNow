@@ -98,7 +98,7 @@ export function ClientRegistrationForm() {
                                     Creating Account...
                                 </>
                             ) : (
-                                "Join BraidsNow.com Community!"
+                                "Sign Up Now!"
                             )}
                         </Button>
                     </div>

@@ -96,11 +96,11 @@ export function MobileMenu({ isOpen, onClose, onLogout }: MobileMenuProps) {
                                 <span>Find Stylists</span>
                             </Link>
                             <Link
-                                to="/style-show"
+                                to="/business-tools"
                                 onClick={onClose}
                                 className="flex items-center space-x-3 p-3 rounded-lg text-[#3F0052] hover:bg-gray-50 transition-colors border border-gray-100 font-medium"
                             >
-                                <span>StyleShow</span>
+                                <span>Stylist Business Tools</span>
                             </Link>
                             <Link
                                 to="/"
@@ -143,11 +143,11 @@ export function MobileMenu({ isOpen, onClose, onLogout }: MobileMenuProps) {
                                 <span>Find Stylists</span>
                             </Link>
                             <Link
-                                to="/style-show"
+                                to="/business-tools"
                                 onClick={onClose}
                                 className="flex items-center space-x-3 p-3 rounded-lg text-[#3F0052] hover:bg-gray-50 transition-colors border border-gray-100 font-medium"
                             >
-                                <span>StyleShow</span>
+                                <span>Stylist Business Tools</span>
                             </Link>
                         </nav>
 
@@ -167,8 +167,8 @@ export function MobileMenu({ isOpen, onClose, onLogout }: MobileMenuProps) {
                                 className="w-full font-medium rounded-lg tracking-normal border-[#3F0052] text-[#3F0052] hover:bg-[#3F0052] hover:text-white"
                                 asChild
                             >
-                                <Link to="/client-community" onClick={onClose}>
-                                    Join Community
+                                <Link to="/stylist-community" onClick={onClose}>
+                                    Register My Business
                                 </Link>
                             </Button>
                         </div>

@@ -13,7 +13,7 @@ export const faqData = [
     },
     {
         question: "I'm a Hair Braider/Stylist, how do I sign up?",
-        answer: 'Click "Join BraidsNow.com Community" at the top of the home page and the system will prompt you through the registration process.',
+        answer: 'Click "Register My Business" at the top of the home page and the system will prompt you through the registration process.',
     },
     {
         question: "Is BraidsNow.com open to all ethnicities?",

@@ -52,7 +52,7 @@ export function HomePricingSection() {
                             <div className="mt-8 text-center">
                                 <Link
                                     to="/client-community"
-                                    className="inline-flex items-center justify-center transition-colors bg-gradient-to-r from-[#3F0052] to-[#DFA801] text-white shadow hover:brightness-110 h-12 px-8 text-base rounded-full font-light"
+                                    className="inline-flex items-center justify-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-[#3F0052] text-white shadow hover:bg-[#3F0052]/90 h-12 px-8 text-base rounded-full font-light"
                                 >
                                     Sign Up Now!
                                 </Link>
@@ -123,7 +123,7 @@ export function HomePricingSection() {
                             <div className="mt-8 text-center">
                                 <Link
                                     to="/stylist-community"
-                                    className="inline-flex items-center justify-center transition-colors bg-gradient-to-r from-[#3F0052] to-[#DFA801] text-white shadow hover:brightness-110 h-12 px-8 text-base rounded-full font-light"
+                                    className="inline-flex items-center justify-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-[#3F0052] text-white shadow hover:bg-[#3F0052]/90 h-12 px-8 text-base rounded-full font-light"
                                 >
                                     Register My Business
                                 </Link>

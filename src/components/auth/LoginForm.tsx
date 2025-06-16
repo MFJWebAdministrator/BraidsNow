@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { loginSchema } from "@/lib/schemas/login";
@@ -102,7 +101,7 @@ export function LoginForm() {
                 />
 
                 <div className="flex items-center justify-between">
-                    <FormField
+                    {/* <FormField
                         control={form.control}
                         name="rememberMe"
                         render={({ field }) => (
@@ -119,7 +118,7 @@ export function LoginForm() {
                                 </FormLabel>
                             </FormItem>
                         )}
-                    />
+                    /> */}
 
                     <button
                         type="button"

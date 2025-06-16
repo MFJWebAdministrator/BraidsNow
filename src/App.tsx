@@ -185,14 +185,6 @@ export function App() {
                         }
                     />
                     <Route
-                        path="/dashboard/client/styleboard"
-                        element={
-                            <ProtectedRoute>
-                                <StyleBoardPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
                         path="/dashboard/stylist"
                         element={
                             <ProtectedRoute>

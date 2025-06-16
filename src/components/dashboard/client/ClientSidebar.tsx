@@ -3,7 +3,6 @@ import { NavLink } from "react-router-dom";
 import {
     Calendar,
     Heart,
-    Image,
     Settings,
     LogOut,
     MessageSquare,
@@ -36,12 +35,6 @@ const links = [
         href: "/dashboard/client/favorites",
         label: "Favorites",
         icon: Heart,
-    },
-    {
-        id: "styleboard",
-        href: "/dashboard/client/styleboard",
-        label: "Style Board",
-        icon: Image,
     },
     {
         id: "settings",

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { registerStylist } from "@/lib/firebase/stylist/register";
 import type { StylistRegistrationForm } from "@/lib/schemas/stylist-registration";
+import type { User } from "firebase/auth";
 
 export function useRegisterStylist() {
     const [isLoading, setIsLoading] = useState(false);
@@ -12,10 +13,10 @@ export function useRegisterStylist() {
     const register = async (
         data: StylistRegistrationForm,
         profileImage: File | null
-    ) => {
+    ): Promise<User> => {
         try {
             setIsLoading(true);
-            await registerStylist(data, profileImage);
+            const user = await registerStylist(data, profileImage);
 
             toast({
                 title: "Welcome to BraidsNow.com!",
@@ -23,7 +24,7 @@ export function useRegisterStylist() {
                     "Your stylist account has been created successfully.",
             });
 
-            navigate("/registration-success");
+            return user;
         } catch (error: any) {
             console.error("Registration error:", error);
 

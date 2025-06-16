@@ -11,7 +11,7 @@ import { PrivacyPolicyPage } from "@/pages/PrivacyPolicy";
 import { ClientCommunityPage } from "@/pages/ClientCommunity";
 import { StylistCommunityPage } from "@/pages/StylistCommunity";
 import { ClientRegistrationSuccessPage } from "@/pages/ClientRegistrationSuccess";
-import { StylistRegistrationSuccessPage } from "@/pages/StylistRegistrationSuccess";
+import { StylistRegistrationSuccess } from "@/pages/StylistRegistrationSuccess";
 import { ClientDashboardPage } from "@/pages/dashboard/ClientDashboard";
 import { ClientSettingsPage } from "@/pages/dashboard/ClientDashboard/Settings";
 import { ClientFavoritesPage } from "@/pages/dashboard/ClientDashboard/Favorites";
@@ -146,7 +146,7 @@ export function App() {
                     />
                     <Route
                         path="/stylist-registration-success"
-                        element={<StylistRegistrationSuccessPage />}
+                        element={<StylistRegistrationSuccess />}
                     />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/style-show" element={<StyleShowPage />} />

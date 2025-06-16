@@ -20,10 +20,10 @@ export function ServicesSection({ form }: ServicesSectionProps) {
         "form-input border-[#3F0052] focus:ring-[#3F0052]/20 focus:border-[#3F0052]";
 
     const additionalServices = [
-        { name: "washesHair", label: "Do You Wash Hair" },
-        { name: "providesHair", label: "Do You Provide Hair" },
-        { name: "stylesMensHair", label: "Do You Style Men's Hair" },
-        { name: "stylesChildrensHair", label: "Do You Style Children's Hair" },
+        { name: "washesHair", label: "Do You Wash Hair?" },
+        { name: "providesHair", label: "Do You Provide Hair?" },
+        { name: "stylesMensHair", label: "Do You Style Men's Hair?" },
+        { name: "stylesChildrensHair", label: "Do You Style Children's Hair?" },
         {
             name: "isLicensedBraider",
             label: "Are You A Licensed Braider?",

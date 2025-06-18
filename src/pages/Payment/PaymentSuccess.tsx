@@ -92,7 +92,7 @@ export function PaymentSuccess() {
             </Link>
           </Button>
           <Button asChild variant="outline" className="w-full">
-            <Link to="/dashboard/appointments">
+            <Link to="/dashboard/client/appointments">
               View My Appointments
             </Link>
           </Button>

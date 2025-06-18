@@ -20,8 +20,8 @@ export function SubscriptionModal({
 }: SubscriptionModalProps) {
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
+            <DialogContent className="!rounded-2xl max-w-[90%] sm:max-w-md border border-purple-200 shadow-lg">
+                <DialogHeader className="!text-center">
                     <DialogTitle className="text-xl text-[#3F0052] font-medium">
                         Subscription Required
                     </DialogTitle>
@@ -31,7 +31,7 @@ export function SubscriptionModal({
                         features.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="flex justify-end space-x-4 mt-6">
+                <div className="flex justify-center space-x-4 mt-6">
                     <Button
                         variant="outline"
                         onClick={onClose}

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { registerStylist } from "@/lib/firebase/stylist/register";
 import type { StylistRegistrationForm } from "@/lib/schemas/stylist-registration";
@@ -8,7 +7,6 @@ import type { User } from "firebase/auth";
 export function useRegisterStylist() {
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
-    const navigate = useNavigate();
 
     const register = async (
         data: StylistRegistrationForm,
@@ -16,12 +14,14 @@ export function useRegisterStylist() {
     ): Promise<User> => {
         try {
             setIsLoading(true);
+            // get user by email first to check if the email is already in use
+
             const user = await registerStylist(data, profileImage);
 
             toast({
                 title: "Welcome to BraidsNow.com!",
-                description:
-                    "Your stylist account has been created successfully.",
+                // description:
+                //     "Your stylist account has been created successfully.",
             });
 
             return user;

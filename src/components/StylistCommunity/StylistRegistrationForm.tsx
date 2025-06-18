@@ -48,27 +48,30 @@ export function StylistRegistrationForm() {
     const form = useForm<FormType>({
         resolver: zodResolver(stylistRegistrationSchema),
         defaultValues: {
-            username: "",
-            password: "",
-            firstName: "",
-            lastName: "",
-            email: "",
-            phone: "",
-            businessName: "",
-            introduction: "",
-            specialInstructions: "",
-            policyAndProcedures: "",
+            username: "abcd",
+            password: "12345678",
+            firstName: "abcd",
+            lastName: "efg",
+            email: "abcd@gmail.com",
+            phone: "0949960922",
+            businessName: "noname",
+            introduction:
+                "nonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenoname",
+            specialInstructions:
+                "nonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenoname",
+            policyAndProcedures:
+                "nonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenonamenoname",
             servicePreference: ["shop"],
             washesHair: false,
             providesHair: false,
             stylesMensHair: false,
             stylesChildrensHair: false,
-            depositAmount: 0,
-            couponCode: "",
-            businessAddress: "",
-            city: "",
-            state: "",
-            zipCode: "",
+            isLicensedBraider: false,
+            depositAmount: 15,
+            businessAddress: "AA",
+            city: "AA",
+            state: "AA",
+            zipCode: "10001",
             agreeToTerms: false,
         },
     });
@@ -91,8 +94,8 @@ export function StylistRegistrationForm() {
 
             // Get properly formatted origin URL
             const originUrl = getFormattedOriginUrl();
-            const successUrl = `${originUrl}/stylist-registration-success`;
-            const cancelUrl = `${originUrl}/stylist-registration?canceled=true`;
+            const successUrl = `${originUrl}/stylist-registration?success=true`;
+            const cancelUrl = `${originUrl}/stylist-registration?success=false`;
 
             // Create Stripe checkout session
             const response = await axios.post(

@@ -221,6 +221,12 @@ export function ServicesSection({ form }: ServicesSectionProps) {
                                         placeholder="Enter Amount"
                                         className={`${inputClasses} pl-7`}
                                         {...field}
+                                        onChange={(e) =>
+                                            field.onChange(
+                                                Number(e.target.value)
+                                            )
+                                        }
+                                        value={field.value || ""}
                                     />
                                 </div>
                             </FormControl>

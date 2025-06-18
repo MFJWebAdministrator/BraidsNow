@@ -51,12 +51,7 @@ export const stylistRegistrationSchema = z.object({
     stylesMensHair: z.boolean(),
     stylesChildrensHair: z.boolean(),
     isLicensedBraider: z.boolean(),
-    depositAmount: z
-        .string()
-        .regex(/^\d+$/, "Deposit amount must be a number")
-        .transform(Number)
-        .refine((n) => n >= 0, "Deposit amount must be positive"),
-    couponCode: z.string().optional(),
+    depositAmount: z.number().min(0, "Deposit amount must be positive"),
     businessAddress: z.string().optional(),
     city: z.string().min(1, "City is required"),
     state: z

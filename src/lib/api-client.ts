@@ -1,5 +1,6 @@
 import axios from "axios";
 import { auth } from "@/lib/firebase/config";
+import { loadStripe as loadStripeLib } from "@stripe/stripe-js";
 
 // Define the API base URL - make sure we're using the correct endpoint
 // During development, you might want to use the emulator URL
@@ -77,23 +78,5 @@ export const createConnectAccount = async (
 
 // Helper function to load Stripe
 export const loadStripe = async (key: string) => {
-    if (!window.Stripe) {
-        const script = document.createElement("script");
-        script.src = "https://js.stripe.com/v3/";
-        script.async = true;
-        document.body.appendChild(script);
-
-        await new Promise((resolve) => {
-            script.onload = resolve;
-        });
-    }
-
-    return window.Stripe(key);
+    return loadStripeLib(key);
 };
-
-// Add Stripe to the Window interface
-declare global {
-    interface Window {
-        Stripe?: any;
-    }
-}

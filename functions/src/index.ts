@@ -758,6 +758,38 @@ app.post(
                     .json({ error: "Unauthorized access to user data" });
             }
 
+            // Fetch stylist's schedule from Firestore
+            const scheduleSnap = await db.collection('stylists').doc(bookingData.stylistId).collection('settings').doc('schedule').get();
+            if (!scheduleSnap.exists) {
+                return res.status(400).json({ error: 'Stylist schedule not found' });
+            }
+            const schedule = scheduleSnap.data();
+            // Determine day of week
+            const bookingDate = new Date(bookingData.date);
+            const dayOfWeek = bookingDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            const workHours = schedule.workHours[dayOfWeek];
+            if (!workHours || !workHours.isEnabled) {
+                return res.status(400).json({ error: 'Stylist is not available on this day' });
+            }
+            // Parse booking start time
+            const [hour, minute] = bookingData.time.split(':').map(Number);
+            const start = new Date(bookingDate);
+            start.setHours(hour, minute, 0, 0);
+            // Calculate total service duration (minutes)
+            const duration = (bookingData.service?.duration?.hours || 0) * 60 + (bookingData.service?.duration?.minutes || 0);
+            const bufferBefore = schedule.bufferTime?.before || 0;
+            const bufferAfter = schedule.bufferTime?.after || 0;
+            const totalDuration = duration + bufferBefore + bufferAfter;
+            // Calculate end time
+            const end = new Date(start.getTime() + totalDuration * 60000);
+            // Stylist closing time
+            const closing = new Date(bookingDate);
+            closing.setHours(workHours.end.hour, workHours.end.minute, 0, 0);
+            // Prevent overtime
+            if (end > closing) {
+                return res.status(400).json({ error: 'This service will run past the stylist\'s available hours. Please select an earlier time.' });
+            }
+
             // Create the booking
             const bookingRef = db.collection("bookings").doc();
             await bookingRef.set({

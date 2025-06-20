@@ -26,12 +26,22 @@ export function ScheduleContent() {
   }
 
   return (
-    <Card className="p-6">
-      <Tabs defaultValue="work-hours">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
-          <TabsTrigger value="work-hours">Work Hours</TabsTrigger>
-          <TabsTrigger value="breaks">Breaks</TabsTrigger>
-          <TabsTrigger value="buffer-time">Buffer Time</TabsTrigger>
+    <Card className="p-4 sm:p-6 w-full ">
+      <Tabs defaultValue="work-hours" className='w-full'>
+        <TabsList
+          className="
+            flex w-full mb-6 gap-2
+            border-b border-gray-200
+            px-4
+            overflow-x-auto
+            whitespace-nowrap
+            pl-2 pr-2
+            sm:grid sm:grid-cols-3 sm:gap-0 sm:overflow-x-visible sm:whitespace-normal
+          "
+        >
+          <TabsTrigger className="w-full" value="work-hours">Work Hours</TabsTrigger>
+          <TabsTrigger className="w-full" value="breaks">Breaks</TabsTrigger>
+          <TabsTrigger className="w-full" value="buffer-time">Buffer Time</TabsTrigger>
         </TabsList>
 
         <TabsContent value="work-hours">
@@ -50,7 +60,7 @@ export function ScheduleContent() {
           />
         </TabsContent>
 
-        <TabsContent value="buffer-time">
+        <TabsContent value="buffer-time" className=''>
           <BufferTimeSection 
             bufferTime={schedule.bufferTime}
             onUpdate={updateBufferTime}

@@ -12,7 +12,7 @@ import {
     XCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { auth } from "@/lib/firebase/config";
 import axios from "axios";
@@ -528,73 +528,81 @@ export function PaymentsContent() {
                                         </Button>
                                     </div>
                                 ) : (
-                                    <Dialog
-                                        open={cancelDialogOpen}
-                                        onOpenChange={setCancelDialogOpen}
-                                    >
-                                        <DialogTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                className="text-red-500 border-red-200 hover:bg-red-50"
-                                            >
-                                                <XCircle className="h-4 w-4 mr-2" />
-                                                Cancel Subscription
-                                            </Button>
-                                        </DialogTrigger>
-                                        <DialogContent>
-                                            <DialogHeader>
-                                                <DialogTitle>
-                                                    Cancel Subscription
-                                                </DialogTitle>
-                                                <DialogDescription>
-                                                    Are you sure you want to
-                                                    cancel your subscription?
-                                                    You'll still have access
-                                                    until the end of your
-                                                    current billing period.
-                                                </DialogDescription>
-                                            </DialogHeader>
-                                            <div className="bg-amber-50 p-3 rounded-md border border-amber-200 text-amber-800 text-sm mb-4">
+                                    // <Dialog
+                                    //     open={cancelDialogOpen}
+                                    //     onOpenChange={setCancelDialogOpen}
+                                    // >
+                                    //     <DialogTrigger asChild>
+                                    //         <Button
+                                    //             variant="outline"
+                                    //             className="text-red-500 border-red-200 hover:bg-red-50"
+                                    //         >
+                                    //             <XCircle className="h-4 w-4 mr-2" />
+                                    //             Cancel Subscription
+                                    //         </Button>
+                                    //     </DialogTrigger>
+                                    //     <DialogContent>
+                                    //         <DialogHeader>
+                                    //             <DialogTitle>
+                                    //                 Cancel Subscription
+                                    //             </DialogTitle>
+                                    //             <DialogDescription>
+                                    //                 Are you sure you want to
+                                    //                 cancel your subscription?
+                                    //                 You'll still have access
+                                    //                 until the end of your
+                                    //                 current billing period.
+                                    //             </DialogDescription>
+                                    //         </DialogHeader>
+                                    //         <div className="bg-amber-50 p-3 rounded-md border border-amber-200 text-amber-800 text-sm mb-4">
+                                    //             <p>
+                                    //                 Your subscription will
+                                    //                 remain active until{" "}
+                                    //                 {convertTimestampToDate(
+                                    //                     subscriptionStatus
+                                    //                         ?.subscription
+                                    //                         ?.currentPeriodEnd
+                                    //                 )?.toLocaleDateString() ||
+                                    //                     "the end of your current billing period"}
+                                    //                 .
+                                    //             </p>
+                                    //         </div>
+                                    //         <DialogFooter>
+                                    //             <Button
+                                    //                 variant="outline"
+                                    //                 onClick={() =>
+                                    //                     setCancelDialogOpen(
+                                    //                         false
+                                    //                     )
+                                    //                 }
+                                    //             >
+                                    //                 Keep Subscription
+                                    //             </Button>
+                                    //             <Button
+                                    //                 variant="destructive"
+                                    //                 onClick={
+                                    //                     handleCancelSubscription
+                                    //                 }
+                                    //                 disabled={cancelLoading}
+                                    //             >
+                                    //                 {cancelLoading ? (
+                                    //                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    //                 ) : (
+                                    //                     <XCircle className="h-4 w-4 mr-2" />
+                                    //                 )}
+                                    //                 Confirm Cancellation
+                                    //             </Button>
+                                    //         </DialogFooter>
+                                    //     </DialogContent>
+                                    // </Dialog>
+                                     <div className="bg-amber-50 p-3 rounded-md border border-amber-200 text-amber-800 text-sm mb-4">
                                                 <p>
-                                                    Your subscription will
-                                                    remain active until{" "}
-                                                    {convertTimestampToDate(
-                                                        subscriptionStatus
-                                                            ?.subscription
-                                                            ?.currentPeriodEnd
-                                                    )?.toLocaleDateString() ||
-                                                        "the end of your current billing period"}
-                                                    .
-                                                </p>
+                                                To cancel, please email us at  
+                                                <Link to={"mailto:cancellations@braidsnow.com"}>
+                                                <span className="text-blue-600"> cancellations@braidsnow.com </span>                                               
+                                                </Link>
+                                                 </p>
                                             </div>
-                                            <DialogFooter>
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() =>
-                                                        setCancelDialogOpen(
-                                                            false
-                                                        )
-                                                    }
-                                                >
-                                                    Keep Subscription
-                                                </Button>
-                                                <Button
-                                                    variant="destructive"
-                                                    onClick={
-                                                        handleCancelSubscription
-                                                    }
-                                                    disabled={cancelLoading}
-                                                >
-                                                    {cancelLoading ? (
-                                                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                                    ) : (
-                                                        <XCircle className="h-4 w-4 mr-2" />
-                                                    )}
-                                                    Confirm Cancellation
-                                                </Button>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
                                 )}
                             </div>
                         ) : (

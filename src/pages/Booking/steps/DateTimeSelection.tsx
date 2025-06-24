@@ -80,7 +80,6 @@ export function DateTimeSelection({ stylistId, selectedService, onSelect }: Date
       (selectedService.duration?.minutes || 0) +
       (schedule.bufferTime.before || 0) + 
       (schedule.bufferTime.after || 0);
-    
     // Account for breaks
     const breaks = schedule.breaks.filter(b => b.days.includes(dayOfWeek));
     

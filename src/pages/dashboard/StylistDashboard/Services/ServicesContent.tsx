@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ServicesList } from './ServicesList';
 import { AddServiceDialog } from './AddServiceDialog';
 import { useStylistServices } from './hooks/useStylistServices';
 import type { StylistService } from '@/lib/schemas/stylist-service';
+import ImageLightbox from '@/components/ImageLightBox';
+
+// Lightbox modal for image preview
+
 
 export function ServicesContent() {
   const {
@@ -18,6 +21,7 @@ export function ServicesContent() {
 
   const [showDialog, setShowDialog] = useState(false);
   const [editingService, setEditingService] = useState<StylistService | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const handleEdit = (service: StylistService) => {
     setEditingService(service);
@@ -64,11 +68,30 @@ export function ServicesContent() {
         </Button>
       </div>
 
-      <ServicesList
-        services={services}
-        onEdit={handleEdit}
-        onDelete={handleDeleteService}
-      />
+      {/* Updated Services List with image thumbnails */}
+      <div className="space-y-4">
+        {services.map((service) => (
+          <div key={service.name} className="flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-100 shadow-sm">
+            <div className='w-full flex justify-start items-center gap-4'>
+            <div className="">
+              <div className="font-medium text-[#3F0052] text-lg">{service.name}</div>
+              <div className="text-gray-500 text-sm">${service.price}</div>
+              <div className="text-gray-400 text-xs">{service.duration.hours}h {service.duration.minutes}m</div>
+            </div>
+            {service.imageUrl && (
+              <img
+                src={service.imageUrl}
+                alt={service.name}
+                className="w-16 h-16 object-cover rounded-full border cursor-pointer hover:opacity-80 transition"
+                onClick={() => setLightboxUrl(service.imageUrl!)}
+              />
+            )}
+            </div>
+            <Button variant="outline" onClick={() => handleEdit(service)} className="mr-2">Edit</Button>
+            <Button variant="destructive" onClick={() => handleDeleteService(service)}>Delete</Button>
+          </div>
+        ))}
+      </div>
 
       <AddServiceDialog
         open={showDialog}
@@ -77,6 +100,9 @@ export function ServicesContent() {
         initialData={editingService}
         isEdit={!!editingService}
       />
+
+      {/* Lightbox for image preview */}
+      {lightboxUrl && <ImageLightbox imageUrl={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
     </div>
   );
 }

@@ -16,6 +16,7 @@ export interface Message {
   participants: string[];
   readBy: string[];
   createdAt: string;
+  images?: string[];
 }
 
 export interface MessageThread {

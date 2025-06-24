@@ -37,6 +37,7 @@ export function ScheduleContent() {
             whitespace-nowrap
             pl-2 pr-2
             sm:grid sm:grid-cols-3 sm:gap-0 sm:overflow-x-visible sm:whitespace-normal
+            // bg-gray-
           "
         >
           <TabsTrigger className="w-full" value="work-hours">Work Hours</TabsTrigger>

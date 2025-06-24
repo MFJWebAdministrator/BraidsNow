@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/tooltip';
 import type { StylistService } from '@/lib/schemas/stylist-service';
 import { useToast } from '@/hooks/use-toast';
+import ImageLightbox from '@/components/ImageLightBox';
 
 interface ServicesSectionProps {
   services: StylistService[];
@@ -19,8 +20,10 @@ interface ServicesSectionProps {
   stylistId: string;
 }
 
+
 export function ServicesSection({ services, depositAmount, stylistId }: ServicesSectionProps) {
   const [showAll, setShowAll] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const displayedServices = showAll ? services : services.slice(0, 3);
   const hasMoreServices = services.length > 3;
   const navigate = useNavigate();
@@ -94,12 +97,15 @@ export function ServicesSection({ services, depositAmount, stylistId }: Services
       <div className="space-y-4">
         {/* Services */}
         {displayedServices.map((service) => (
-          <div key={service.name} className="relative group">
-            {/* Service Card with Gradient Border */}
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-[#3F0052] to-[#DFA801] rounded-xl blur opacity-0 group-hover:opacity-20 transition duration-500" />
+          <div key={service.name} className="relative group flex items-center gap-4">
             
-            <div className="relative bg-white rounded-lg p-4 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300">
+            {/* Service Card with Gradient Border */}
+            <div className="relative flex-1 bg-white rounded-lg p-4 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300">
               <div className="flex items-center justify-between">
+
+                <div className='flex gap-4'>
+
+                
                 {/* Service Info */}
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
@@ -126,6 +132,17 @@ export function ServicesSection({ services, depositAmount, stylistId }: Services
                     </span>
                   </div>
                 </div>
+
+                {/* Service Image Thumbnail */}
+            {service.imageUrl && (
+              <img
+                src={service.imageUrl}
+                alt={service.name}
+                className="w-16 h-16 object-cover rounded-full border cursor-pointer hover:opacity-80 transition"
+                onClick={() => setLightboxUrl(service.imageUrl!)}
+              />
+            )}
+            </div>
 
                 {/* Price and Book Button */}
                 <div className="flex items-center gap-4">
@@ -171,6 +188,8 @@ export function ServicesSection({ services, depositAmount, stylistId }: Services
           </div>
         )}
       </div>
+      {/* Lightbox for image preview */}
+      {lightboxUrl && <ImageLightbox imageUrl={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
     </Card>
   );
 }

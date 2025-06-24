@@ -368,7 +368,7 @@ export function MessagesContent() {
                   {/* Message Input */}
                   <div className="mt-4 border-t pt-4">
                     <div className="flex gap-2 items-end relative">
-                      <div className="absolute left-3 top-1/3 -translate-y-1/2 h-4 w-4 flex flex-col items-center">
+                      {/* <div className="absolute left-3 top-1/3 -translate-y-1/2 h-4 w-4 flex flex-col items-center">
                         <input
                           type="file"
                           accept="image/*,.heic,.heif"
@@ -388,10 +388,10 @@ export function MessagesContent() {
                         >
                           <Paperclip className="w-5 h-5 text-gray-400" />
                         </Button>
-                      </div>
+                      </div> */}
                       <Input
                         placeholder="Write a message..."
-                        className="flex-1 pl-10"
+                        className="flex-1"
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         onKeyPress={(e) => {

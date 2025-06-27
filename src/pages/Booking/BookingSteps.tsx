@@ -109,7 +109,6 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
   };
 
 
-  console.log(bookingData,"Password123")
 
   return (
     <div className="bg-white rounded-2xl shadow-lg p-8 relative overflow-hidden">

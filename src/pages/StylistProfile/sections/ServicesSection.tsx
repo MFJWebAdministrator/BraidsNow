@@ -37,7 +37,8 @@ export function ServicesSection({ services, depositAmount, stylistId }: Services
             serviceId: service.name,
             stylistId,
             price: service.price,
-            depositAmount
+            depositAmount,
+            duration: service.duration
           }
         } 
       });
@@ -51,7 +52,8 @@ export function ServicesSection({ services, depositAmount, stylistId }: Services
           serviceId: service.name,
           stylistId,
           price: service.price,
-          depositAmount
+          depositAmount,
+          duration: service.duration
         }
       }
     });

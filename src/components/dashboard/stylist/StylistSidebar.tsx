@@ -34,6 +34,12 @@ const links = [
         requiresSubscription: true,
     },
     {
+        href: "/dashboard/stylist/calendar",
+        label: "Calendar",
+        icon: Calendar,
+        requiresSubscription: true,
+    },
+    {
         href: "/dashboard/stylist/schedule",
         label: "Schedule",
         icon: Clock,

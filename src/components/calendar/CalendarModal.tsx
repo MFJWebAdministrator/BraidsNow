@@ -10,9 +10,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
-import { doc, setDoc, collection } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
-import { checkScheduleConflicts } from '@/lib/utils/schedule-conflicts';
+import { checkEnhancedScheduleConflicts } from '@/lib/utils/schedule-conflicts';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useSchedule } from '@/hooks/use-schedule';
@@ -64,7 +62,7 @@ const DAYS = [
 
 const TIME_OPTIONS = generateTimeOptions();
 
-export function CalendarModal({
+export function   CalendarModal({
   isOpen,
   onClose,
   selectedDate,
@@ -159,18 +157,18 @@ export function CalendarModal({
         });
       } else {
         // Handle single event creation
-        // Check for schedule conflicts
-        const hasConflict = await checkScheduleConflicts(
+        // Use enhanced conflict checking
+        const conflictResult = await checkEnhancedScheduleConflicts(
           stylistId,
           data.startTime,
           data.endTime,
           data.date
         );
 
-        if (hasConflict) {
+        if (conflictResult.hasConflict) {
           toast({
             title: "Schedule Conflict",
-            description: "This time conflicts with an existing appointment or break. Please choose another time.",
+            description: conflictResult.conflicts.join(', '),
             variant: "destructive"
           });
           return;
@@ -179,9 +177,9 @@ export function CalendarModal({
         // Calculate duration
         const start = parseTime(data.startTime);
         const end = parseTime(data.endTime);
-        const durationMinutes = (end.hour * 60 + end.minute) - (start.hour * 60 + start.minute);
-        const hours = Math.floor(durationMinutes / 60);
-        const minutes = durationMinutes % 60;
+        // const durationMinutes = (end.hour * 60 + end.minute) - (start.hour * 60 + start.minute);
+        // const hours = Math.floor(durationMinutes / 60);
+        // const minutes = durationMinutes % 60;
 
         // If this is a break event, also create it as a break in the schedule
         if (data.eventType === 'break' || data.eventType === 'lunch') {
@@ -202,42 +200,42 @@ export function CalendarModal({
           await addBreak(breakData);
         }
 
-        const customAppointment = {
-          stylistId: user.uid,
-          clientId: user.uid,
-          serviceName: data.title,
-          date: data.date,
-          time: data.startTime,
-          status: 'confirmed',
-          paymentType: 'custom',
-          paymentAmount: 0,
-          totalAmount: 0,
-          notes: data.description || '',
-          eventType: data.eventType,
-          clientName: 'Custom Event',
-          clientEmail: user.email || '',
-          clientPhone: '',
-          businessName: '',
-          depositAmount: 0,
-          paymentStatus: 'paid',
-          bookingSource: 'website',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          isCustomEvent: true,
-          service: {
-            duration: { hours, minutes },
-            serviceId: 'custom',
-            stylistId: user.uid,
-            price: 0,
-            depositAmount: 0
-          }
-        };
+        // const customAppointment = {
+        //   stylistId: user.uid,
+        //   clientId: user.uid,
+        //   serviceName: data.title,
+        //   date: data.date,
+        //   time: data.startTime,
+        //   status: 'confirmed',
+        //   paymentType: 'custom',
+        //   paymentAmount: 0,
+        //   totalAmount: 0,
+        //   notes: data.description || '',
+        //   eventType: data.eventType,
+        //   clientName: 'Custom Event',
+        //   clientEmail: user.email || '',
+        //   clientPhone: '',
+        //   businessName: '',
+        //   depositAmount: 0,
+        //   paymentStatus: 'paid',
+        //   bookingSource: 'website',
+        //   createdAt: new Date(),
+        //   updatedAt: new Date(),
+        //   isCustomEvent: true,
+        //   service: {
+        //     duration: { hours, minutes },
+        //     serviceId: 'custom',
+        //     stylistId: user.uid,
+        //     price: 0,
+        //     depositAmount: 0
+        //   }
+        // };
 
-        const bookingRef = doc(collection(db, 'bookings'));
-        await setDoc(bookingRef, {
-          ...customAppointment,
-          id: bookingRef.id
-        });
+        // const bookingRef = doc(collection(db, 'bookings'));
+        // await setDoc(bookingRef, {
+        //   ...customAppointment,
+        //   id: bookingRef.id
+        // });
         
         const eventTypeText = data.eventType === 'break' || data.eventType === 'lunch' ? 'Break' : 'Event';
         toast({

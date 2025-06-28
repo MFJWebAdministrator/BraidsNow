@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { LoginForm } from "@/components/auth/LoginForm";
 // import { useLogin } from '@/components/auth/hooks/useLogin';
 import { ArrowLeft } from "lucide-react";
+import { SEO } from '@/components/SEO';
+import { getPageMetadata } from '@/lib/metadata';
 
 export function LoginPage() {
     // const navigate = useNavigate();
@@ -26,6 +28,7 @@ export function LoginPage() {
 
     return (
         <div className="min-h-screen flex">
+            <SEO metadata={getPageMetadata('login')} />
             {/* Left Side - Gradient Overlay */}
             <div className="hidden lg:flex lg:w-1/2 relative">
                 <img

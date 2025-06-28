@@ -30,7 +30,7 @@ export function useFindStylists() {
     // Fetch stylists function - extracted for reuse
     const fetchStylists = useCallback(async () => {
         try {
-            setLoading(false);
+            setLoading(true);
             const stylistsRef = collection(db, "stylists");
             const q = query(
                 stylistsRef,

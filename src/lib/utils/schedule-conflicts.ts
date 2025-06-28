@@ -261,7 +261,7 @@ export const getAvailableTimeSlots = (
   stylistStartTime: string,
   stylistEndTime: string,
   duration: ServiceDuration,
-  bufferMinutes: number = 15
+  // bufferMinutes: number = 15
 ): string[] => {
   const slots: string[] = [];
   const [startHour, startMinute] = stylistStartTime.split(':').map(Number);

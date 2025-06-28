@@ -5,7 +5,7 @@ import {
     Calendar,
     // Users,
     Scissors,
-    Image,
+    // Image,
     Settings,
     Heart,
     Clock,
@@ -64,12 +64,12 @@ const links = [
         icon: Heart,
         requiresSubscription: true,
     },
-    {
-        href: "/dashboard/stylist/styleboard",
-        label: "Style Board",
-        icon: Image,
-        requiresSubscription: true,
-    },
+    // {
+    //     href: "/dashboard/stylist/styleboard",
+    //     label: "Style Board",
+    //     icon: Image,
+    //     requiresSubscription: true,
+    // },
     {
         href: "/dashboard/stylist/payments",
         label: "Payments",

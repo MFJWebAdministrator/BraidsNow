@@ -90,3 +90,19 @@ export async function getPortfolioImages(userId: string): Promise<PortfolioImage
     throw new Error('Failed to load portfolio images');
   }
 }
+
+export async function uploadServiceImage(userId: string, serviceName: string, file: File): Promise<string> {
+  try {
+    const timestamp = Date.now();
+    const safeServiceName = serviceName.replace(/[^a-zA-Z0-9.-]/g, '');
+    const imageId = `${safeServiceName}-${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '')}`;
+    const imagePath = `profile-images/${userId}/${imageId}`;
+    const imageRef = ref(storage, imagePath);
+    await uploadBytes(imageRef, file);
+    const url = await getDownloadURL(imageRef);
+    return url;
+  } catch (error) {
+    console.error('Error uploading service image:', error);
+    throw new Error('Failed to upload service image. Please try again.');
+  }
+}

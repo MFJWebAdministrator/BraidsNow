@@ -1,12 +1,15 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Confetti } from "@/components/ui/confetti";
+import { SEO } from '@/components/SEO';
+import { getPageMetadata } from '@/lib/metadata';
 
 export function ClientRegistrationSuccessPage() {
     const navigate = useNavigate();
 
     return (
         <div className="min-h-screen bg-white flex flex-col">
+            <SEO metadata={getPageMetadata('registrationSuccess')} />
             <Confetti />
 
             <div className="flex-1 flex items-center justify-center">

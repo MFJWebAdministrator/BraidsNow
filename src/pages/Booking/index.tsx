@@ -3,6 +3,8 @@ import { BookingSteps } from './BookingSteps';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import { SEO } from '@/components/SEO';
+import { getPageMetadata } from '@/lib/metadata';
 
 export function BookingPage() {
   const { stylistId } = useParams();
@@ -16,6 +18,7 @@ export function BookingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <SEO metadata={getPageMetadata('booking')} />
       <div className="max-w-4xl mx-auto px-4 pt-4">
         <Button
           variant="ghost"

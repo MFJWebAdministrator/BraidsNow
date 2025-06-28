@@ -80,7 +80,7 @@ export function ImageCropper({
             max={3}
             step={0.1}
             onValueChange={(value) => setZoom(value[0])}
-            className="w-full max-w-xs"
+            className="w-full max-w-xs border "
           />
         </div>
 
@@ -88,7 +88,7 @@ export function ImageCropper({
           <Button 
             variant="outline" 
             onClick={onCancel}
-            className="font-light tracking-normal"
+            className="font-light tracking-normal "
           >
             Cancel
           </Button>

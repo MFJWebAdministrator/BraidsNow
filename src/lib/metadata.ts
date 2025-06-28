@@ -250,6 +250,13 @@ export const pageMetadata: Record<string, PageMetadata> = {
     description: "We're sorry, your booking could not be completed. Please try again or contact support for assistance.",
     keywords: ["booking failed", "appointment failed", "booking error", "try again", "support needed"],
     canonical: "https://braidsnow.com/booking-failed"
+  },
+
+  notFound: {
+    title: "Page Not Found | BraidsNow.com - 404 Error",
+    description: "The page you're looking for doesn't exist. Return to BraidsNow.com to find professional hair stylists and book appointments.",
+    keywords: ["404", "page not found", "error", "braidsnow", "hair stylist"],
+    canonical: "https://braidsnow.com/404"
   }
 };
 

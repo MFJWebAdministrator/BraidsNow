@@ -6,12 +6,12 @@ import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { format, isBefore, setHours, setMinutes, parse, addMinutes, subMinutes } from 'date-fns';
+import { format, isBefore, setHours, setMinutes, parse, addMinutes } from 'date-fns';
 import { getBookingsForDate } from '@/lib/firebase/booking/getBookings';
 import type { ServiceSelection, DateTimeSelection as DateTimeSelectionType } from '@/lib/schemas/booking';
 import type { Schedule } from '@/lib/schemas/schedule';
 import { Matcher } from 'react-day-picker';
-import { isOvertimeBooking, calculateEndTime } from '@/lib/utils/schedule-conflicts';
+import { isOvertimeBooking } from '@/lib/utils/schedule-conflicts';
 import { 
   checkTimeSlotOverlap, 
   isLastAppointmentOfDay, 

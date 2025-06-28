@@ -1,10 +1,13 @@
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { StylistDashboardHeader } from '@/components/dashboard/stylist/StylistDashboardHeader';
 import { SettingsForm } from './SettingsForm';
+import { SEO } from '@/components/SEO';
+import { getPageMetadata } from '@/lib/metadata';
 
 export function StylistSettingsPage() {
   return (
     <DashboardLayout>
+      <SEO metadata={getPageMetadata('stylistSettings')} />
       <StylistDashboardHeader />
       <main className="flex-1 overflow-y-auto p-8">
         <div className="max-w-4xl mx-auto">

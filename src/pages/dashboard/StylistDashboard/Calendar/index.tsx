@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Plus } from 'lucide-react';
 import { CalendarModal } from '@/components/calendar/CalendarModal';
+import { SEO } from '@/components/SEO';
+import { getPageMetadata } from '@/lib/metadata';
 
 // Custom hook for responsive calendar behavior
 const useResponsiveCalendar = () => {
@@ -381,6 +383,7 @@ export function CalendarPage() {
 
   return (
     <DashboardLayout>
+      <SEO metadata={getPageMetadata('stylistCalendar')} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <StylistDashboardHeader />
         

@@ -87,7 +87,7 @@ export function BreaksSection({ breaks, onAdd, onUpdate, onDelete }: BreaksSecti
 
         <div className="grid gap-4">
           {breaks.map((breakItem) => (
-            <Card key={breakItem.id} className="p-4">
+            <Card key={breakItem.id} className="p-4 w-full">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-medium">{breakItem.name}</h3>
@@ -126,7 +126,7 @@ export function BreaksSection({ breaks, onAdd, onUpdate, onDelete }: BreaksSecti
       </div>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-full w-full sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
               {editingBreak ? 'Edit Break' : 'Add Break'}
@@ -140,12 +140,13 @@ export function BreaksSection({ breaks, onAdd, onUpdate, onDelete }: BreaksSecti
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Lunch Break"
+                className="w-full"
               />
             </div>
 
             <div>
               <Label>Days</Label>
-              <div className="grid grid-cols-2 gap-2 mt-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
                 {DAYS.map((day) => (
                   <div key={day.value} className="flex items-center space-x-2">
                     <Checkbox
@@ -164,14 +165,14 @@ export function BreaksSection({ breaks, onAdd, onUpdate, onDelete }: BreaksSecti
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Start Time</Label>
                 <Select value={startTime} onValueChange={setStartTime}>
-                  <SelectTrigger className="mt-2">
+                  <SelectTrigger className="mt-2 w-full sm:w-[140px]">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent position="popper" className="w-[140px] z-50 bg-white shadow-lg border border-gray-200">
+                  <SelectContent position="popper" className="w-full sm:w-[140px] z-50 bg-white shadow-lg border border-gray-200">
                     <div className="max-h-[300px] overflow-y-auto">
                       {TIME_OPTIONS.map((time) => (
                         <SelectItem key={time} value={time}>
@@ -186,10 +187,10 @@ export function BreaksSection({ breaks, onAdd, onUpdate, onDelete }: BreaksSecti
               <div>
                 <Label>End Time</Label>
                 <Select value={endTime} onValueChange={setEndTime}>
-                  <SelectTrigger className="mt-2">
+                  <SelectTrigger className="mt-2 w-full sm:w-[140px]">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent position="popper" className="w-[140px] z-50 bg-white shadow-lg border border-gray-200">
+                  <SelectContent position="popper" className="w-full sm:w-[140px] z-50 bg-white shadow-lg border border-gray-200">
                     <div className="max-h-[300px] overflow-y-auto">
                       {TIME_OPTIONS.map((time) => (
                         <SelectItem key={time} value={time}>

@@ -1,10 +1,13 @@
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { ClientDashboardHeader } from "@/components/dashboard/client/ClientDashboardHeader";
 import { AppointementsContent } from "./AppointementsContent";
+import { SEO } from '@/components/SEO';
+import { getPageMetadata } from '@/lib/metadata';
 
 export function ClientAppointmentsPage() {
     return (
         <DashboardLayout>
+            <SEO metadata={getPageMetadata('clientAppointments')} />
             <ClientDashboardHeader />
             <main className="flex-1 overflow-y-auto p-8">
                 <div className="max-w-7xl mx-auto">

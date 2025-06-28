@@ -35,6 +35,7 @@ import { PaymentCancel } from "./pages/Payment/PaymentCancel";
 import { Toaster } from "@/components/ui/toaster";
 import { StylistAppointmentsPage } from "./pages/dashboard/StylistDashboard/Appointements";
 import { ClientAppointmentsPage } from "./pages/dashboard/ClientDashboard/Appointements";
+import { CalendarPage } from "./pages/dashboard/StylistDashboard/Calendar";
 import ComingSoon from "./pages/ComingSoon";
 import NotFound from '@/pages/NotFound';
 
@@ -262,6 +263,14 @@ export function App() {
                         element={
                             <ProtectedRoute>
                                 <StyleBoardPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/dashboard/stylist/calendar"
+                        element={
+                            <ProtectedRoute>
+                                <CalendarPage />
                             </ProtectedRoute>
                         }
                     />

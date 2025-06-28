@@ -4,6 +4,8 @@ import { FindStylistsHeader } from './FindStylistsHeader';
 import { SearchSection } from './SearchSection';
 import { StylistsGrid } from './StylistsGrid';
 import { useFindStylists } from './hooks/useFindStylists';
+import { SEO } from '@/components/SEO';
+import { getPageMetadata } from '@/lib/metadata';
 
 export function FindStylistsPage() {
   const {
@@ -18,6 +20,7 @@ export function FindStylistsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <SEO metadata={getPageMetadata('findStylists')} />
       <Header />
       <FindStylistsHeader />
       

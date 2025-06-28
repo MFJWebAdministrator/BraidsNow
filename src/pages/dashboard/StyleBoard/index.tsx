@@ -4,6 +4,8 @@ import { StylistDashboardHeader } from '@/components/dashboard/stylist/StylistDa
 import { StyleBoardContent } from './StyleBoardContent';
 import { useAuth } from '@/hooks/use-auth';
 import { useUserData } from '@/hooks/use-user-data';
+import { SEO } from '@/components/SEO';
+import { getPageMetadata } from '@/lib/metadata';
 
 export function StyleBoardPage() {
   const { user } = useAuth();
@@ -15,6 +17,7 @@ export function StyleBoardPage() {
 
   return (
     <DashboardLayout>
+      <SEO metadata={getPageMetadata('styleBoard')} />
       <Header />
       <main className="flex-1 overflow-y-auto p-8">
         <div className="max-w-7xl mx-auto">

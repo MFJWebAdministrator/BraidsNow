@@ -1,10 +1,13 @@
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { StylistDashboardHeader } from '@/components/dashboard/stylist/StylistDashboardHeader';
 import { MessagesContent } from './MessagesContent';
+import { SEO } from '@/components/SEO';
+import { getPageMetadata } from '@/lib/metadata';
 
 export function StylistMessagesPage() {
   return (
     <DashboardLayout>
+      <SEO metadata={getPageMetadata('stylistMessages')} />
       <StylistDashboardHeader />
 
       <main className="flex-1 overflow-y-auto p-8">

@@ -12,9 +12,8 @@ import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase/config';
 import { format } from 'date-fns';
 import { collection, doc, getDoc, setDoc } from 'firebase/firestore';
-import { Loader2, MessageSquare, Search, Send, Users, Paperclip } from 'lucide-react';
-import { useState, useRef } from 'react';
-import heic2any from 'heic2any';
+import { Loader2, MessageSquare, Search, Send, Users } from 'lucide-react';
+import { useState } from 'react';
 import { ImageCropper } from '@/components/ClientCommunity/ImageCropper';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 
@@ -28,7 +27,6 @@ export function MessagesContent() {
   const { toast } = useToast();
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [croppingImage, setCroppingImage] = useState<File | null>(null);
   const [croppingQueue, setCroppingQueue] = useState<File[]>([]);
   const filteredThreads = threads.filter(thread => {
@@ -143,33 +141,33 @@ export function MessagesContent() {
   };
 
   // Modified handleImageChange to queue images for cropping
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    let newFiles: File[] = [];
-    for (let i = 0; i < files.length && selectedImages.length + newFiles.length < 3; i++) {
-      let file = files[i];
-      // Accept HEIC/HEIF and convert to JPEG/PNG for preview
-      if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.endsWith('.heic') || file.name.endsWith('.HEIC') || file.name.endsWith('.heif') || file.name.endsWith('.HEIF')) {
-        try {
-          const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
-          if (converted instanceof Blob) {
-            file = new File([converted], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
-          }
-        } catch (err) {
-          console.error('HEIC conversion failed:', err);
-          continue;
-        }
-      }
-      newFiles.push(file);
-    }
-    // Start cropping the first image in the queue
-    if (newFiles.length > 0) {
-      setCroppingQueue(newFiles);
-      setCroppingImage(newFiles[0]);
-    }
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+  // const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const files = e.target.files;
+  //   if (!files) return;
+  //   let newFiles: File[] = [];
+  //   for (let i = 0; i < files.length && selectedImages.length + newFiles.length < 3; i++) {
+  //     let file = files[i];
+  //     // Accept HEIC/HEIF and convert to JPEG/PNG for preview
+  //     if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.endsWith('.heic') || file.name.endsWith('.HEIC') || file.name.endsWith('.heif') || file.name.endsWith('.HEIF')) {
+  //       try {
+  //         const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+  //         if (converted instanceof Blob) {
+  //           file = new File([converted], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+  //         }
+  //       } catch (err) {
+  //         console.error('HEIC conversion failed:', err);
+  //         continue;
+  //       }
+  //     }
+  //     newFiles.push(file);
+  //   }
+  //   // Start cropping the first image in the queue
+  //   if (newFiles.length > 0) {
+  //     setCroppingQueue(newFiles);
+  //     setCroppingImage(newFiles[0]);
+  //   }
+  //   if (fileInputRef.current) fileInputRef.current.value = '';
+  // };
 
   // Handle crop complete
   const handleCropComplete = (croppedFile: File) => {

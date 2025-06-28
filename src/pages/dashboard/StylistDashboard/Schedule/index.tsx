@@ -1,10 +1,13 @@
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { StylistDashboardHeader } from '@/components/dashboard/stylist/StylistDashboardHeader';
 import { ScheduleContent } from './ScheduleContent';
+import { SEO } from '@/components/SEO';
+import { getPageMetadata } from '@/lib/metadata';
 
 export function StylistSchedulePage() {
   return (
     <DashboardLayout>
+      <SEO metadata={getPageMetadata('stylistSchedule')} />
       <StylistDashboardHeader />
       <main className="flex-1 overflow-y-auto p-8">
         <div className="max-w-7xl mx-auto">

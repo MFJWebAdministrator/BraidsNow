@@ -35,44 +35,44 @@ export function ServicesSection({
     const { user } = useAuth();
     const { toast } = useToast();
 
-    const handleBookService = (service: StylistService) => {
-        // Check if user is logged in
-        if (!user) {
-            navigate("/login", {
-                state: {
-                    from: `/book/${stylistId}`,
-                    selectedService: {
-                        serviceId: service.name,
-                        stylistId,
-                        price: service.price,
-                        depositAmount,
-                        duration: service.duration.hours,
-                    },
-                },
-            });
-            return;
+  const handleBookService = (service: StylistService) => {
+    // Check if user is logged in
+    if (!user) {
+      navigate('/login', { 
+        state: { 
+          from: `/book/${stylistId}`,
+          selectedService: {
+            serviceId: service.name,
+            stylistId,
+            price: service.price,
+            depositAmount,
+            duration: service.duration
+          }
+        } 
+      });
+      return;
+    }
+    
+    // Navigate to booking page with service pre-selected
+    navigate(`/book/${stylistId}`, {
+      state: {
+        selectedService: {
+          serviceId: service.name,
+          stylistId,
+          price: service.price,
+          depositAmount,
+          duration: service.duration
         }
-
-        // Navigate to booking page with service pre-selected
-        navigate(`/book/${stylistId}`, {
-            state: {
-                selectedService: {
-                    serviceId: service.name,
-                    stylistId,
-                    price: service.price,
-                    depositAmount,
-                    duration: service.duration,
-                },
-            },
-        });
-
-        // Show confirmation toast
-        toast({
-            title: "Service Selected",
-            description: `You've selected ${service.name}. Complete your booking details.`,
-            variant: "default",
-        });
-    };
+      }
+    });
+    
+    // Show confirmation toast
+    toast({
+      title: "Service Selected",
+      description: `You've selected ${service.name}. Complete your booking details.`,
+      variant: "default"
+    });
+  };
 
     return (
         <Card className="p-4 sm:p-6">

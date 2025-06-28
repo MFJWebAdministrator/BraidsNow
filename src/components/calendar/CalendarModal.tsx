@@ -45,6 +45,7 @@ interface CalendarModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedDate: Date | null;
+  selectedEnd: Date | null;
   selectedEvent: any;
   onEventSaved: () => void;
   stylistId: string;
@@ -62,10 +63,11 @@ const DAYS = [
 
 const TIME_OPTIONS = generateTimeOptions();
 
-export function   CalendarModal({
+export function  CalendarModal({
   isOpen,
   onClose,
   selectedDate,
+  selectedEnd,
   selectedEvent,
   onEventSaved,
   stylistId
@@ -113,14 +115,24 @@ export function   CalendarModal({
       if (selectedDate && !selectedEvent) {
         // Creating new event
         setValue('date', format(selectedDate, 'yyyy-MM-dd'));
-        setValue('startTime', formatTime(selectedDate.getHours(), selectedDate.getMinutes()));
-        const endTime = new Date(selectedDate.getTime() + 60 * 60000); // 1 hour later
-        setValue('endTime', formatTime(endTime.getHours(), endTime.getMinutes()));
+        
+        // Always use AM/PM format for consistency
+        const startTimeFormatted = formatTime(selectedDate.getHours(), selectedDate.getMinutes());
+        setValue('startTime', startTimeFormatted);
+        
+        if (selectedEnd) {
+          const endTimeFormatted = formatTime(selectedEnd.getHours(), selectedEnd.getMinutes());
+          setValue('endTime', endTimeFormatted);
+        } else {
+          const endTime = new Date(selectedDate.getTime() + 60 * 60000); // 1 hour later
+          const endTimeFormatted = formatTime(endTime.getHours(), endTime.getMinutes());
+          setValue('endTime', endTimeFormatted);
+        }
       }
     } else {
       reset();
     }
-  }, [isOpen, selectedDate, setValue, reset, selectedEvent]);
+  }, [isOpen, selectedDate, selectedEnd, setValue, reset, selectedEvent]);
 
   const calculateEndTime = (startTime: string, duration: { hours: number; minutes: number }): string => {
     const [hours, minutes] = startTime.split(':').map(Number);
@@ -130,6 +142,12 @@ export function   CalendarModal({
     return endDate.toTimeString().slice(0, 5);
   };
 
+  // Helper function to convert AM/PM format to HH:MM format for conflict checking
+  const convertTo24HourFormat = (timeString: string): string => {
+    const { hour, minute } = parseTime(timeString);
+    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+  };
+
   const onSubmit = async (data: CustomEventForm) => {
     if (!user) return;
 
@@ -137,6 +155,7 @@ export function   CalendarModal({
     try {
       if (data.isRecurring) {
         // Handle recurring break creation using useSchedule hook
+        // Times are already in AM/PM format for recurring events
         const start = parseTime(data.startTime);
         const end = parseTime(data.endTime);
 
@@ -157,11 +176,17 @@ export function   CalendarModal({
         });
       } else {
         // Handle single event creation
+        // Times are now in AM/PM format for both recurring and non-recurring events
+        
+        // Convert to HH:MM format for conflict checking
+        const startTime24Hour = convertTo24HourFormat(data.startTime);
+        const endTime24Hour = convertTo24HourFormat(data.endTime);
+        
         // Use enhanced conflict checking
         const conflictResult = await checkEnhancedScheduleConflicts(
           stylistId,
-          data.startTime,
-          data.endTime,
+          startTime24Hour,
+          endTime24Hour,
           data.date
         );
 
@@ -177,9 +202,6 @@ export function   CalendarModal({
         // Calculate duration
         const start = parseTime(data.startTime);
         const end = parseTime(data.endTime);
-        // const durationMinutes = (end.hour * 60 + end.minute) - (start.hour * 60 + start.minute);
-        // const hours = Math.floor(durationMinutes / 60);
-        // const minutes = durationMinutes % 60;
 
         // If this is a break event, also create it as a break in the schedule
         if (data.eventType === 'break' || data.eventType === 'lunch') {
@@ -199,43 +221,6 @@ export function   CalendarModal({
           // Add the break to the schedule
           await addBreak(breakData);
         }
-
-        // const customAppointment = {
-        //   stylistId: user.uid,
-        //   clientId: user.uid,
-        //   serviceName: data.title,
-        //   date: data.date,
-        //   time: data.startTime,
-        //   status: 'confirmed',
-        //   paymentType: 'custom',
-        //   paymentAmount: 0,
-        //   totalAmount: 0,
-        //   notes: data.description || '',
-        //   eventType: data.eventType,
-        //   clientName: 'Custom Event',
-        //   clientEmail: user.email || '',
-        //   clientPhone: '',
-        //   businessName: '',
-        //   depositAmount: 0,
-        //   paymentStatus: 'paid',
-        //   bookingSource: 'website',
-        //   createdAt: new Date(),
-        //   updatedAt: new Date(),
-        //   isCustomEvent: true,
-        //   service: {
-        //     duration: { hours, minutes },
-        //     serviceId: 'custom',
-        //     stylistId: user.uid,
-        //     price: 0,
-        //     depositAmount: 0
-        //   }
-        // };
-
-        // const bookingRef = doc(collection(db, 'bookings'));
-        // await setDoc(bookingRef, {
-        //   ...customAppointment,
-        //   id: bookingRef.id
-        // });
         
         const eventTypeText = data.eventType === 'break' || data.eventType === 'lunch' ? 'Break' : 'Event';
         toast({
@@ -481,7 +466,7 @@ export function   CalendarModal({
                 <div>
                   <Label>Start Time</Label>
                   <Select value={watchedStartTime} onValueChange={(value) => setValue('startTime', value)}>
-                    <SelectTrigger className="mt-2">
+                    <SelectTrigger className="mt-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent position="popper" className="w-[140px] z-50 bg-white shadow-lg border border-gray-200">
@@ -502,7 +487,7 @@ export function   CalendarModal({
                 <div>
                   <Label>End Time</Label>
                   <Select value={watchedEndTime} onValueChange={(value) => setValue('endTime', value)}>
-                    <SelectTrigger className="mt-2">
+                    <SelectTrigger className="mt-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent position="popper" className="w-[140px] z-50 bg-white shadow-lg border border-gray-200">
@@ -558,12 +543,20 @@ export function   CalendarModal({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="startTime">Start Time</Label>
-                  <Input
-                    id="startTime"
-                    type="time"
-                    {...register('startTime')}
-                    className="mt-1"
-                  />
+                  <Select value={watchedStartTime} onValueChange={(value) => setValue('startTime', value)}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="w-[140px] z-50 bg-white shadow-lg border border-gray-200">
+                      <div className="max-h-[300px] overflow-y-auto">
+                        {TIME_OPTIONS.map((time) => (
+                          <SelectItem key={time} value={time}>
+                            {time}
+                          </SelectItem>
+                        ))}
+                      </div>
+                    </SelectContent>
+                  </Select>
                   {errors.startTime && (
                     <p className="text-red-500 text-sm mt-1">{errors.startTime.message}</p>
                   )}
@@ -571,12 +564,20 @@ export function   CalendarModal({
 
                 <div>
                   <Label htmlFor="endTime">End Time</Label>
-                  <Input
-                    id="endTime"
-                    type="time"
-                    {...register('endTime')}
-                    className="mt-1"
-                  />
+                  <Select value={watchedEndTime} onValueChange={(value) => setValue('endTime', value)}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="w-[140px] z-50 bg-white shadow-lg border border-gray-200">
+                      <div className="max-h-[300px] overflow-y-auto">
+                        {TIME_OPTIONS.map((time) => (
+                          <SelectItem key={time} value={time}>
+                            {time}
+                          </SelectItem>
+                        ))}
+                      </div>
+                    </SelectContent>
+                  </Select>
                   {errors.endTime && (
                     <p className="text-red-500 text-sm mt-1">{errors.endTime.message}</p>
                   )}
@@ -585,7 +586,11 @@ export function   CalendarModal({
             </>
           )}
 
-          {watchedStartTime && watchedEndTime && watchedStartTime >= watchedEndTime && (
+          {watchedStartTime && watchedEndTime && (() => {
+            const startMinutes = parseTime(watchedStartTime).hour * 60 + parseTime(watchedStartTime).minute;
+            const endMinutes = parseTime(watchedEndTime).hour * 60 + parseTime(watchedEndTime).minute;
+            return startMinutes >= endMinutes;
+          })() && (
             <p className="text-red-500 text-sm">End time must be after start time</p>
           )}
 
@@ -613,7 +618,11 @@ export function   CalendarModal({
             
             <Button
               type="submit"
-              disabled={isSubmitting || Boolean(watchedStartTime && watchedEndTime && watchedStartTime >= watchedEndTime)}
+              disabled={isSubmitting || Boolean(watchedStartTime && watchedEndTime && (() => {
+                const startMinutes = parseTime(watchedStartTime).hour * 60 + parseTime(watchedStartTime).minute;
+                const endMinutes = parseTime(watchedEndTime).hour * 60 + parseTime(watchedEndTime).minute;
+                return startMinutes >= endMinutes;
+              })())}
               className="bg-[#3F0052] hover:bg-[#3F0052]/90"
             >
               <Save className="w-4 h-4 mr-2" />

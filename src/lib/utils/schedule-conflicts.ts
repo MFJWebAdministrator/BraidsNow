@@ -56,45 +56,8 @@ export const checkEnhancedScheduleConflicts = async (
     // Get stylist schedule
     const stylistSchedule = await getStylistSchedule(stylistId);
     
-    // Check for booking conflicts
-    // const bookingConflicts = existingBookings.filter(booking => {
-    //   if (excludeBookingId && booking.id === excludeBookingId) return false;
-    //   if (booking.status === 'cancelled') return false;
-    //   if (!booking.time) return false;
-      
-    //   let bookingDate: string;
-    //   if (booking.date instanceof Date) {
-    //     bookingDate = booking.date.toISOString().split('T')[0];
-    //   } else if (typeof booking.date === 'string') {
-    //     bookingDate = booking.date;
-    //   } else if (booking.dateTime?.date instanceof Date) {
-    //     bookingDate = booking.dateTime.date.toISOString().split('T')[0];
-    //   } else {
-    //     return false;
-    //   }
-      
-    //   if (bookingDate !== date) return false;
-      
-    //   const bookingEndTime = calculateEndTime(
-    //     booking.time, 
-    //     (booking as any).service?.duration || { hours: 0, minutes: 0 }
-    //   );
-      
-    //   const hasOverlap = (
-    //     (newStartTime < bookingEndTime && newEndTime > booking.time) ||
-    //     (booking.time < newEndTime && bookingEndTime > newStartTime)
-    //   );
-      
-    //   if (hasOverlap) {
-    //     conflicts.push(`Conflicts with existing appointment: ${booking.clientName} - ${booking.serviceName}`);
-    //   }
-      
-    //   return hasOverlap;
-    // });
-    
-    // Check for buffer time conflicts
+    // Check for booking conflicts with buffer time
     if (stylistSchedule?.bufferTime) {
-      const bufferBefore = stylistSchedule.bufferTime.before || 0;
       const bufferAfter = stylistSchedule.bufferTime.after || 0;
       
       existingBookings.forEach(booking => {
@@ -120,36 +83,54 @@ export const checkEnhancedScheduleConflicts = async (
           (booking as any).service?.duration || { hours: 0, minutes: 0 }
         );
         
-        // Check buffer before appointment
-        if (bufferBefore > 0) {
-          const bufferStartTime = new Date(`2000-01-01T${booking.time}:00`);
-          bufferStartTime.setMinutes(bufferStartTime.getMinutes() - bufferBefore);
-          const bufferStart = bufferStartTime.toTimeString().slice(0, 5);
-          
-          const hasBufferConflict = (
-            (newStartTime < booking.time && newEndTime > bufferStart) ||
-            (bufferStart < newEndTime && booking.time > newStartTime)
-          );
-          
-          if (hasBufferConflict) {
-            conflicts.push(`Conflicts with buffer time before appointment: ${booking.clientName}`);
-          }
+        // Add buffer time to the end of the existing booking
+        const bookingBufferEndTime = calculateEndTime(bookingEndTime, { hours: 0, minutes: bufferAfter });
+        
+        // Add buffer time to the end of the new booking
+        const newBookingBufferEndTime = calculateEndTime(newEndTime, { hours: 0, minutes: bufferAfter });
+        
+        // Check for overlap considering buffer times
+        const hasBufferConflict = (
+          (newStartTime < bookingBufferEndTime && newBookingBufferEndTime > booking.time) ||
+          (booking.time < newBookingBufferEndTime && bookingBufferEndTime > newStartTime)
+        );
+        
+        if (hasBufferConflict) {
+          conflicts.push(`Conflicts with appointment (including buffer time): ${booking.clientName}`);
+        }
+      });
+    } else {
+      // Fallback to simple overlap checking if no buffer time is configured
+      existingBookings.forEach(booking => {
+        if (excludeBookingId && booking.id === excludeBookingId) return;
+        if (booking.status === 'cancelled') return;
+        if (!booking.time) return;
+        
+        let bookingDate: string;
+        if (booking.date instanceof Date) {
+          bookingDate = booking.date.toISOString().split('T')[0];
+        } else if (typeof booking.date === 'string') {
+          bookingDate = booking.date;
+        } else if (booking.dateTime?.date instanceof Date) {
+          bookingDate = booking.dateTime.date.toISOString().split('T')[0];
+        } else {
+          return;
         }
         
-        // Check buffer after appointment
-        if (bufferAfter > 0) {
-          const bufferEndTime = new Date(`2000-01-01T${bookingEndTime}:00`);
-          bufferEndTime.setMinutes(bufferEndTime.getMinutes() + bufferAfter);
-          const bufferEnd = bufferEndTime.toTimeString().slice(0, 5);
-          
-          const hasBufferConflict = (
-            (newStartTime < bufferEnd && newEndTime > bookingEndTime) ||
-            (bookingEndTime < newEndTime && bufferEnd > newStartTime)
-          );
-          
-          if (hasBufferConflict) {
-            conflicts.push(`Conflicts with buffer time after appointment: ${booking.clientName}`);
-          }
+        if (bookingDate !== date) return;
+        
+        const bookingEndTime = calculateEndTime(
+          booking.time, 
+          (booking as any).service?.duration || { hours: 0, minutes: 0 }
+        );
+        
+        const hasOverlap = (
+          (newStartTime < bookingEndTime && newEndTime > booking.time) ||
+          (booking.time < newEndTime && bookingEndTime > newStartTime)
+        );
+        
+        if (hasOverlap) {
+          conflicts.push(`Conflicts with existing appointment: ${booking.clientName}`);
         }
       });
     }
@@ -189,7 +170,7 @@ export const checkEnhancedScheduleConflicts = async (
       } else {
         const workStart = `${workHours.start.hour.toString().padStart(2, '0')}:${workHours.start.minute.toString().padStart(2, '0')}`;
         const workEnd = `${workHours.end.hour.toString().padStart(2, '0')}:${workHours.end.minute.toString().padStart(2, '0')}`;
-        console.log
+        
         if (newStartTime < workStart) {
           conflicts.push('Time is before stylist\'s work hours');
         }
@@ -290,16 +271,16 @@ export const getAvailableTimeSlots = (
   const endTime = new Date(2000, 0, 1, endHour, endMinute);
   
   while (currentTime < endTime) {
-    const slotStart = currentTime.toTimeString().slice(0, 5);
-    const slotEnd = calculateEndTime(slotStart, duration);
+    const timeString = currentTime.toTimeString().slice(0, 5);
+    const endTimeString = calculateEndTime(timeString, duration);
     
-    // Check if this slot would end before closing time
-    if (slotEnd <= stylistEndTime) {
-      slots.push(slotStart);
+    // Check if this slot would extend past the stylist's end time
+    if (endTimeString <= stylistEndTime) {
+      slots.push(timeString);
     }
     
-    // Move to next slot (add buffer time)
-    currentTime = new Date(currentTime.getTime() + (duration.hours * 60 + duration.minutes + bufferMinutes) * 60000);
+    // Move to next slot (30-minute intervals)
+    currentTime.setMinutes(currentTime.getMinutes() + 30);
   }
   
   return slots;

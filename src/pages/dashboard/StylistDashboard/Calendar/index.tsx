@@ -46,6 +46,7 @@ export function CalendarPage() {
   const { isMobile, currentView } = useResponsiveCalendar();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedEnd, setSelectedEnd] = useState<Date | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
 
   // Get only stylist appointments for the calendar
@@ -309,21 +310,24 @@ export function CalendarPage() {
     const selectedDate = selectInfo.start;
     const selectedEnd = selectInfo.end;
     
-    // Convert to time strings for comparison
-    const startTime = selectedDate.toTimeString().slice(0, 5);
-    const endTime = selectedEnd.toTimeString().slice(0, 5);
-    // const dateString = selectedDate.toISOString().split('T')[0];
-    
     // Check if the selected time conflicts with unavailable slots
     const isUnavailable = calendarEvents.some(event => {
       if (event.extendedProps?.isUnavailable) {
-        const eventStart = new Date(event.start).toTimeString().slice(0, 5);
-        const eventEnd = new Date(event.end).toTimeString().slice(0, 5);
+        const eventStart = new Date(event.start);
+        const eventEnd = new Date(event.end);
         
-        // Check for overlap
+        // Only check events on the same day
+        const selectedDay = selectedDate.toDateString();
+        const eventDay = eventStart.toDateString();
+        
+        if (selectedDay !== eventDay) {
+          return false;
+        }
+        
+        // Check for overlap using Date objects
         return (
-          (startTime < eventEnd && endTime > eventStart) ||
-          (eventStart < endTime && eventEnd > startTime)
+          (selectedDate < eventEnd && selectedEnd > eventStart) ||
+          (eventStart < selectedEnd && eventEnd > selectedDate)
         );
       }
       return false;
@@ -340,6 +344,7 @@ export function CalendarPage() {
     }
     
     setSelectedDate(selectedDate);
+    setSelectedEnd(selectedEnd);
     setSelectedEvent(null);
     setIsModalOpen(true);
   };
@@ -347,12 +352,14 @@ export function CalendarPage() {
   const handleEventClick = (clickInfo: any) => {
     setSelectedEvent(clickInfo.event);
     setSelectedDate(null);
+    setSelectedEnd(null);
     setIsModalOpen(true);
   };
 
   const handleModalClose = () => {
     setIsModalOpen(false);
     setSelectedDate(null);
+    setSelectedEnd(null);
     setSelectedEvent(null);
   };
 
@@ -557,6 +564,7 @@ export function CalendarPage() {
           isOpen={isModalOpen}
           onClose={handleModalClose}
           selectedDate={selectedDate}
+          selectedEnd={selectedEnd}
           selectedEvent={selectedEvent}
           onEventSaved={handleEventSaved}
           stylistId={user?.uid || ''}

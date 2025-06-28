@@ -14,6 +14,7 @@ export const stylistServiceSchema = z.object({
   price: z.number()
     .min(1, 'Price must be greater than 0')
     .max(10000, 'Price must be less than $10,000'),
+  imageUrl: z.string().url('Invalid image URL').optional(),
 });
 
 export type StylistService = z.infer<typeof stylistServiceSchema>;

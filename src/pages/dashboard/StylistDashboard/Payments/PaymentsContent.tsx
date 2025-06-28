@@ -4,28 +4,13 @@ import {
     StripeConnect,
 } from "@/components/StylistCommunity/StripeConnect";
 import { Card } from "@/components/ui/card";
-import {
-    DollarSign,
-    Loader2,
-    CheckCircle,
-    AlertCircle,
-    XCircle,
-} from "lucide-react";
+import { DollarSign, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { auth } from "@/lib/firebase/config";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
 import { useSubscription } from "@/hooks/use-subscription";
 
 // Update the API base URL to the new endpoint
@@ -51,8 +36,8 @@ export function PaymentsContent() {
     const [searchParams] = useSearchParams();
     const { toast } = useToast();
     const { subscriptionStatus, isLoading, refetch } = useSubscription();
-    const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-    const [cancelLoading, setCancelLoading] = useState(false);
+    // const [setCancelDialogOpen] = useState(false);
+    // const [setCancelLoading] = useState(false);
     const [reactivateLoading, setReactivateLoading] = useState(false);
     const [connectLoading, setConnectLoading] = useState(false);
 
@@ -108,57 +93,57 @@ export function PaymentsContent() {
     }, [searchParams, refetch]);
 
     // Handle canceling a subscription
-    const handleCancelSubscription = async () => {
-        if (!user || !user.uid) {
-            toast({
-                title: "Authentication Error",
-                description:
-                    "User information not available. Please log out and log back in.",
-                variant: "destructive",
-            });
-            return;
-        }
+    // const handleCancelSubscription = async () => {
+    //     if (!user || !user.uid) {
+    //         toast({
+    //             title: "Authentication Error",
+    //             description:
+    //                 "User information not available. Please log out and log back in.",
+    //             variant: "destructive",
+    //         });
+    //         return;
+    //     }
 
-        setCancelLoading(true);
-        try {
-            // Get fresh ID token
-            const idToken = await auth.currentUser?.getIdToken(true);
+    //     setCancelLoading(true);
+    //     try {
+    //         // Get fresh ID token
+    //         const idToken = await auth.currentUser?.getIdToken(true);
 
-            // Call the Express API endpoint
-            await axios.post(
-                `${API_BASE_URL}/cancel-subscription`,
-                { userId: user.uid },
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${idToken}`,
-                    },
-                }
-            );
+    //         // Call the Express API endpoint
+    //         await axios.post(
+    //             `${API_BASE_URL}/cancel-subscription`,
+    //             { userId: user.uid },
+    //             {
+    //                 headers: {
+    //                     "Content-Type": "application/json",
+    //                     Authorization: `Bearer ${idToken}`,
+    //                 },
+    //             }
+    //         );
 
-            // Refetch the updated status TODO
-            await refetch();
+    //         // Refetch the updated status TODO
+    //         await refetch();
 
-            // Close the dialog
-            setCancelDialogOpen(false);
+    //         // Close the dialog
+    //         setCancelDialogOpen(false);
 
-            toast({
-                title: "Subscription Canceled",
-                description:
-                    "Your subscription has been canceled and will end at the current billing period.",
-                variant: "default",
-            });
-        } catch (error) {
-            console.error("Error canceling subscription:", error);
-            toast({
-                title: "Error",
-                description: "Failed to cancel subscription. Please try again.",
-                variant: "destructive",
-            });
-        } finally {
-            setCancelLoading(false);
-        }
-    };
+    //         toast({
+    //             title: "Subscription Canceled",
+    //             description:
+    //                 "Your subscription has been canceled and will end at the current billing period.",
+    //             variant: "default",
+    //         });
+    //     } catch (error) {
+    //         console.error("Error canceling subscription:", error);
+    //         toast({
+    //             title: "Error",
+    //             description: "Failed to cancel subscription. Please try again.",
+    //             variant: "destructive",
+    //         });
+    //     } finally {
+    //         setCancelLoading(false);
+    //     }
+    // };
 
     // Format requirement strings to be more user-friendly
     const formatRequirement = (requirement: string): string => {
@@ -528,73 +513,88 @@ export function PaymentsContent() {
                                         </Button>
                                     </div>
                                 ) : (
-                                    <Dialog
-                                        open={cancelDialogOpen}
-                                        onOpenChange={setCancelDialogOpen}
-                                    >
-                                        <DialogTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                className="text-red-500 border-red-200 hover:bg-red-50"
+                                    // <Dialog
+                                    //     open={cancelDialogOpen}
+                                    //     onOpenChange={setCancelDialogOpen}
+                                    // >
+                                    //     <DialogTrigger asChild>
+                                    //         <Button
+                                    //             variant="outline"
+                                    //             className="text-red-500 border-red-200 hover:bg-red-50"
+                                    //         >
+                                    //             <XCircle className="h-4 w-4 mr-2" />
+                                    //             Cancel Subscription
+                                    //         </Button>
+                                    //     </DialogTrigger>
+                                    //     <DialogContent>
+                                    //         <DialogHeader>
+                                    //             <DialogTitle>
+                                    //                 Cancel Subscription
+                                    //             </DialogTitle>
+                                    //             <DialogDescription>
+                                    //                 Are you sure you want to
+                                    //                 cancel your subscription?
+                                    //                 You'll still have access
+                                    //                 until the end of your
+                                    //                 current billing period.
+                                    //             </DialogDescription>
+                                    //         </DialogHeader>
+                                    //         <div className="bg-amber-50 p-3 rounded-md border border-amber-200 text-amber-800 text-sm mb-4">
+                                    //             <p>
+                                    //                 Your subscription will
+                                    //                 remain active until{" "}
+                                    //                 {convertTimestampToDate(
+                                    //                     subscriptionStatus
+                                    //                         ?.subscription
+                                    //                         ?.currentPeriodEnd
+                                    //                 )?.toLocaleDateString() ||
+                                    //                     "the end of your current billing period"}
+                                    //                 .
+                                    //             </p>
+                                    //         </div>
+                                    //         <DialogFooter>
+                                    //             <Button
+                                    //                 variant="outline"
+                                    //                 onClick={() =>
+                                    //                     setCancelDialogOpen(
+                                    //                         false
+                                    //                     )
+                                    //                 }
+                                    //             >
+                                    //                 Keep Subscription
+                                    //             </Button>
+                                    //             <Button
+                                    //                 variant="destructive"
+                                    //                 onClick={
+                                    //                     handleCancelSubscription
+                                    //                 }
+                                    //                 disabled={cancelLoading}
+                                    //             >
+                                    //                 {cancelLoading ? (
+                                    //                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    //                 ) : (
+                                    //                     <XCircle className="h-4 w-4 mr-2" />
+                                    //                 )}
+                                    //                 Confirm Cancellation
+                                    //             </Button>
+                                    //         </DialogFooter>
+                                    //     </DialogContent>
+                                    // </Dialog>
+                                    <div className="bg-amber-50 p-3 rounded-md border border-amber-200 text-amber-800 text-sm mb-4">
+                                        <p>
+                                            To cancel, please email us at
+                                            <Link
+                                                to={
+                                                    "mailto:cancellations@braidsnow.com"
+                                                }
                                             >
-                                                <XCircle className="h-4 w-4 mr-2" />
-                                                Cancel Subscription
-                                            </Button>
-                                        </DialogTrigger>
-                                        <DialogContent>
-                                            <DialogHeader>
-                                                <DialogTitle>
-                                                    Cancel Subscription
-                                                </DialogTitle>
-                                                <DialogDescription>
-                                                    Are you sure you want to
-                                                    cancel your subscription?
-                                                    You'll still have access
-                                                    until the end of your
-                                                    current billing period.
-                                                </DialogDescription>
-                                            </DialogHeader>
-                                            <div className="bg-amber-50 p-3 rounded-md border border-amber-200 text-amber-800 text-sm mb-4">
-                                                <p>
-                                                    Your subscription will
-                                                    remain active until{" "}
-                                                    {convertTimestampToDate(
-                                                        subscriptionStatus
-                                                            ?.subscription
-                                                            ?.currentPeriodEnd
-                                                    )?.toLocaleDateString() ||
-                                                        "the end of your current billing period"}
-                                                    .
-                                                </p>
-                                            </div>
-                                            <DialogFooter>
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() =>
-                                                        setCancelDialogOpen(
-                                                            false
-                                                        )
-                                                    }
-                                                >
-                                                    Keep Subscription
-                                                </Button>
-                                                <Button
-                                                    variant="destructive"
-                                                    onClick={
-                                                        handleCancelSubscription
-                                                    }
-                                                    disabled={cancelLoading}
-                                                >
-                                                    {cancelLoading ? (
-                                                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                                    ) : (
-                                                        <XCircle className="h-4 w-4 mr-2" />
-                                                    )}
-                                                    Confirm Cancellation
-                                                </Button>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
+                                                <span className="text-blue-600">
+                                                    {" "}
+                                                    cancellations@braidsnow.com{" "}
+                                                </span>
+                                            </Link>
+                                        </p>
+                                    </div>
                                 )}
                             </div>
                         ) : (

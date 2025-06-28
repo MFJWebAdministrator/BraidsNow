@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// @ts-ignore
 import { MassMessageDialog } from '@/components/dashboard/stylist/MassMessageDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -8,11 +9,14 @@ import { Toaster } from '@/components/ui/toaster';
 import { useAuth } from '@/hooks/use-auth';
 import { useMessages } from '@/hooks/use-messages';
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase/config';
+import { db, storage } from '@/lib/firebase/config';
 import { format } from 'date-fns';
 import { collection, doc, getDoc, setDoc } from 'firebase/firestore';
-import { Loader2, MessageSquare, Search, Send, Users } from 'lucide-react';
-import { useState } from 'react';
+import { Loader2, MessageSquare, Search, Send, Users, Paperclip } from 'lucide-react';
+import { useState, useRef } from 'react';
+import heic2any from 'heic2any';
+import { ImageCropper } from '@/components/ClientCommunity/ImageCropper';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 
 export function MessagesContent() {
   const { user } = useAuth();
@@ -22,6 +26,11 @@ export function MessagesContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showMassMessage, setShowMassMessage] = useState(false);
   const { toast } = useToast();
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [croppingImage, setCroppingImage] = useState<File | null>(null);
+  const [croppingQueue, setCroppingQueue] = useState<File[]>([]);
   const filteredThreads = threads.filter(thread => {
     const otherParticipant = thread.participants.find(p => p !== user?.uid);
     if (!otherParticipant) return false;
@@ -30,54 +39,8 @@ export function MessagesContent() {
     return participantDetails.name.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-
-  // const handleSendMessage = async () => {
-  //   if (!user || !selectedThreadId || !newMessage.trim()) return;
-
-  //   try {
-
-
-  //     setSendingMessage(true);
-  //     const messageRef = doc(collection(db, 'messages'));
-  //     const threadRef = doc(db, 'messageThreads', selectedThreadId);
-
-  //     // Find the current thread
-  //     const currentThread = threads.find(t => t.id === selectedThreadId);
-  //     if (!currentThread) return;
-
-  //     const message = {
-  //       id: messageRef.id,
-  //       threadId: selectedThreadId,
-  //       content: newMessage.trim(),
-  //       senderId: user.uid,
-  //       senderName: currentThread.participantDetails[user.uid]?.name || 'Unknown',
-  //       senderImage: currentThread.participantDetails[user.uid]?.image || '',
-  //       participants: currentThread.participants || [],
-  //       readBy: [user.uid],
-  //       createdAt: new Date().toISOString()
-  //     };
-
-  //     await Promise.all([
-  //       setDoc(messageRef, message),
-  //       setDoc(threadRef, {
-  //         lastMessage: {
-  //           content: newMessage.trim(),
-  //           senderId: user.uid,
-  //           createdAt: new Date().toISOString()
-  //         },
-  //         updatedAt: new Date().toISOString()
-  //       }, { merge: true })
-  //     ]);
-
-  //     setNewMessage('');
-  //   } catch (error) {
-  //     console.error('Error sending message:', error);
-  //   } finally {
-  //     setSendingMessage(false);
-  //   }
-  // };
   const handleSendMessage = async () => {
-    if (!user || !selectedThreadId || !newMessage.trim()) return;
+    if (!user || !selectedThreadId || (!newMessage.trim() && selectedImages.length === 0)) return;
 
     try {
       setSendingMessage(true);
@@ -108,6 +71,17 @@ export function MessagesContent() {
         }
       }
 
+      // Upload images if any
+      let imageUrls: string[] = [];
+      if (selectedImages.length > 0) {
+        imageUrls = await Promise.all(selectedImages.map(async (file) => {
+        const imageRef = ref(storage, `profile-images/${user?.uid}/${messageRef.id}-${Date.now()}`);
+        await uploadBytes(imageRef, file);
+        const downloadUrl = await getDownloadURL(imageRef);
+        return downloadUrl
+        }));
+      }
+    
       // Create message
       const message = {
         id: messageRef.id,
@@ -119,6 +93,7 @@ export function MessagesContent() {
         participants: participants,
         readBy: [senderId],
         createdAt: new Date().toISOString(),
+        images: imageUrls,
       };
 
       // Create notification for the client
@@ -150,6 +125,8 @@ export function MessagesContent() {
       ]);
 
       setNewMessage("");
+      setSelectedImages([]);
+      setImagePreviews([]);
     } catch (error: any) {
       console.error("Error sending message:", error);
 
@@ -164,6 +141,87 @@ export function MessagesContent() {
       setSendingMessage(false);
     }
   };
+
+  // Modified handleImageChange to queue images for cropping
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    let newFiles: File[] = [];
+    for (let i = 0; i < files.length && selectedImages.length + newFiles.length < 3; i++) {
+      let file = files[i];
+      // Accept HEIC/HEIF and convert to JPEG/PNG for preview
+      if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.endsWith('.heic') || file.name.endsWith('.HEIC') || file.name.endsWith('.heif') || file.name.endsWith('.HEIF')) {
+        try {
+          const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+          if (converted instanceof Blob) {
+            file = new File([converted], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+          }
+        } catch (err) {
+          console.error('HEIC conversion failed:', err);
+          continue;
+        }
+      }
+      newFiles.push(file);
+    }
+    // Start cropping the first image in the queue
+    if (newFiles.length > 0) {
+      setCroppingQueue(newFiles);
+      setCroppingImage(newFiles[0]);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Handle crop complete
+  const handleCropComplete = (croppedFile: File) => {
+    // Check file size after cropping
+    if (croppedFile.size > 5 * 1024 * 1024) {
+      toast({
+        title: 'Image too large',
+        description: 'Each image must be less than 5MB after cropping.',
+        variant: 'destructive',
+      });
+      // Move to next image in queue
+      const [, ...rest] = croppingQueue;
+      if (rest.length > 0) {
+        setCroppingQueue(rest);
+        setCroppingImage(rest[0]);
+      } else {
+        setCroppingQueue([]);
+        setCroppingImage(null);
+      }
+      return;
+    }
+    setSelectedImages(prev => [...prev, croppedFile].slice(0, 3));
+    setImagePreviews(prev => [...prev, URL.createObjectURL(croppedFile)].slice(0, 3));
+    // Move to next image in queue
+    const [, ...rest] = croppingQueue;
+    if (rest.length > 0) {
+      setCroppingQueue(rest);
+      setCroppingImage(rest[0]);
+    } else {
+      setCroppingQueue([]);
+      setCroppingImage(null);
+    }
+  };
+
+  // Handle crop cancel (skip image)
+  const handleCropCancel = () => {
+    const [, ...rest] = croppingQueue;
+    if (rest.length > 0) {
+      setCroppingQueue(rest);
+      setCroppingImage(rest[0]);
+    } else {
+      setCroppingQueue([]);
+      setCroppingImage(null);
+    }
+  };
+
+  // Remove image
+  const handleRemoveImage = (idx: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== idx));
+    setImagePreviews(prev => prev.filter((_, i) => i !== idx));
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -181,7 +239,7 @@ export function MessagesContent() {
         {/* Messages List */}
         <div className="col-span-12 lg:col-span-4">
           <Card className="p-4">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div className="relative flex-1">
                 <Input
                   placeholder="Search messages..."
@@ -193,7 +251,7 @@ export function MessagesContent() {
               </div>
               <Button
                 variant="outline"
-                className="ml-2"
+                className="ml-2 "
                 onClick={() => setShowMassMessage(true)}
               >
                 <Users className="w-4 h-4 mr-2" />
@@ -283,6 +341,19 @@ export function MessagesContent() {
                                 : 'bg-gray-100'
                                 }`}>
                                 {message.content}
+                                {message.images && message.images.length > 0 && (
+                                  <div className="mt-2 flex flex-col gap-2">
+                                    {message.images.map((image: string, index: number) => (
+                                      <a key={index} href={image} target="_blank" rel="noopener noreferrer">
+                                        <img
+                                          src={image}
+                                          alt={`Sent image ${index + 1}`}
+                                          className="rounded-lg max-w-full h-auto"
+                                        />
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                               <div className={`text-xs mt-1 ${isSender ? 'text-right' : ''}`}>
                                 {format(new Date(message.createdAt), 'MMM d, h:mm a')}
@@ -296,9 +367,30 @@ export function MessagesContent() {
 
                   {/* Message Input */}
                   <div className="mt-4 border-t pt-4">
-                    <div className="flex gap-4">
+                    <div className="flex gap-2 items-end relative">
+                      {/* <div className="absolute left-3 top-1/3 -translate-y-1/2 h-4 w-4 flex flex-col items-center">
+                        <input
+                          type="file"
+                          accept="image/*,.heic,.heif"
+                          multiple
+                          ref={fileInputRef}
+                          style={{ display: 'none' }}
+                          onChange={handleImageChange}
+                          disabled={selectedImages.length >= 3}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="p-2"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={selectedImages.length >= 3}
+                          title={selectedImages.length >= 3 ? 'Maximum 3 images' : 'Attach image'}
+                        >
+                          <Paperclip className="w-5 h-5 text-gray-400" />
+                        </Button>
+                      </div> */}
                       <Input
-                        placeholder="Type a message..."
+                        placeholder="Write a message..."
                         className="flex-1"
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
@@ -311,7 +403,8 @@ export function MessagesContent() {
                       />
                       <Button
                         onClick={handleSendMessage}
-                        disabled={!newMessage.trim() || sendingMessage}
+                        disabled={(!newMessage.trim() && selectedImages.length === 0) || sendingMessage}
+                        className="ml-2"
                       >
                         {sendingMessage ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -320,6 +413,24 @@ export function MessagesContent() {
                         )}
                       </Button>
                     </div>
+                    {/* Image previews */}
+                    {imagePreviews.length > 0 && (
+                      <div className="flex gap-2 mt-2">
+                        {imagePreviews.map((src, idx) => (
+                          <div key={idx} className="relative group">
+                            <img src={src} alt={`preview-${idx}`} className="max-w-16 max-h-16 object-cover rounded" />
+                            <button
+                              type="button"
+                              className="absolute top-0 right-0 bg-white bg-opacity-80 rounded-full p-1 text-xs hidden group-hover:block"
+                              onClick={() => handleRemoveImage(idx)}
+                              title="Remove"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (
@@ -347,6 +458,14 @@ export function MessagesContent() {
         onClose={() => setShowMassMessage(false)}
       />
 
+      {croppingImage && (
+        <ImageCropper
+          image={croppingImage}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+          cropShape="square"
+        />
+      )}
 
     </>
   );

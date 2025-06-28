@@ -80,28 +80,29 @@ export function DateTimeSelection({ stylistId, selectedService, onSelect }: Date
       (selectedService.duration?.minutes || 0) +
       (schedule.bufferTime.before || 0) + 
       (schedule.bufferTime.after || 0);
-
     // Account for breaks
     const breaks = schedule.breaks.filter(b => b.days.includes(dayOfWeek));
-
+    
     while (isBefore(currentTime, endTime)) {
+      // Calculate end time for this slot
+      const slotEndTime = addMinutes(currentTime, totalDuration);
+      // Prevent overtime: if service would end after closing, skip this slot
+      if (isAfter(slotEndTime, endTime)) {
+        break;
+      }
       // Format time in 12-hour format
       const timeString = format(currentTime, 'h:mm a');
-      
       // Check if time slot overlaps with any break
       const isBreakTime = breaks.some(b => {
         const breakStart = setMinutes(setHours(date, b.start.hour), b.start.minute);
         const breakEnd = setMinutes(setHours(date, b.end.hour), b.end.minute);
         return !isAfter(currentTime, breakEnd) && !isBefore(addMinutes(currentTime, totalDuration), breakStart);
       });
-
       // Check if time slot is available (not booked)
       const isAvailable = isTimeSlotAvailable(currentTime, totalDuration);
-
       if (!isBreakTime && isAvailable) {
         times.push(timeString);
       }
-
       currentTime = addMinutes(currentTime, 30);
     }
 

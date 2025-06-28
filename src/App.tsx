@@ -36,6 +36,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { StylistAppointmentsPage } from "./pages/dashboard/StylistDashboard/Appointements";
 import { ClientAppointmentsPage } from "./pages/dashboard/ClientDashboard/Appointements";
 import ComingSoon from "./pages/ComingSoon";
+import NotFound from '@/pages/NotFound';
 
 const COMING_SOON = import.meta.env.VITE_COMING_SOON;
 
@@ -269,6 +270,8 @@ export function App() {
                         element={<PaymentSuccess />}
                     />
                     <Route path="/payment-cancel" element={<PaymentCancel />} />
+                    {/* 404 Catch-all route */}
+                    <Route path="*" element={<NotFound />} />
                 </Routes>
                 <Toaster />
             </div>

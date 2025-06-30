@@ -10,12 +10,18 @@ import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 export function GoogleCalendarCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const { toast } = useToast();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState('');
   console.log('user', user);
+  
   useEffect(() => {
+    // Wait for auth to finish loading before processing callback
+    if (loading) {
+      return;
+    }
+    
     const handleCallback = async () => {
       if (!user) {
         setStatus('error');

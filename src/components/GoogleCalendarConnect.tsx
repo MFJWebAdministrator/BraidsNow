@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Calendar, Link, Link2, Unlink, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import { Calendar, Link2, Unlink, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { useGoogleCalendar } from '@/hooks/use-google-calendar';
 import { useAppointments } from '@/hooks/use-appointments';
 

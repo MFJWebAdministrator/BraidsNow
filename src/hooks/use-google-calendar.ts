@@ -1,16 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
-import { useAuth } from './use-auth';
 import { useToast } from './use-toast';
 import googleCalendarService from '@/lib/google-calendar';
-import type { GoogleCalendarEvent } from '@/lib/google-calendar';
-
-interface GoogleCalendarTokens {
-  access_token: string;
-  refresh_token?: string;
-  expiry_date?: number;
-}
 
 interface UseGoogleCalendarReturn {
   isConnected: boolean;
@@ -24,7 +14,7 @@ interface UseGoogleCalendarReturn {
 }
 
 export function useGoogleCalendar(): UseGoogleCalendarReturn {
-  const { user } = useAuth();
+  // const { user } = useAuth();
   const { toast } = useToast();
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -35,10 +25,10 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
     setIsConnected(!!tokens.access_token);
   }, []);
 
-  const checkConnectionStatus = useCallback(() => {
-    const tokens = JSON.parse(localStorage.getItem('googleCalendarTokens') || '{}');
-    setIsConnected(!!tokens.access_token);
-  }, []);
+  // const checkConnectionStatus = useCallback(() => {
+  //   const tokens = JSON.parse(localStorage.getItem('googleCalendarTokens') || '{}');
+  //   setIsConnected(!!tokens.access_token);
+  // }, []);
 
   const connectGoogleCalendar = useCallback(async () => {
     setIsConnecting(true);
@@ -59,7 +49,7 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
     });
   }, [toast]);
 
-  const syncAppointmentToGoogle = useCallback(async (appointment: any) => {
+  const syncAppointmentToGoogle = useCallback(async () => {
     const tokens = JSON.parse(localStorage.getItem('googleCalendarTokens') || '{}');
     if (!tokens.access_token) {
       toast({
@@ -70,8 +60,8 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
       return;
     }
     try {
-      const googleEvent = googleCalendarService.convertAppointmentToGoogleEvent(appointment);
-      const createdEvent = await googleCalendarService.createEvent(googleEvent, tokens.access_token);
+      // const googleEvent = googleCalendarService.convertAppointmentToGoogleEvent(appointment);
+      // const createdEvent = await googleCalendarService.createEvent(googleEvent, tokens.access_token);
       toast({
         title: "Synced to Google Calendar",
         description: "Appointment has been added to your Google Calendar.",
@@ -150,8 +140,8 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
       let syncedCount = 0;
       for (const appointment of appointments) {
         if (appointment.status !== 'cancelled' && !appointment.googleCalendarEventId) {
-          const googleEvent = googleCalendarService.convertAppointmentToGoogleEvent(appointment);
-          const createdEvent = await googleCalendarService.createEvent(googleEvent, tokens.access_token);
+          // const googleEvent = googleCalendarService.convertAppointmentToGoogleEvent(appointment);
+          // const createdEvent = await googleCalendarService.createEvent(googleEvent, tokens.access_token);
           syncedCount++;
         }
       }

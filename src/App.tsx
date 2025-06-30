@@ -36,6 +36,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { StylistAppointmentsPage } from "./pages/dashboard/StylistDashboard/Appointements";
 import { ClientAppointmentsPage } from "./pages/dashboard/ClientDashboard/Appointements";
 import { CalendarPage } from "./pages/dashboard/StylistDashboard/Calendar";
+import { GoogleCalendarCallback } from "./pages/GoogleCalendarCallback";
 import ComingSoon from "./pages/ComingSoon";
 import NotFound from '@/pages/NotFound';
 
@@ -279,6 +280,10 @@ export function App() {
                         element={<PaymentSuccess />}
                     />
                     <Route path="/payment-cancel" element={<PaymentCancel />} />
+                    <Route
+                        path="/google-calendar-callback"
+                        element={<GoogleCalendarCallback />}
+                    />
                     {/* 404 Catch-all route */}
                     <Route path="*" element={<NotFound />} />
                 </Routes>

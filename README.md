@@ -212,3 +212,152 @@ This project is proprietary software. All rights reserved.
 ---
 
 For technical support or questions, please contact the development team.
+
+## Google Calendar Integration
+
+The platform includes full Google Calendar integration for stylists:
+
+### Features
+- **Automatic Sync**: New appointments are automatically added to Google Calendar
+- **Two-way Updates**: Changes in BraidsNow update Google Calendar events
+- **Client Invitations**: Clients receive Google Calendar invitations
+- **Reminders**: Google Calendar notifications and reminders
+- **Bulk Sync**: Sync all existing appointments at once
+
+### Setup Steps
+
+1. **Create Google Cloud Project**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select existing one
+   - Enable Google Calendar API
+
+2. **Configure OAuth 2.0**:
+   - Go to "APIs & Services" > "Credentials"
+   - Create OAuth 2.0 Client ID
+   - Set authorized redirect URI: `https://yourdomain.com/google-calendar-callback`
+   - Download client credentials
+
+3. **Environment Variables**:
+   Add these to your `.env` file:
+   ```env
+   VITE_GOOGLE_CLIENT_ID=your_google_client_id
+   VITE_GOOGLE_CLIENT_SECRET=your_google_client_secret
+   VITE_GOOGLE_REDIRECT_URI=https://yourdomain.com/google-calendar-callback
+   ```
+
+4. **User Experience**:
+   - Stylists can connect their Google Calendar from the Calendar page
+   - One-click sync for all existing appointments
+   - Automatic sync for new appointments
+   - Easy disconnect option
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+ 
+- npm or yarn
+- Firebase project
+- Stripe account
+- Google Cloud project (for calendar integration)
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/braidsnow.git
+cd braidsnow
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Set up environment variables:
+```bash
+cp .env.example .env
+```
+
+4. Configure your environment variables in `.env`:
+```env
+# Firebase
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+
+# Stripe
+VITE_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
+
+# Google Calendar
+VITE_GOOGLE_CLIENT_ID=your_google_client_id
+VITE_GOOGLE_CLIENT_SECRET=your_google_client_secret
+VITE_GOOGLE_REDIRECT_URI=https://yourdomain.com/google-calendar-callback
+```
+
+5. Start the development server:
+```bash
+npm run dev
+```
+
+## Project Structure
+
+```
+src/
+├── components/          # Reusable UI components
+│   ├── auth/           # Authentication components
+│   ├── dashboard/      # Dashboard components
+│   ├── ui/            # Base UI components
+│   └── GoogleCalendarConnect.tsx  # Google Calendar integration
+├── hooks/              # Custom React hooks
+│   └── use-google-calendar.ts     # Google Calendar hook
+├── lib/                # Utility libraries
+│   ├── firebase/       # Firebase configuration
+│   ├── google-calendar.ts         # Google Calendar service
+│   └── stripe.ts       # Stripe configuration
+├── pages/              # Page components
+│   ├── dashboard/      # Dashboard pages
+│   └── GoogleCalendarCallback.tsx # OAuth callback
+└── App.tsx             # Main app component
+```
+
+## Deployment
+
+### Firebase Hosting
+
+1. Build the project:
+```bash
+npm run build
+```
+
+2. Deploy to Firebase:
+```bash
+firebase deploy
+```
+
+### Environment Variables
+
+Make sure to set all environment variables in your production environment:
+
+- **Firebase**: API keys and project configuration
+- **Stripe**: Publishable and secret keys
+- **Google Calendar**: OAuth 2.0 credentials
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License.
+
+## Support
+
+For support, email support@braidsnow.com or create an issue in the repository.

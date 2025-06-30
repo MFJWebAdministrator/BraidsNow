@@ -5,6 +5,7 @@ import { useSchedule } from '@/hooks/use-schedule';
 import { useToast } from '@/hooks/use-toast';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { StylistDashboardHeader } from '@/components/dashboard/stylist/StylistDashboardHeader';
+import { GoogleCalendarConnect } from '@/components/GoogleCalendarConnect';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -431,6 +432,9 @@ export function CalendarPage() {
                 </div>
               </div>
             </Card>
+
+            {/* Google Calendar Integration */}
+            <GoogleCalendarConnect />
 
             {/* Calendar Container */}
             <div className="w-full">

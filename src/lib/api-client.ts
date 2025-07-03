@@ -5,8 +5,7 @@ import { loadStripe as loadStripeLib } from "@stripe/stripe-js";
 // Define the API base URL - make sure we're using the correct endpoint
 // During development, you might want to use the emulator URL
 const isLocalDev =
-    process.env.NODE_ENV === "development" &&
-    process.env.REACT_APP_USE_EMULATOR === "true";
+    import.meta.env.DEV && import.meta.env.VITE_USE_EMULATOR === "true";
 const API_BASE_URL = isLocalDev
     ? "http://localhost:5001/braidsnow/us-central1/api"
     : import.meta.env.VITE_API_URL;
@@ -79,4 +78,105 @@ export const createConnectAccount = async (
 // Helper function to load Stripe
 export const loadStripe = async (key: string) => {
     return loadStripeLib(key);
+};
+
+// Email API functions
+export const sendWelcomeClientEmail = async (
+    clientName: string,
+    clientEmail: string
+) => {
+    return apiRequest("/send-welcome-client-email", {
+        clientName,
+        clientEmail,
+    });
+};
+
+export const sendWelcomeStylistEmail = async (
+    stylistName: string,
+    stylistEmail: string
+) => {
+    return apiRequest("/send-welcome-stylist-email", {
+        stylistName,
+        stylistEmail,
+    });
+};
+
+export const sendAppointmentConfirmationClient = async (data: {
+    clientName: string;
+    clientEmail: string;
+    stylistName: string;
+    appointmentDate: string;
+    appointmentTime: string;
+    serviceName: string;
+}) => {
+    return apiRequest("/send-appointment-confirmation-client", data);
+};
+
+export const sendAppointmentConfirmationStylist = async (data: {
+    stylistName: string;
+    stylistEmail: string;
+    clientName: string;
+    appointmentDate: string;
+    appointmentTime: string;
+    serviceName: string;
+}) => {
+    return apiRequest("/send-appointment-confirmation-stylist", data);
+};
+
+export const sendPaymentFailureStylist = async (
+    stylistName: string,
+    stylistEmail: string
+) => {
+    return apiRequest("/send-payment-failure-stylist", {
+        stylistName,
+        stylistEmail,
+    });
+};
+
+export const sendAccountCancellationStylist = async (
+    stylistName: string,
+    stylistEmail: string
+) => {
+    return apiRequest("/send-account-cancellation-stylist", {
+        stylistName,
+        stylistEmail,
+    });
+};
+
+export const sendAppointmentDeniedClient = async (data: {
+    clientName: string;
+    clientEmail: string;
+    stylistName: string;
+}) => {
+    return apiRequest("/send-appointment-denied-client", data);
+};
+
+export const sendFullPaymentReminderClient = async (data: {
+    clientName: string;
+    clientEmail: string;
+    stylistName: string;
+    appointmentDate: string;
+    appointmentTime: string;
+    serviceName: string;
+    balanceAmount: string;
+}) => {
+    return apiRequest("/send-full-payment-reminder-client", data);
+};
+
+export const sendMessageNotificationStylist = async (data: {
+    recipientName: string;
+    recipientEmail: string;
+    senderName: string;
+    userType: "client" | "stylist";
+}) => {
+    return apiRequest("/send-message-notification-stylist", data);
+};
+
+export const sendMessageNotificationClient = async (data: {
+    recipientName: string;
+    recipientEmail: string;
+    senderName: string;
+    userType: "client" | "stylist";
+}) => {
+    return apiRequest("/send-message-notification-client", data);
 };

@@ -7,6 +7,7 @@ import express, { Request, Response } from "express";
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import Stripe from "stripe";
+import { EmailService } from "./email-service";
 
 const app = express();
 
@@ -17,7 +18,6 @@ const db = admin.firestore();
 // Initialize Stripe with your secret key
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-    // @ts-expect-error this is a workaround for the Stripe library
     apiVersion: "2022-11-15",
 });
 
@@ -759,24 +759,37 @@ app.post(
             }
 
             // Fetch stylist's schedule from Firestore
-            const scheduleSnap = await db.collection('stylists').doc(bookingData.stylistId).collection('settings').doc('schedule').get();
+            const scheduleSnap = await db
+                .collection("stylists")
+                .doc(bookingData.stylistId)
+                .collection("settings")
+                .doc("schedule")
+                .get();
             if (!scheduleSnap.exists) {
-                return res.status(400).json({ error: 'Stylist schedule not found' });
+                return res
+                    .status(400)
+                    .json({ error: "Stylist schedule not found" });
             }
             const schedule = scheduleSnap.data();
             // Determine day of week
             const bookingDate = new Date(bookingData.date);
-            const dayOfWeek = bookingDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            const dayOfWeek = bookingDate
+                .toLocaleDateString("en-US", { weekday: "long" })
+                .toLowerCase();
             const workHours = schedule.workHours[dayOfWeek];
             if (!workHours || !workHours.isEnabled) {
-                return res.status(400).json({ error: 'Stylist is not available on this day' });
+                return res
+                    .status(400)
+                    .json({ error: "Stylist is not available on this day" });
             }
             // Parse booking start time
-            const [hour, minute] = bookingData.time.split(':').map(Number);
+            const [hour, minute] = bookingData.time.split(":").map(Number);
             const start = new Date(bookingDate);
             start.setHours(hour, minute, 0, 0);
             // Calculate total service duration (minutes)
-            const duration = (bookingData.service?.duration?.hours || 0) * 60 + (bookingData.service?.duration?.minutes || 0);
+            const duration =
+                (bookingData.service?.duration?.hours || 0) * 60 +
+                (bookingData.service?.duration?.minutes || 0);
             const bufferBefore = schedule.bufferTime?.before || 0;
             const bufferAfter = schedule.bufferTime?.after || 0;
             const totalDuration = duration + bufferBefore + bufferAfter;
@@ -787,7 +800,9 @@ app.post(
             closing.setHours(workHours.end.hour, workHours.end.minute, 0, 0);
             // Prevent overtime
             if (end > closing) {
-                return res.status(400).json({ error: 'This service will run past the stylist\'s available hours. Please select an earlier time.' });
+                return res.status(400).json({
+                    error: "This service will run past the stylist's available hours. Please select an earlier time.",
+                });
             }
 
             // Create the booking
@@ -1034,6 +1049,61 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
 
                             // Clean up the pending booking
                             await pendingBookingRef.delete();
+
+                            console.log(
+                                "notifying stylist about the new appointment"
+                            );
+
+                            // send email to stylist about the new appointment
+                            setTimeout(
+                                async () =>
+                                    await EmailService.sendNewAppointmentForStylist(
+                                        {
+                                            stylistName:
+                                                bookingData.stylistName,
+                                            stylistEmail:
+                                                bookingData.stylistEmail,
+                                            clientName: bookingData.clientName,
+                                            appointmentDate: bookingData.date,
+                                            appointmentTime: bookingData.time,
+                                            serviceName:
+                                                bookingData.serviceName,
+                                        }
+                                    )
+                            );
+
+                            console.log(
+                                "booking type",
+                                bookingData.paymentType
+                            );
+
+                            if (bookingData.paymentType === "deposit") {
+                                console.log(
+                                    "notifying client about the full payment reminder"
+                                );
+
+                                setTimeout(
+                                    async () =>
+                                        await EmailService.sendFullPaymentReminderForClient(
+                                            {
+                                                clientName:
+                                                    bookingData.clientName,
+                                                clientEmail:
+                                                    bookingData.clientEmail,
+                                                stylistName:
+                                                    bookingData.stylistName,
+                                                appointmentDate:
+                                                    bookingData.date,
+                                                appointmentTime:
+                                                    bookingData.time,
+                                                serviceName:
+                                                    bookingData.serviceName,
+                                                balanceAmount:
+                                                    bookingData.totalAmount,
+                                            }
+                                        )
+                                );
+                            }
                         }
                     }
                 }
@@ -1588,6 +1658,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                 const invoice = event.data.object as Stripe.Invoice;
                 const subscriptionId = invoice.subscription as string;
                 const customerId = invoice.customer as string;
+                const customerEmail = invoice.customer_email as string;
 
                 if (subscriptionId && customerId) {
                     // Find the stylist with this customer ID
@@ -1643,6 +1714,21 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                             createdAt:
                                 admin.firestore.FieldValue.serverTimestamp(),
                         });
+
+                        //send email to stylist
+                        // TODO: to be tested after a month when the next payment fails
+                        setTimeout(
+                            async () =>
+                                await EmailService.sendPaymentFailureForStylist(
+                                    {
+                                        stylistName:
+                                            stylistDoc.data()?.name ||
+                                            "Unknown",
+                                        stylistEmail: customerEmail,
+                                    }
+                                ),
+                            0
+                        );
                     }
                 }
                 break;
@@ -2877,6 +2963,518 @@ app.get(
             });
         } catch (error) {
             console.error("Error getting payment details:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.get(
+    "/test",
+    cors({ origin: true }),
+    async (req: Request, res: Response) => {
+        return res.status(200).json({ message: "Hello, world!" });
+    }
+);
+
+// Email endpoints
+app.post(
+    "/send-welcome-client-email",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: { clientName: string; clientEmail: string };
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const { clientName, clientEmail } = req.body;
+
+            if (!clientName || !clientEmail) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+
+            await EmailService.sendWelcomeClientEmail({
+                clientName,
+                clientEmail,
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: "Welcome email sent successfully",
+            });
+        } catch (error) {
+            console.error("Error sending welcome client email:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.post(
+    "/send-welcome-stylist-email",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: { stylistName: string; stylistEmail: string };
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const { stylistName, stylistEmail } = req.body;
+
+            if (!stylistName || !stylistEmail) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+
+            await EmailService.sendWelcomeStylistEmail({
+                stylistName,
+                stylistEmail,
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: "Welcome email sent successfully",
+            });
+        } catch (error) {
+            console.error("Error sending welcome stylist email:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.post(
+    "/send-appointment-confirmation-client",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: {
+                clientName: string;
+                clientEmail: string;
+                stylistName: string;
+                appointmentDate: string;
+                appointmentTime: string;
+                serviceName: string;
+            };
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const {
+                clientName,
+                clientEmail,
+                stylistName,
+                appointmentDate,
+                appointmentTime,
+                serviceName,
+            } = req.body;
+
+            if (
+                !clientName ||
+                !clientEmail ||
+                !stylistName ||
+                !appointmentDate ||
+                !appointmentTime ||
+                !serviceName
+            ) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+
+            await EmailService.sendAppointmentConfirmationClient({
+                clientName,
+                clientEmail,
+                stylistName,
+                appointmentDate,
+                appointmentTime,
+                serviceName,
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: "Appointment confirmation email sent successfully",
+            });
+        } catch (error) {
+            console.error(
+                "Error sending appointment confirmation email:",
+                error
+            );
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.post(
+    "/send-new-appointment-email-to-stylist",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: {
+                stylistName: string;
+                stylistEmail: string;
+                clientName: string;
+                appointmentDate: string;
+                appointmentTime: string;
+                serviceName: string;
+            };
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const {
+                stylistName,
+                stylistEmail,
+                clientName,
+                appointmentDate,
+                appointmentTime,
+                serviceName,
+            } = req.body;
+
+            if (
+                !stylistName ||
+                !stylistEmail ||
+                !clientName ||
+                !appointmentDate ||
+                !appointmentTime ||
+                !serviceName
+            ) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+
+            await EmailService.sendNewAppointmentForStylist({
+                stylistName,
+                stylistEmail,
+                clientName,
+                appointmentDate,
+                appointmentTime,
+                serviceName,
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: "Appointment confirmation email sent successfully",
+            });
+        } catch (error) {
+            console.error(
+                "Error sending appointment confirmation email:",
+                error
+            );
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.post(
+    "/send-payment-failure-stylist",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: { stylistName: string; stylistEmail: string };
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const { stylistName, stylistEmail } = req.body;
+
+            if (!stylistName || !stylistEmail) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+
+            await EmailService.sendPaymentFailureForStylist({
+                stylistName,
+                stylistEmail,
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: "Payment failure email sent successfully",
+            });
+        } catch (error) {
+            console.error("Error sending payment failure email:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.post(
+    "/send-account-cancellation-stylist",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: { stylistName: string; stylistEmail: string };
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const { stylistName, stylistEmail } = req.body;
+
+            if (!stylistName || !stylistEmail) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+
+            await EmailService.sendAccountCancellationStylist({
+                stylistName,
+                stylistEmail,
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: "Account cancellation email sent successfully",
+            });
+        } catch (error) {
+            console.error("Error sending account cancellation email:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.post(
+    "/send-appointment-denied-client",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: {
+                clientName: string;
+                clientEmail: string;
+                stylistName: string;
+            };
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const { clientName, clientEmail, stylistName } = req.body;
+
+            if (!clientName || !clientEmail || !stylistName) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+
+            await EmailService.sendAppointmentDeniedClient({
+                clientName,
+                clientEmail,
+                stylistName,
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: "Appointment denied email sent successfully",
+            });
+        } catch (error) {
+            console.error("Error sending appointment denied email:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.post(
+    "/send-full-payment-reminder-client",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: {
+                clientName: string;
+                clientEmail: string;
+                stylistName: string;
+                appointmentDate: string;
+                appointmentTime: string;
+                serviceName: string;
+                balanceAmount: string;
+            };
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const {
+                clientName,
+                clientEmail,
+                stylistName,
+                appointmentDate,
+                appointmentTime,
+                serviceName,
+                balanceAmount,
+            } = req.body;
+
+            if (
+                !clientName ||
+                !clientEmail ||
+                !stylistName ||
+                !appointmentDate ||
+                !appointmentTime ||
+                !serviceName ||
+                !balanceAmount
+            ) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+
+            await EmailService.sendFullPaymentReminderForClient({
+                clientName,
+                clientEmail,
+                stylistName,
+                appointmentDate,
+                appointmentTime,
+                serviceName,
+                balanceAmount,
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: "Full payment reminder email sent successfully",
+            });
+        } catch (error) {
+            console.error("Error sending full payment reminder email:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.post(
+    "/send-message-notification-stylist",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: {
+                recipientName: string;
+                recipientEmail: string;
+                senderName: string;
+                userType: "client" | "stylist";
+            };
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const { recipientName, recipientEmail, senderName, userType } =
+                req.body;
+
+            if (!recipientName || !recipientEmail || !senderName || !userType) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+
+            await EmailService.sendMessageNotificationStylist({
+                recipientName,
+                recipientEmail,
+                senderName,
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: "Message notification email sent successfully",
+            });
+        } catch (error) {
+            console.error("Error sending message notification email:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.post(
+    "/send-message-notification-client",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: {
+                recipientName: string;
+                recipientEmail: string;
+                senderName: string;
+                userType: "client" | "stylist";
+            };
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const { recipientName, recipientEmail, senderName } = req.body;
+
+            if (!recipientName || !recipientEmail || !senderName) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+
+            await EmailService.sendMessageNotificationClient({
+                recipientName,
+                recipientEmail,
+                senderName,
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: "Message notification email sent successfully",
+            });
+        } catch (error) {
+            console.error("Error sending message notification email:", error);
             return res.status(500).json({
                 error:
                     error instanceof Error

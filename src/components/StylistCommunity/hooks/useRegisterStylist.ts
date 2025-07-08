@@ -3,10 +3,12 @@ import { useToast } from "@/hooks/use-toast";
 import { registerStylist } from "@/lib/firebase/stylist/register";
 import type { StylistRegistrationForm } from "@/lib/schemas/stylist-registration";
 import type { User } from "firebase/auth";
+import { useEmail } from "@/hooks/use-email";
 
 export function useRegisterStylist() {
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
+    const { sendWelcomeStylistEmail } = useEmail();
 
     const register = async (
         data: StylistRegistrationForm,
@@ -23,6 +25,16 @@ export function useRegisterStylist() {
                 // description:
                 //     "Your stylist account has been created successfully.",
             });
+
+            // send welcome email
+            try {
+                await sendWelcomeStylistEmail({
+                    stylistName: `${data.firstName} ${data.lastName}`,
+                    stylistEmail: data.email,
+                });
+            } catch (error) {
+                console.error("Error sending welcome email:", error);
+            }
 
             return user;
         } catch (error: any) {

@@ -3,8 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import confetti from "canvas-confetti";
 import { AlertCircle } from "lucide-react";
-import { SEO } from '@/components/SEO';
-import { getPageMetadata } from '@/lib/metadata';
+import { SEO } from "@/components/SEO";
+import { getPageMetadata } from "@/lib/metadata";
 
 // Helper function for confetti animation
 function randomInRange(min: number, max: number) {
@@ -64,7 +64,7 @@ export function StylistRegistration() {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <SEO metadata={getPageMetadata('stylistRegistration')} />
+            <SEO metadata={getPageMetadata("stylistRegistration")} />
             <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-lg text-center">
                 <div className="space-y-4">
                     {isSuccess ? (

@@ -10,273 +10,295 @@ import axios from "axios";
 import type { BookingForm } from "@/lib/schemas/booking";
 
 interface BookingConfirmationProps {
-  booking: BookingForm;
-  onComplete: () => void;
+    booking: BookingForm;
+    onComplete: () => void;
 }
 
 export function BookingConfirmation({
-  booking,
-  onComplete,
+    booking,
+    onComplete,
 }: BookingConfirmationProps | any) {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const { toast } = useToast();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const API_BASE_URL = import.meta.env.VITE_API_URL;
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const { toast } = useToast();
+    const navigate = useNavigate();
+    const { user } = useAuth();
+    const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-  // Calculate payment amount based on payment type (in cents for Stripe)
-  const paymentAmount =
-    booking.paymentType === "deposit"
-      ? booking.depositAmount * 100
-      : booking.totalAmount * 100;
-  const isPaymentRequired = paymentAmount > 0;
+    // Calculate payment amount based on payment type (in cents for Stripe)
+    const paymentAmount =
+        booking.paymentType === "deposit"
+            ? booking.depositAmount * 100
+            : booking.totalAmount * 100;
+    const isPaymentRequired = paymentAmount > 0;
 
-  const handleConfirm = async () => {
-    try {
-      setErrorMessage(null);
-      setIsProcessing(true);
-
-      // Validate booking data
-      if (
-        !booking.stylistId ||
-        !booking.serviceName ||
-        !booking.date ||
-        !booking.time
-      ) {
-        throw new Error("Missing required booking information");
-      }
-
-      if (!user || !user.uid) {
-        throw new Error("You must be logged in to complete this booking");
-      }
-
-      const formattedDate =
-        booking.date instanceof Date
-          ? format(booking.date, "yyyy-MM-dd")
-          : typeof booking.date === "string"
-            ? booking.date
-            : format(new Date(booking.date), "yyyy-MM-dd");
-
-      const completeBookingData = {
-        ...booking,
-        date: formattedDate,
-        clientId: user.uid,
-        status: "pending",
-        paymentStatus: isPaymentRequired ? "pending" : "not_required",
-        paymentAmount: paymentAmount / 100, // Store in dollars
-        paymentType: booking.paymentType,
-        createdAt: new Date().toISOString(),
-      };
-
-      if (!isPaymentRequired) {
-        // Handle free booking
+    const handleConfirm = async () => {
         try {
-          // Get fresh ID token
-          const idToken = await user.getIdToken(true);
+            setErrorMessage(null);
+            setIsProcessing(true);
 
-          // Create booking through API
-          const response = await axios.post(
-            `${API_BASE_URL}/create-booking`,
-            completeBookingData,
-            {
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${idToken}`,
-              },
+            // Validate booking data
+            if (
+                !booking.stylistId ||
+                !booking.serviceName ||
+                !booking.date ||
+                !booking.time
+            ) {
+                throw new Error("Missing required booking information");
             }
-          );
 
-          if (response.data?.bookingId) {
+            if (!user || !user.uid) {
+                throw new Error(
+                    "You must be logged in to complete this booking"
+                );
+            }
+
+            const formattedDate =
+                booking.date instanceof Date
+                    ? format(booking.date, "yyyy-MM-dd")
+                    : typeof booking.date === "string"
+                      ? booking.date
+                      : format(new Date(booking.date), "yyyy-MM-dd");
+
+            const completeBookingData = {
+                ...booking,
+                date: formattedDate,
+                clientId: user.uid,
+                status: "pending",
+                paymentStatus: isPaymentRequired ? "pending" : "not_required",
+                paymentAmount: paymentAmount / 100, // Store in dollars
+                paymentType: booking.paymentType,
+                createdAt: new Date().toISOString(),
+            };
+
+            if (!isPaymentRequired) {
+                // Handle free booking
+                try {
+                    // Get fresh ID token
+                    const idToken = await user.getIdToken(true);
+
+                    // Create booking through API
+                    const response = await axios.post(
+                        `${API_BASE_URL}/create-booking`,
+                        completeBookingData,
+                        {
+                            headers: {
+                                "Content-Type": "application/json",
+                                Authorization: `Bearer ${idToken}`,
+                            },
+                        }
+                    );
+
+                    if (response.data?.bookingId) {
+                        toast({
+                            title: "Booking Confirmed",
+                            description:
+                                "Your appointment has been successfully booked!",
+                        });
+
+                        onComplete();
+                    } else {
+                        throw new Error("Failed to create booking");
+                    }
+                } catch (apiError: any) {
+                    console.error("API error details:", apiError);
+                    throw apiError;
+                }
+            } else {
+                const idToken = await user.getIdToken(true);
+                if (!idToken) {
+                    throw new Error(
+                        "Authentication error. Please log in again."
+                    );
+                }
+
+                const origin = window.location.origin;
+                const successUrl = `${origin}/payment-success`;
+                const cancelUrl = `${origin}/payment-cancel`;
+
+                const response = await axios.post(
+                    `${API_BASE_URL}/create-payment-to-stylist`,
+                    {
+                        userId: user.uid,
+                        stylistId: booking.stylistId,
+                        amount: paymentAmount,
+                        serviceDescription: `${booking.paymentType === "deposit" ? "Deposit" : "Full payment"} for ${booking.serviceName} with ${booking.stylistName}`,
+                        successUrl,
+                        cancelUrl,
+                        bookingData: completeBookingData,
+                    },
+                    {
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${idToken}`,
+                        },
+                        timeout: 1000000,
+                    }
+                );
+
+                if (response.data?.url) {
+                    window.location.href = response.data.url;
+                } else {
+                    throw new Error(
+                        "Payment session creation failed - no URL returned"
+                    );
+                }
+            }
+        } catch (error) {
+            console.error("Error processing booking:", error);
+
+            let message =
+                "There was an error processing your booking. Please try again.";
+
+            // Check for specific error response
+            if (axios.isAxiosError(error) && error.response) {
+                if (error.response.status === 403) {
+                    message =
+                        "Permission denied. Please log in again or contact support.";
+                } else if (error.response.status === 401) {
+                    message = "Your session has expired. Please log in again.";
+                } else if (
+                    error.response.data?.error ===
+                    "Stylist does not have an active payment account"
+                ) {
+                    message =
+                        "This stylist is not set up to receive payments yet. Please contact them directly.";
+                } else if (error.response.data?.error) {
+                    message = error.response.data.error;
+                }
+            } else if (error instanceof Error) {
+                message = error.message;
+            }
+
+            // Set error message state instead of just showing toast
+            setErrorMessage(message);
+
+            // Also show toast
             toast({
-              title: "Booking Confirmed",
-              description: "Your appointment has been successfully booked!",
+                title: "Booking Failed",
+                description: message,
+                variant: "destructive",
             });
 
-            onComplete();
-          } else {
-            throw new Error("Failed to create booking");
-          }
-        } catch (apiError: any) {
-          console.error("API error details:", apiError);
-          throw apiError;
+            // Make sure to set processing to false
+            setIsProcessing(false);
         }
-      } else {
-        const idToken = await user.getIdToken(true);
-        if (!idToken) {
-          throw new Error("Authentication error. Please log in again.");
-        }
+    };
 
-        const origin = window.location.origin;
-        const successUrl = `${origin}/payment-success`;
-        const cancelUrl = `${origin}/payment-failed`;
+    return (
+        <div className="space-y-6">
+            <div>
+                <h2 className="text-2xl font-light text-[#3F0052] mb-2">
+                    Booking Confirmation
+                </h2>
+                <p className="text-gray-600">
+                    Please review your booking details
+                </p>
+            </div>
 
-        const response = await axios.post(
-          `${API_BASE_URL}/create-payment-to-stylist`,
-          {
-            userId: user.uid,
-            stylistId: booking.stylistId,
-            amount: paymentAmount,
-            serviceDescription: `${booking.paymentType === "deposit" ? "Deposit" : "Full payment"} for ${booking.serviceName} with ${booking.stylistName}`,
-            successUrl,
-            cancelUrl,
-            bookingData: completeBookingData,
-          },
-          {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${idToken}`,
-            },
-            timeout: 1000000,
-          }
-        );
+            {/* Show error message if present */}
+            {errorMessage && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-800">
+                    <div className="flex items-start">
+                        <AlertCircle className="h-5 w-5 mr-2 text-red-600 flex-shrink-0" />
+                        <p>{errorMessage}</p>
+                    </div>
+                </div>
+            )}
 
-        if (response.data?.url) {
-          window.location.href = response.data.url;
-        } else {
-          throw new Error("Payment session creation failed - no URL returned");
-        }
-      }
-    } catch (error) {
-      console.error("Error processing booking:", error);
+            <Card className="p-6 space-y-4">
+                <div>
+                    <h3 className="font-medium mb-2">Service Details</h3>
+                    <p>
+                        Service:{" "}
+                        {booking.serviceName || booking.service.serviceId}
+                    </p>
+                    <p>
+                        Date:{" "}
+                        {booking.date instanceof Date
+                            ? format(booking.date, "MMMM d, yyyy")
+                            : booking.dateTime?.date
+                              ? format(booking.dateTime.date, "MMMM d, yyyy")
+                              : "Not specified"}
+                    </p>
+                    <p>Time: {booking.time || booking.dateTime?.time}</p>
+                    <p>Stylist: {booking.stylistName}</p>
+                    {booking.businessName && (
+                        <p>Business: {booking.businessName}</p>
+                    )}
+                </div>
 
-      let message =
-        "There was an error processing your booking. Please try again.";
+                <div>
+                    <h3 className="font-medium mb-2">Client Information</h3>
+                    <p>
+                        Name:{" "}
+                        {booking.clientName ||
+                            `${booking.clientInfo.firstName} ${booking.clientInfo.lastName}`}
+                    </p>
+                    <p>
+                        Email: {booking.clientEmail || booking.clientInfo.email}
+                    </p>
+                    <p>
+                        Phone: {booking.clientPhone || booking.clientInfo.phone}
+                    </p>
+                    {(booking.notes || booking.clientInfo.specialRequests) && (
+                        <p>
+                            Special Requests:{" "}
+                            {booking.notes ||
+                                booking.clientInfo.specialRequests}
+                        </p>
+                    )}
+                </div>
 
-      // Check for specific error response
-      if (axios.isAxiosError(error) && error.response) {
-        if (error.response.status === 403) {
-          message =
-            "Permission denied. Please log in again or contact support.";
-        } else if (error.response.status === 401) {
-          message = "Your session has expired. Please log in again.";
-        } else if (
-          error.response.data?.error ===
-          "Stylist does not have an active payment account"
-        ) {
-          message =
-            "This stylist is not set up to receive payments yet. Please contact them directly.";
-        } else if (error.response.data?.error) {
-          message = error.response.data.error;
-        }
-      } else if (error instanceof Error) {
-        message = error.message;
-      }
+                <div>
+                    <h3 className="font-medium mb-2">Payment Details</h3>
+                    <p>Total Service Price: ${booking.totalAmount}</p>
+                    <p>
+                        Payment Type:{" "}
+                        {booking.paymentType === "deposit"
+                            ? "Deposit"
+                            : "Full Payment"}
+                    </p>
+                    <p>
+                        Amount Due Now: $
+                        {booking.paymentType === "deposit"
+                            ? booking.depositAmount
+                            : booking.totalAmount}
+                    </p>
+                    {booking.paymentType === "deposit" && (
+                        <p className="text-sm text-gray-600">
+                            Remaining Balance: $
+                            {booking.totalAmount - booking.depositAmount}
+                        </p>
+                    )}
+                </div>
+            </Card>
 
-      // Set error message state instead of just showing toast
-      setErrorMessage(message);
-
-      // Also show toast
-      toast({
-        title: "Booking Failed",
-        description: message,
-        variant: "destructive",
-      });
-
-      // Make sure to set processing to false
-      setIsProcessing(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-light text-[#3F0052] mb-2">
-          Booking Confirmation
-        </h2>
-        <p className="text-gray-600">Please review your booking details</p>
-      </div>
-
-      {/* Show error message if present */}
-      {errorMessage && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-800">
-          <div className="flex items-start">
-            <AlertCircle className="h-5 w-5 mr-2 text-red-600 flex-shrink-0" />
-            <p>{errorMessage}</p>
-          </div>
+            <div className="flex justify-end space-x-4">
+                <Button
+                    variant="outline"
+                    onClick={() => navigate(-1)}
+                    disabled={isProcessing}
+                >
+                    Back
+                </Button>
+                <Button
+                    onClick={handleConfirm}
+                    disabled={isProcessing}
+                    className="bg-[#3F0052] hover:bg-[#3F0052]/90"
+                >
+                    {isProcessing ? (
+                        <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Processing...
+                        </>
+                    ) : isPaymentRequired ? (
+                        `Confirm & Pay ${booking.paymentType === "deposit" ? "Deposit" : "Full Amount"}`
+                    ) : (
+                        "Confirm Booking"
+                    )}
+                </Button>
+            </div>
         </div>
-      )}
-
-      <Card className="p-6 space-y-4">
-        <div>
-          <h3 className="font-medium mb-2">Service Details</h3>
-          <p>Service: {booking.serviceName || booking.service.serviceId}</p>
-          <p>
-            Date:{" "}
-            {booking.date instanceof Date
-              ? format(booking.date, "MMMM d, yyyy")
-              : booking.dateTime?.date
-                ? format(booking.dateTime.date, "MMMM d, yyyy")
-                : "Not specified"}
-          </p>
-          <p>Time: {booking.time || booking.dateTime?.time}</p>
-          <p>Stylist: {booking.stylistName}</p>
-          {booking.businessName && <p>Business: {booking.businessName}</p>}
-        </div>
-
-        <div>
-          <h3 className="font-medium mb-2">Client Information</h3>
-          <p>
-            Name:{" "}
-            {booking.clientName ||
-              `${booking.clientInfo.firstName} ${booking.clientInfo.lastName}`}
-          </p>
-          <p>Email: {booking.clientEmail || booking.clientInfo.email}</p>
-          <p>Phone: {booking.clientPhone || booking.clientInfo.phone}</p>
-          {(booking.notes || booking.clientInfo.specialRequests) && (
-            <p>
-              Special Requests:{" "}
-              {booking.notes || booking.clientInfo.specialRequests}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <h3 className="font-medium mb-2">Payment Details</h3>
-          <p>Total Service Price: ${booking.totalAmount}</p>
-          <p>
-            Payment Type:{" "}
-            {booking.paymentType === "deposit" ? "Deposit" : "Full Payment"}
-          </p>
-          <p>
-            Amount Due Now: $
-            {booking.paymentType === "deposit"
-              ? booking.depositAmount
-              : booking.totalAmount}
-          </p>
-          {booking.paymentType === "deposit" && (
-            <p className="text-sm text-gray-600">
-              Remaining Balance: ${booking.totalAmount - booking.depositAmount}
-            </p>
-          )}
-        </div>
-      </Card>
-
-      <div className="flex justify-end space-x-4">
-        <Button
-          variant="outline"
-          onClick={() => navigate(-1)}
-          disabled={isProcessing}
-        >
-          Back
-        </Button>
-        <Button
-          onClick={handleConfirm}
-          disabled={isProcessing}
-          className="bg-[#3F0052] hover:bg-[#3F0052]/90"
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processing...
-            </>
-          ) : isPaymentRequired ? (
-            `Confirm & Pay ${booking.paymentType === "deposit" ? "Deposit" : "Full Amount"}`
-          ) : (
-            "Confirm Booking"
-          )}
-        </Button>
-      </div>
-    </div>
-  );
+    );
 }

@@ -12,26 +12,28 @@ import { registerClient } from "@/lib/firebase/client/register";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import type { ClientRegistrationForm as FormType } from "@/lib/schemas/client-registration";
+import { useEmail } from "@/hooks/use-email";
 
 export function ClientRegistrationForm() {
     const [profileImage, setProfileImage] = useState<File | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
     const navigate = useNavigate();
+    const { sendWelcomeClientEmail } = useEmail();
 
     const form = useForm<FormType>({
         resolver: zodResolver(clientRegistrationSchema),
         defaultValues: {
-            firstName: "",
-            lastName: "",
-            username: "",
-            password: "",
-            email: "",
-            phone: "",
-            streetAddress: "",
-            city: "",
-            state: "",
-            zipCode: "",
+            firstName: "John",
+            lastName: "Smith",
+            username: "johnsmith",
+            password: "12345678",
+            email: "john.smith@example.com", 
+            phone: "(555) 555-5555",
+            streetAddress: "123 Main Street",
+            city: "Los Angeles",
+            state: "CA",
+            zipCode: "90001",
             agreeToTerms: false,
         },
     });
@@ -45,6 +47,16 @@ export function ClientRegistrationForm() {
                 title: "Success!",
                 description: "Your account has been created successfully.",
             });
+
+            // send welcome email
+            try {
+                await sendWelcomeClientEmail({
+                    clientName: `${data.firstName} ${data.lastName}`,
+                    clientEmail: data.email,
+                });
+            } catch (error) {
+                console.error("Error sending welcome email:", error);
+            }
 
             // Navigate to registration success page
             navigate("/registration-success", { replace: true });

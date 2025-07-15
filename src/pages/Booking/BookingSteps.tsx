@@ -101,6 +101,7 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
             serviceName: bookingData.service.serviceId,
             stylistName: `${stylist.firstName} ${stylist.lastName}`,
             stylistEmail: stylist.email,
+            stylistPhone: stylist.phone,
             businessName: stylist.businessName || "",
             date: bookingData.dateTime.date,
             time: bookingData.dateTime.time,

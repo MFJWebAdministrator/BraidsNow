@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import type { ClientRegistrationForm as FormType } from "@/lib/schemas/client-registration";
 import { useEmail } from "@/hooks/use-email";
+import { useSms } from "@/hooks/use-sms";
 
 export function ClientRegistrationForm() {
     const [profileImage, setProfileImage] = useState<File | null>(null);
@@ -20,6 +21,7 @@ export function ClientRegistrationForm() {
     const { toast } = useToast();
     const navigate = useNavigate();
     const { sendWelcomeClientEmail } = useEmail();
+    const { sendWelcomeClientSms } = useSms();
 
     const form = useForm<FormType>({
         resolver: zodResolver(clientRegistrationSchema),
@@ -28,7 +30,7 @@ export function ClientRegistrationForm() {
             lastName: "Smith",
             username: "johnsmith",
             password: "12345678",
-            email: "john.smith@example.com", 
+            email: "john.smith@example.com",
             phone: "(555) 555-5555",
             streetAddress: "123 Main Street",
             city: "Los Angeles",
@@ -54,8 +56,14 @@ export function ClientRegistrationForm() {
                     clientName: `${data.firstName} ${data.lastName}`,
                     clientEmail: data.email,
                 });
+
+                // send welcome sms
+                await sendWelcomeClientSms(
+                    `${data.firstName} ${data.lastName}`,
+                    data.phone
+                );
             } catch (error) {
-                console.error("Error sending welcome email:", error);
+                console.error("Error sending welcome email/sms:", error);
             }
 
             // Navigate to registration success page

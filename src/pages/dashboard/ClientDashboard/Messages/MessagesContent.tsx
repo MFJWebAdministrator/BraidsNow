@@ -15,6 +15,7 @@ import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { ImageCropper } from "@/components/ClientCommunity/ImageCropper";
 import { useToast } from "@/hooks/use-toast";
 import { useEmail } from "@/hooks/use-email";
+import { useSms } from "@/hooks/use-sms";
 
 export function MessagesContent() {
     const { user } = useAuth();
@@ -46,6 +47,7 @@ export function MessagesContent() {
             .includes(searchQuery.toLowerCase());
     });
     const { sendMessageNotificationStylist } = useEmail();
+    const { sendNewMessageStylistSms } = useSms();
 
     const handleSendMessage = async () => {
         if (
@@ -135,23 +137,36 @@ export function MessagesContent() {
                 setDoc(notificationRef, notification),
             ]);
 
-            //send email about this message
-            setTimeout(
-                async () =>
+            //send email/sms about this message
+            setTimeout(async () => {
+                let stylistUserData;
+                try {
+                    stylistUserData = (
+                        await getDoc(doc(db, "stylists", recipientId))
+                    ).data();
+
                     await sendMessageNotificationStylist({
                         recipientName:
-                            currentThread.participantDetails[recipientId]
-                                ?.name || "Unknown",
-                        recipientEmail:
-                            (
-                                await getDoc(doc(db, "stylists", recipientId))
-                            ).data()?.email || "",
+                            currentThread.participantDetails[recipientId]?.name,
+                        recipientEmail: stylistUserData?.email || "",
                         senderName:
-                            currentThread.participantDetails[user.uid]?.name ||
-                            "Unknown",
-                    }),
-                0
-            );
+                            currentThread.participantDetails[user.uid]?.name,
+                    });
+
+                    await sendNewMessageStylistSms({
+                        stylistName:
+                            currentThread.participantDetails[recipientId]?.name,
+                        phoneNumber: stylistUserData?.phone || "",
+                        clientName:
+                            currentThread.participantDetails[user.uid]?.name,
+                    });
+                } catch (error) {
+                    console.error(
+                        `Error sending new message sms/email notification to stylist ${stylistUserData?.name} over (${stylistUserData?.email}) or ${stylistUserData?.phone}:`,
+                        error
+                    );
+                }
+            }, 0);
 
             setNewMessage("");
             setSelectedImages([]);

@@ -44,6 +44,7 @@ export const bookingSchema = z.object({
     serviceName: z.string().min(1).optional(),
     stylistName: z.string().min(1).optional(),
     stylistEmail: z.string().email().optional(),
+    stylistPhone: z.string().min(1).optional(),
     businessName: z.string().min(1).optional(),
     date: z.date().optional(),
     time: z.string().min(1).optional(),

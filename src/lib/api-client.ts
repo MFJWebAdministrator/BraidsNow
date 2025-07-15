@@ -179,3 +179,59 @@ export const sendMessageNotificationClient = async (data: {
 }) => {
     return apiRequest("/send-message-notification-client", data);
 };
+
+// SMS API functions
+export const sendWelcomeClientSms = async (
+    clientName: string,
+    phoneNumber: string
+) => {
+    return apiRequest("/send-welcome-client-sms", {
+        clientName,
+        phoneNumber,
+    });
+};
+
+export const sendWelcomeStylistSms = async (
+    stylistName: string,
+    phoneNumber: string
+) => {
+    return apiRequest("/send-welcome-stylist-sms", {
+        stylistName,
+        phoneNumber,
+    });
+};
+
+export const sendAppointmentBookedStylistSms = async (data: {
+    stylistName: string;
+    phoneNumber: string;
+    appointmentDate: string;
+    appointmentTime: string;
+    serviceName: string;
+    clientName: string;
+}) => {
+    return apiRequest("/send-appointment-booked-stylist-sms", data);
+};
+
+export const sendSubscriptionPaymentFailedStylistSms = async (data: {
+    stylistName: string;
+    phoneNumber: string;
+    updatePaymentUrl: string;
+}) => {
+    return apiRequest("/send-subscription-payment-failed-stylist-sms", data);
+};
+
+export const sendNewMessageStylistSms = async (data: {
+    stylistName: string;
+    phoneNumber: string;
+    clientName: string;
+}) => {
+    return apiRequest("/send-new-message-stylist-sms", data);
+};
+
+export const sendNewMessageClientSms = async (data: {
+    clientName: string;
+    phoneNumber: string;
+    stylistName: string;
+}) => {
+    return apiRequest("/send-new-message-client-sms", data);
+};

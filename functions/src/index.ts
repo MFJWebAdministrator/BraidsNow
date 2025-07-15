@@ -7,7 +7,8 @@ import express, { Request, Response } from "express";
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import Stripe from "stripe";
-import { EmailService } from "./email-service";
+import { EmailService } from "./services/email-service";
+import { SmsService } from "./services/sms-service";
 
 const app = express();
 
@@ -885,6 +886,8 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                         const pendingBookingData = pendingBookingDoc.data();
                         const bookingData = pendingBookingData?.bookingData;
 
+                        console.log("bookingData", bookingData);
+
                         if (bookingData) {
                             // Create the actual booking
                             const bookingRef = db
@@ -1055,8 +1058,8 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                             );
 
                             // send email to stylist about the new appointment
-                            setTimeout(
-                                async () =>
+                            setTimeout(async () => {
+                                try {
                                     await EmailService.sendNewAppointmentForStylist(
                                         {
                                             stylistName:
@@ -1069,21 +1072,37 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                             serviceName:
                                                 bookingData.serviceName,
                                         }
-                                    )
-                            );
+                                    );
 
-                            console.log(
-                                "booking type",
-                                bookingData.paymentType
-                            );
+                                    // send sms to stylist about the new appointment
+                                    await SmsService.sendAppointmentBookedStylistSms(
+                                        {
+                                            stylistName:
+                                                bookingData.stylistName,
+                                            phoneNumber:
+                                                bookingData.stylistPhone,
+                                            appointmentDate: bookingData.date,
+                                            appointmentTime: bookingData.time,
+                                            serviceName:
+                                                bookingData.serviceName,
+                                            clientName: bookingData.clientName,
+                                        }
+                                    );
+                                } catch (error) {
+                                    console.error(
+                                        "Error sending new appointment email/sms notification:",
+                                        error
+                                    );
+                                }
+                            });
 
                             if (bookingData.paymentType === "deposit") {
                                 console.log(
                                     "notifying client about the full payment reminder"
                                 );
 
-                                setTimeout(
-                                    async () =>
+                                setTimeout(async () => {
+                                    try {
                                         await EmailService.sendFullPaymentReminderForClient(
                                             {
                                                 clientName:
@@ -1098,11 +1117,41 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                                     bookingData.time,
                                                 serviceName:
                                                     bookingData.serviceName,
-                                                balanceAmount:
-                                                    bookingData.totalAmount,
+                                                balanceAmount: (
+                                                    bookingData.totalAmount -
+                                                    bookingData.depositAmount
+                                                ).toString(),
                                             }
-                                        )
-                                );
+                                        );
+
+                                        // send sms to client about the full payment reminder
+                                        await SmsService.sendFullPaymentReminderForClientSms(
+                                            {
+                                                clientName:
+                                                    bookingData.clientName,
+                                                phoneNumber:
+                                                    bookingData.clientPhone,
+                                                serviceName:
+                                                    bookingData.serviceName,
+                                                stylistName:
+                                                    bookingData.stylistName,
+                                                appointmentDate:
+                                                    bookingData.date,
+                                                appointmentTime:
+                                                    bookingData.time,
+                                                balanceAmount: (
+                                                    bookingData.totalAmount -
+                                                    bookingData.depositAmount
+                                                ).toString(),
+                                            }
+                                        );
+                                    } catch (error) {
+                                        console.error(
+                                            "Error sending full payment reminder email/sms:",
+                                            error
+                                        );
+                                    }
+                                });
                             }
                         }
                     }
@@ -3401,17 +3450,15 @@ app.post(
                 recipientName: string;
                 recipientEmail: string;
                 senderName: string;
-                userType: "client" | "stylist";
             };
             user?: admin.auth.DecodedIdToken;
         },
         res: Response
     ) => {
         try {
-            const { recipientName, recipientEmail, senderName, userType } =
-                req.body;
+            const { recipientName, recipientEmail, senderName } = req.body;
 
-            if (!recipientName || !recipientEmail || !senderName || !userType) {
+            if (!recipientName || !recipientEmail || !senderName) {
                 return res
                     .status(400)
                     .json({ error: "Missing required parameters" });
@@ -3448,7 +3495,6 @@ app.post(
                 recipientName: string;
                 recipientEmail: string;
                 senderName: string;
-                userType: "client" | "stylist";
             };
             user?: admin.auth.DecodedIdToken;
         },
@@ -3475,6 +3521,353 @@ app.post(
             });
         } catch (error) {
             console.error("Error sending message notification email:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+// sms endpoints
+app.post(
+    "/send-welcome-client-sms",
+    // validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: { clientName: string; phoneNumber: string };
+            // user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const { clientName, phoneNumber } = req.body;
+
+            if (!clientName || !phoneNumber) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+
+            console.log("clientName", clientName);
+            console.log("phoneNumber", phoneNumber);
+
+            const response = await SmsService.sendWelcomeClientSms({
+                clientName,
+                phoneNumber,
+            });
+
+            console.log("response", response);
+
+            return res.status(200).json({
+                success: true,
+                message: "Welcome SMS sent successfully",
+            });
+        } catch (error) {
+            console.error("Error sending welcome SMS:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.post(
+    "/send-welcome-stylist-sms",
+    // validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: { stylistName: string; phoneNumber: string };
+            // user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const { stylistName, phoneNumber } = req.body;
+
+            if (!stylistName || !phoneNumber) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+
+            const response = await SmsService.sendWelcomeStylistSms({
+                stylistName,
+                phoneNumber,
+            });
+
+            console.log("response", response);
+
+            return res.status(200).json({
+                success: true,
+                message: "Welcome SMS sent successfully",
+            });
+        } catch (error) {
+            console.error("Error sending welcome SMS:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.post(
+    "/send-appointment-booked-stylist-sms",
+    async (
+        req: RequestWithRawBody & {
+            body: {
+                stylistName: string;
+                phoneNumber: string;
+                appointmentDate: string;
+                appointmentTime: string;
+                serviceName: string;
+                clientName: string;
+            };
+        },
+        res: Response
+    ) => {
+        try {
+            const {
+                stylistName,
+                phoneNumber,
+                appointmentDate,
+                appointmentTime,
+                serviceName,
+                clientName,
+            } = req.body;
+            if (
+                !stylistName ||
+                !phoneNumber ||
+                !appointmentDate ||
+                !appointmentTime ||
+                !serviceName ||
+                !clientName
+            ) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+            await SmsService.sendAppointmentBookedStylistSms({
+                stylistName,
+                phoneNumber,
+                appointmentDate,
+                appointmentTime,
+                serviceName,
+                clientName,
+            });
+            return res.status(200).json({
+                success: true,
+                message: "Appointment booked SMS sent successfully",
+            });
+        } catch (error) {
+            console.error("Error sending appointment booked SMS:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.post(
+    "/send-full-payment-reminder-client-sms",
+    async (
+        req: RequestWithRawBody & {
+            body: {
+                clientName: string;
+                phoneNumber: string;
+                stylistName: string;
+                appointmentDate: string;
+                appointmentTime: string;
+                balanceAmount: string;
+            };
+        },
+        res: Response
+    ) => {
+        try {
+            const {
+                clientName,
+                phoneNumber,
+                serviceName,
+                stylistName,
+                appointmentDate,
+                appointmentTime,
+                balanceAmount,
+            } = req.body;
+
+            if (
+                !clientName ||
+                !phoneNumber ||
+                !serviceName ||
+                !stylistName ||
+                !appointmentDate ||
+                !appointmentTime ||
+                !balanceAmount
+            ) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+
+            await SmsService.sendFullPaymentReminderForClientSms({
+                clientName,
+                phoneNumber,
+                serviceName,
+                stylistName,
+                appointmentDate,
+                appointmentTime,
+                balanceAmount,
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: "Full payment reminder SMS sent successfully",
+            });
+        } catch (error) {
+            console.error("Error sending full payment reminder SMS:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.post(
+    "/send-subscription-payment-failed-stylist-sms",
+    async (
+        req: RequestWithRawBody & {
+            body: {
+                stylistName: string;
+                phoneNumber: string;
+                updatePaymentUrl: string;
+            };
+        },
+        res: Response
+    ) => {
+        try {
+            const { stylistName, phoneNumber, updatePaymentUrl } = req.body;
+            if (!stylistName || !phoneNumber || !updatePaymentUrl) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+            await SmsService.sendSubscriptionPaymentFailedStylistSms({
+                stylistName,
+                phoneNumber,
+                updatePaymentUrl,
+            });
+            return res.status(200).json({
+                success: true,
+                message: "Subscription payment failed SMS sent successfully",
+            });
+        } catch (error) {
+            console.error(
+                "Error sending subscription payment failed SMS:",
+                error
+            );
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.post(
+    "/send-new-message-stylist-sms",
+    async (
+        req: RequestWithRawBody & {
+            body: {
+                stylistName: string;
+                phoneNumber: string;
+                clientName: string;
+            };
+        },
+        res: Response
+    ) => {
+        try {
+            const { stylistName, phoneNumber, clientName } = req.body;
+            if (!stylistName || !phoneNumber || !clientName) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+
+            await SmsService.sendNewMessageStylistSms({
+                stylistName,
+                phoneNumber,
+                clientName,
+            });
+
+            return res.status(200).json({
+                success: true,
+                message:
+                    "New message notification SMS sent to stylist successfully",
+            });
+        } catch (error) {
+            console.error(
+                "Error sending new message notification SMS to stylist:",
+                error
+            );
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+app.post(
+    "/send-new-message-client-sms",
+    async (
+        req: RequestWithRawBody & {
+            body: {
+                clientName: string;
+                phoneNumber: string;
+                stylistName: string;
+            };
+        },
+        res: Response
+    ) => {
+        try {
+            const { clientName, phoneNumber, stylistName } = req.body;
+            if (!clientName || !phoneNumber || !stylistName) {
+                return res
+                    .status(400)
+                    .json({ error: "Missing required parameters" });
+            }
+            await SmsService.sendNewMessageClientSms({
+                clientName,
+                phoneNumber,
+                stylistName,
+            });
+            return res.status(200).json({
+                success: true,
+                message:
+                    "New message notification SMS sent to client successfully",
+            });
+        } catch (error) {
+            console.error(
+                "Error sending new message notification SMS to client:",
+                error
+            );
             return res.status(500).json({
                 error:
                     error instanceof Error

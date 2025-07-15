@@ -15,6 +15,7 @@ import { useState } from "react";
 import { ImageCropper } from "@/components/ClientCommunity/ImageCropper";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { useEmail } from "@/hooks/use-email";
+import { useSms } from "@/hooks/use-sms";
 
 export function MessagesContent() {
     const { user } = useAuth();
@@ -46,6 +47,7 @@ export function MessagesContent() {
             .includes(searchQuery.toLowerCase());
     });
     const { sendMessageNotificationClient } = useEmail();
+    const { sendNewMessageStylistSms } = useSms();
 
     const handleSendMessage = async () => {
         if (
@@ -159,21 +161,36 @@ export function MessagesContent() {
                 setDoc(notificationRef, notification),
             ]);
 
-            //send email about this message
+            //send email/sms about this message
             setTimeout(async () => {
-                const clientData = (
-                    await getDoc(doc(db, "clients", clientId))
-                ).data();
+                try {
+                    const clientUserData = (
+                        await getDoc(doc(db, "users", clientId))
+                    ).data();
 
-                await sendMessageNotificationClient({
-                    recipientName:
-                        currentThread.participantDetails[clientId]?.name ||
-                        "Unknown",
-                    recipientEmail: clientData?.email || "",
-                    senderName:
-                        currentThread.participantDetails[stylistId]?.name ||
-                        "Unknown",
-                });
+                    await sendMessageNotificationClient({
+                        recipientName:
+                            currentThread.participantDetails[clientId]?.name ||
+                            "Unknown",
+                        recipientEmail: clientUserData?.email || "",
+                        senderName:
+                            currentThread.participantDetails[stylistId]?.name ||
+                            "Unknown",
+                    });
+
+                    await sendNewMessageStylistSms({
+                        stylistName:
+                            currentThread.participantDetails[stylistId]?.name,
+                        phoneNumber: clientUserData?.phone || "",
+                        clientName:
+                            currentThread.participantDetails[clientId]?.name,
+                    });
+                } catch (error) {
+                    console.error(
+                        "Error sending new message sms/email notification:",
+                        error
+                    );
+                }
             }, 0);
 
             setNewMessage("");

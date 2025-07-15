@@ -4,11 +4,13 @@ import { registerStylist } from "@/lib/firebase/stylist/register";
 import type { StylistRegistrationForm } from "@/lib/schemas/stylist-registration";
 import type { User } from "firebase/auth";
 import { useEmail } from "@/hooks/use-email";
+import { useSms } from "@/hooks/use-sms";
 
 export function useRegisterStylist() {
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
     const { sendWelcomeStylistEmail } = useEmail();
+    const { sendWelcomeStylistSms } = useSms();
 
     const register = async (
         data: StylistRegistrationForm,
@@ -27,14 +29,22 @@ export function useRegisterStylist() {
             });
 
             // send welcome email
-            try {
-                await sendWelcomeStylistEmail({
-                    stylistName: `${data.firstName} ${data.lastName}`,
-                    stylistEmail: data.email,
-                });
-            } catch (error) {
-                console.error("Error sending welcome email:", error);
-            }
+            setTimeout(async () => {
+                try {
+                    await sendWelcomeStylistEmail({
+                        stylistName: `${data.firstName} ${data.lastName}`,
+                        stylistEmail: data.email,
+                    });
+
+                    // send welcome sms
+                    await sendWelcomeStylistSms(
+                        `${data.firstName} ${data.lastName}`,
+                        data.phone
+                    );
+                } catch (error) {
+                    console.error("Error sending welcome email:", error);
+                }
+            }, 1000);
 
             return user;
         } catch (error: any) {

@@ -3,13 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+
 import { AppointmentCard } from "@/components/dashboard/AppointmentCard";
 import { useAppointments } from "@/hooks/use-appointments";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,53 +22,55 @@ export function AppointementsContent() {
 
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState("all");
     const [activeTab, setActiveTab] = useState("today");
 
     // Get client-specific appointments
     const clientAppointments = getClientAppointments();
 
-    // Filter appointments based on search and status
+    // Tab logic as per new requirements
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+
+    // Filter appointments based on search only
     const filteredAppointments = clientAppointments.filter((appointment) => {
-        const matchesSearch =
-            appointment.stylistName
-                .toLowerCase()
-                .includes(searchTerm.toLowerCase()) ||
-            appointment.businessName
-                .toLowerCase()
-                .includes(searchTerm.toLowerCase()) ||
-            appointment.serviceName
-                .toLowerCase()
-                .includes(searchTerm.toLowerCase());
-        const matchesStatus =
-            statusFilter === "all" || appointment.status === statusFilter;
-        return matchesSearch && matchesStatus;
+        const appointmentDateTimeStr = `${appointment.date}T${appointment.time}`;
+        const appointmentDateTime = new Date(appointmentDateTimeStr);
+        return (
+            (!searchTerm ||
+                appointment.stylistName
+                    .toLowerCase()
+                    .includes(searchTerm.toLowerCase()) ||
+                appointment.businessName
+                    .toLowerCase()
+                    .includes(searchTerm.toLowerCase()) ||
+                appointment.serviceName
+                    .toLowerCase()
+                    .includes(searchTerm.toLowerCase())) &&
+            (appointment.status === "confirmed" ||
+                appointment.status === "pending") &&
+            appointmentDateTime >= now
+        );
     });
 
-    // Separate appointments by time
-    const upcomingAppointments = filteredAppointments.filter((appointment) => {
-        const today = new Date().toISOString().split("T")[0];
-        return appointment.date >= today;
-    });
+    const confirmedAppointments = filteredAppointments.filter(
+        (a) => a.status === "confirmed"
+    );
 
-    const pastAppointments = filteredAppointments.filter((appointment) => {
-        const today = new Date().toISOString().split("T")[0];
-        return appointment.date < today;
+    const todaysAppointments = confirmedAppointments.filter((appointment) => {
+        return appointment.date === todayStr;
     });
-
-    const todaysAppointments = filteredAppointments.filter((appointment) => {
-        const today = new Date().toISOString().split("T")[0];
-        return appointment.date === today;
-    });
+    const upcomingAppointments = confirmedAppointments.filter(
+        (appointment) => appointment.date > todayStr
+    );
+    const pendingAppointments = filteredAppointments.filter(
+        (appointment) => appointment.status === "pending"
+    );
 
     // Calculate statistics
-    const totalAppointments = clientAppointments.length;
-    const confirmedAppointments = clientAppointments.filter(
-        (a) => a.status === "confirmed"
-    ).length;
-    const pendingAppointments = clientAppointments.filter(
-        (a) => a.status === "pending"
-    ).length;
+    const confirmedAppointmentsCount = confirmedAppointments.length;
+    const pendingAppointmentsCount = pendingAppointments.length;
+    const totalAppointmentsCount =
+        confirmedAppointmentsCount + pendingAppointmentsCount;
     const totalSpent = clientAppointments
         .filter((a) => a.paymentStatus === "paid")
         .reduce((sum, a) => sum + a.paymentAmount, 0);
@@ -127,7 +123,7 @@ export function AppointementsContent() {
                                     Total Appointments
                                 </p>
                                 <p className="text-2xl font-bold text-[#3F0052]">
-                                    {totalAppointments}
+                                    {totalAppointmentsCount}
                                 </p>
                             </div>
                         </div>
@@ -145,7 +141,7 @@ export function AppointementsContent() {
                                     Confirmed
                                 </p>
                                 <p className="text-2xl font-bold text-green-600">
-                                    {confirmedAppointments}
+                                    {confirmedAppointmentsCount}
                                 </p>
                             </div>
                         </div>
@@ -161,7 +157,7 @@ export function AppointementsContent() {
                             <div>
                                 <p className="text-sm text-gray-600">Pending</p>
                                 <p className="text-2xl font-bold text-yellow-600">
-                                    {pendingAppointments}
+                                    {pendingAppointmentsCount}
                                 </p>
                             </div>
                         </div>
@@ -205,28 +201,6 @@ export function AppointementsContent() {
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <Select
-                                value={statusFilter}
-                                onValueChange={setStatusFilter}
-                            >
-                                <SelectTrigger className="w-48">
-                                    <SelectValue placeholder="Filter by status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All Status
-                                    </SelectItem>
-                                    <SelectItem value="confirmed">
-                                        Confirmed
-                                    </SelectItem>
-                                    <SelectItem value="pending">
-                                        Pending
-                                    </SelectItem>
-                                    <SelectItem value="failed">
-                                        Failed
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
                             <Button
                                 onClick={handleBookNew}
                                 className="bg-[#3F0052] hover:bg-[#3F0052]/90"
@@ -256,9 +230,9 @@ export function AppointementsContent() {
                     </TabsTrigger>
                     <TabsTrigger
                         className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
-                        value="past"
+                        value="pending"
                     >
-                        Past ({pastAppointments.length})
+                        Pending ({pendingAppointments.length})
                     </TabsTrigger>
                 </TabsList>
 
@@ -271,9 +245,9 @@ export function AppointementsContent() {
                                     No appointments today
                                 </h3>
                                 <p className="text-gray-600 mb-4">
-                                    You don't have any appointments scheduled
-                                    for today. Ready to book your next styling
-                                    session?
+                                    You don't have any confirmed appointments
+                                    scheduled for today. Ready to book your next
+                                    styling session?
                                 </p>
                                 <Button
                                     onClick={handleBookNew}
@@ -306,8 +280,9 @@ export function AppointementsContent() {
                                     No upcoming appointments
                                 </h3>
                                 <p className="text-gray-600 mb-4">
-                                    You don't have any upcoming appointments.
-                                    Ready to book your next styling session?
+                                    You don't have any confirmed upcoming
+                                    appointments. Ready to book your next
+                                    styling session?
                                 </p>
                                 <Button
                                     onClick={handleBookNew}
@@ -331,30 +306,30 @@ export function AppointementsContent() {
                     )}
                 </TabsContent>
 
-                <TabsContent value="past" className="space-y-4">
-                    {pastAppointments.length === 0 ? (
+                <TabsContent value="pending" className="space-y-4">
+                    {pendingAppointments.length === 0 ? (
                         <Card className="border border-gray-200 shadow-sm">
                             <CardContent className="p-8 text-center">
                                 <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                                 <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                    No past appointments
+                                    No pending appointments
                                 </h3>
                                 <p className="text-gray-600 mb-4">
-                                    You haven't had any appointments yet. Start
-                                    your styling journey today!
+                                    You don't have any pending appointments
+                                    requiring stylist action.
                                 </p>
                                 <Button
                                     onClick={handleBookNew}
                                     className="bg-[#3F0052] hover:bg-[#3F0052]/90"
                                 >
                                     <Plus className="h-4 w-4 mr-2" />
-                                    Book Your First Appointment
+                                    Find a Stylist
                                 </Button>
                             </CardContent>
                         </Card>
                     ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            {pastAppointments.map((appointment) => (
+                            {pendingAppointments.map((appointment) => (
                                 <AppointmentCard
                                     key={appointment.id}
                                     appointment={appointment}

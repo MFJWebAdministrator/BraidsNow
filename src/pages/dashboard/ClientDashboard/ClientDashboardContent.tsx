@@ -10,16 +10,24 @@ export function ClientDashboardContent() {
     const { user } = useAuth();
     const { userData } = useUserData(user?.uid);
     const { favorites } = useFavorites();
-    const { getClientAppointments } = useAppointments();
+    const { getAppointmentsByStatus } = useAppointments();
 
     if (!userData) return null;
 
-    // Get today's appointments for the client
-    const clientAppointments = getClientAppointments();
-    const today = new Date().toISOString().split("T")[0];
-    const todaysAppointments = clientAppointments.filter(
-        (appointment) => appointment.date === today
-    );
+    // Get now's appointments for the client
+    const clientAppointments = getAppointmentsByStatus("confirmed");
+    const now = new Date();
+    const nowsAppointments = clientAppointments.filter((appointment) => {
+        // Combine date and time into a single string
+        const appointmentDateTimeStr = `${appointment.date}T${appointment.time}`;
+        // Parse into a Date object
+        const appointmentDateTime = new Date(appointmentDateTimeStr);
+        // Compare to now
+        return (
+            appointment.date === now.toISOString().split("T")[0] &&
+            appointmentDateTime >= now
+        );
+    });
 
     return (
         <div className="space-y-6">
@@ -30,7 +38,7 @@ export function ClientDashboardContent() {
                     title="Today's Appointments"
                     description="View your appointments for today"
                     icon={Calendar}
-                    value={todaysAppointments.length.toString()}
+                    value={nowsAppointments.length.toString()}
                     onClick={() =>
                         (window.location.href =
                             "/dashboard/client/appointments")

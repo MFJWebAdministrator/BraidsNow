@@ -66,7 +66,7 @@ export class SmsService {
         welcomeStylist: (data) =>
             `Hi ${data.stylistName}! Welcome to BraidsNow.com 🎉 Setup payouts, add services, and set your schedule now 👉 https://braidsnow.com/dashboard/stylist\n— BraidsNow.com`,
         appointmentBookedStylist: (data: AppointmentBookedStylistSmsData) =>
-            `Hi ${data.stylistName},\nYou have a new appointment booked.\n\nDate: ${data.appointmentDate}\nTime: ${data.appointmentTime}\nService: ${data.serviceName}\nClient: ${data.clientName}\n\nPlease check your calendar for full details.\n\nThank you,\nBraidsNow.com Team`,
+            `Hi ${data.stylistName},\nYou have a new appointment request.\n\nDate: ${data.appointmentDate}\nTime: ${data.appointmentTime}\nService: ${data.serviceName}\nClient: ${data.clientName}\n\nPlease review and accept or reject this booking in your dashboard.\n\nThank you,\nBraidsNow.com Team`,
         subscriptionPaymentFailedStylist: (
             data: SubscriptionPaymentFailedStylistSmsData
         ) =>
@@ -173,5 +173,43 @@ export class SmsService {
         data: FullPaymentReminderClientSmsData
     ): Promise<void> {
         await this.sendSms({ type: "fullPaymentReminderClient", data });
+    }
+
+    /**
+     * Appointment accepted SMS for Client
+     */
+    static async sendAppointmentAcceptedClientSms(data: {
+        clientName: string;
+        phoneNumber: string;
+        stylistName: string;
+        appointmentDate: string;
+        appointmentTime: string;
+        serviceName: string;
+    }): Promise<void> {
+        const message = `Hi ${data.clientName},\nYour appointment for ${data.serviceName} with ${data.stylistName} on ${data.appointmentDate} at ${data.appointmentTime} has been accepted!\n\nWe look forward to seeing you.\n— BraidsNow.com`;
+        await this.sendSms({
+            type: null,
+            data,
+            customMessage: message,
+        });
+    }
+
+    /**
+     * Appointment rejected SMS for Client
+     */
+    static async sendAppointmentRejectedClientSms(data: {
+        clientName: string;
+        phoneNumber: string;
+        stylistName: string;
+        appointmentDate: string;
+        appointmentTime: string;
+        serviceName: string;
+    }): Promise<void> {
+        const message = `Hi ${data.clientName},\nUnfortunately, your appointment for ${data.serviceName} with ${data.stylistName} on ${data.appointmentDate} at ${data.appointmentTime} was rejected.\n\nYour payment will be automatically refunded.\n— BraidsNow.com`;
+        await this.sendSms({
+            type: null,
+            data,
+            customMessage: message,
+        });
     }
 }

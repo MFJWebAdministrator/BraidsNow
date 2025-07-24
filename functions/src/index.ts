@@ -672,7 +672,8 @@ app.post(
                         destination: stylistData.stripeAccountId,
                     },
                     metadata,
-                    application_fee_amount: amount * 0.05, // 5% fee
+                    application_fee_amount: amount * 0.05, // 5% fee,
+                    capture_method: "manual",
                 },
                 line_items: [
                     {
@@ -695,6 +696,8 @@ app.post(
                     : `${req.headers.origin}/payment-canceled?booking_id=${pendingBookingId}`,
                 metadata,
             });
+
+            console.log("session in create-payment-to-stylist", session);
 
             // Create payment record
             const paymentRef = await db.collection("payments").add({
@@ -843,6 +846,415 @@ app.post(
     }
 );
 
+// Add a new endpoint to accept a booking
+app.post(
+    "/accept-booking",
+    validateFirebaseIdToken,
+    async (req: RequestWithRawBody, res: Response) => {
+        try {
+            const { bookingId } = req.body;
+            const userId = req.user?.uid;
+
+            if (!bookingId) {
+                return res
+                    .status(400)
+                    .json({ error: "Booking ID is required" });
+            }
+
+            if (!userId) {
+                return res
+                    .status(401)
+                    .json({ error: "User not authenticated" });
+            }
+
+            // Check if the user is a stylist
+            const stylistDoc = await db
+                .collection("stylists")
+                .doc(userId)
+                .get();
+
+            if (!stylistDoc.exists) {
+                return res
+                    .status(403)
+                    .json({ error: "Only stylists can accept bookings" });
+            }
+
+            // Get the booking document
+            const bookingRef = db.collection("bookings").doc(bookingId);
+            const bookingDoc = await bookingRef.get();
+
+            if (!bookingDoc.exists) {
+                return res.status(404).json({ error: "Booking not found" });
+            }
+
+            const bookingData = bookingDoc.data();
+
+            // Verify that the booking belongs to this stylist
+            if (bookingData?.stylistId !== userId) {
+                return res.status(403).json({
+                    error: "You can only accept bookings assigned to you",
+                });
+            }
+
+            // Check if the booking is in pending status
+            if (bookingData?.status !== "pending") {
+                return res.status(400).json({
+                    error: "Only pending bookings can be accepted",
+                    currentStatus: bookingData?.status,
+                });
+            }
+
+            // Check if the booking has a payment ID for capture
+            if (!bookingData?.paymentId) {
+                return res.status(400).json({
+                    error: "No payment found for this booking",
+                    bookingId: bookingId,
+                });
+            }
+
+            try {
+                console.log(
+                    `Payment captured successfully for booking ${bookingId}:`
+                );
+
+                // Update payment document status
+                const paymentRef = await db
+                    .collection("payments")
+                    .where("bookingId", "==", bookingId)
+                    .get();
+
+                if (paymentRef.empty) {
+                    return res.status(400).json({
+                        error: "Payment document not found",
+                        bookingId: bookingId,
+                    });
+                }
+
+                const paymentDoc = paymentRef.docs[0];
+                if (!paymentDoc.exists) {
+                    return res.status(400).json({
+                        error: "Payment not found",
+                        bookingId: bookingId,
+                    });
+                }
+
+                // Capture the authorized payment from Stripe
+                const paymentIntent = await stripe.paymentIntents.capture(
+                    bookingData.paymentId
+                );
+
+                // Update the booking status to confirmed
+                await bookingRef.update({
+                    status: "confirmed",
+                    paymentStatus: "paid",
+                    acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    paymentCapturedAt:
+                        admin.firestore.FieldValue.serverTimestamp(),
+                    stripeCaptureId: paymentIntent.latest_charge,
+                });
+
+                await paymentRef.docs[0].ref.update({
+                    status: "paid",
+                    completedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    stripeCaptureId: paymentIntent.latest_charge,
+                });
+
+                // Create notification for the client about booking acceptance
+                await db.collection("notifications").add({
+                    userId: bookingData.clientId,
+                    type: "booking_accepted",
+                    title: "Booking Accepted",
+                    message: `Your booking for ${bookingData.serviceName} on ${bookingData.date} at ${bookingData.time} has been accepted by ${bookingData.stylistName}.`,
+                    read: false,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    data: {
+                        bookingId: bookingId,
+                        serviceName: bookingData.serviceName,
+                        date: bookingData.date,
+                        time: bookingData.time,
+                        stylistName: bookingData.stylistName,
+                    },
+                });
+
+                // Create notification for the stylist about booking acceptance
+                await db.collection("notifications").add({
+                    userId: userId,
+                    type: "booking_accepted_stylist",
+                    title: "Booking Accepted",
+                    message: `You have accepted the booking for ${bookingData.serviceName} on ${bookingData.date} at ${bookingData.time} with ${bookingData.clientName}.`,
+                    read: false,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    data: {
+                        bookingId: bookingId,
+                        serviceName: bookingData.serviceName,
+                        date: bookingData.date,
+                        time: bookingData.time,
+                        clientName: bookingData.clientName,
+                    },
+                });
+
+                //TODO: accepted email/sms to client
+
+                setTimeout(async () => {
+                    try {
+                        await SmsService.sendAppointmentAcceptedClientSms({
+                            clientName: bookingData.clientName,
+                            phoneNumber: bookingData.clientPhone,
+                            stylistName: bookingData.stylistName,
+                            appointmentDate: bookingData.date,
+                            appointmentTime: bookingData.time,
+                            serviceName: bookingData.serviceName,
+                        });
+                    } catch (error) {
+                        console.error(
+                            "Error sending appointment accepted sms to client:",
+                            error
+                        );
+                    }
+                }, 0);
+
+                console.log(
+                    `Booking ${bookingId} accepted by stylist ${userId}`
+                );
+
+                return res.status(200).json({
+                    success: true,
+                    message:
+                        "Payment captured and booking accepted successfully",
+                    bookingId: bookingId,
+                    paymentIntentId: paymentIntent.id,
+                    captureId: paymentIntent.latest_charge,
+                });
+            } catch (stripeError) {
+                console.error(
+                    "Stripe capture failed for booking:",
+                    bookingId,
+                    stripeError
+                );
+
+                return res.status(400).json({
+                    error: "Failed to capture payment",
+                    details:
+                        stripeError instanceof Error
+                            ? stripeError.message
+                            : "Unknown Stripe error",
+                    bookingId: bookingId,
+                });
+            }
+        } catch (error) {
+            console.error("Error accepting booking:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+// Add a new endpoint to reject a booking
+app.post(
+    "/reject-booking",
+    validateFirebaseIdToken,
+    async (req: RequestWithRawBody, res: Response) => {
+        try {
+            const { bookingId } = req.body;
+            const userId = req.user?.uid;
+
+            if (!bookingId) {
+                return res
+                    .status(400)
+                    .json({ error: "Booking ID is required" });
+            }
+
+            if (!userId) {
+                return res
+                    .status(401)
+                    .json({ error: "User not authenticated" });
+            }
+
+            // Check if the user is a stylist
+            const stylistDoc = await db
+                .collection("stylists")
+                .doc(userId)
+                .get();
+            if (!stylistDoc.exists) {
+                return res
+                    .status(403)
+                    .json({ error: "Only stylists can reject bookings" });
+            }
+
+            // Get the booking document
+            const bookingRef = db.collection("bookings").doc(bookingId);
+            const bookingDoc = await bookingRef.get();
+
+            if (!bookingDoc.exists) {
+                return res.status(404).json({ error: "Booking not found" });
+            }
+
+            const bookingData = bookingDoc.data();
+
+            // Verify that the booking belongs to this stylist
+            if (bookingData?.stylistId !== userId) {
+                return res.status(403).json({
+                    error: "You can only reject bookings assigned to you",
+                });
+            }
+
+            // Check if the booking is in pending status
+            if (bookingData?.status !== "pending") {
+                return res.status(400).json({
+                    error: "Only pending bookings can be rejected",
+                    currentStatus: bookingData?.status,
+                });
+            }
+
+            // Check if the booking has a payment ID for cancellation
+            if (!bookingData?.paymentId) {
+                return res.status(400).json({
+                    error: "No payment found for this booking",
+                    bookingId: bookingId,
+                });
+            }
+
+            try {
+                console.log(
+                    `Payment cancelled successfully for booking ${bookingId}:`
+                );
+
+                // Update payment document status
+                const paymentRef = await db
+                    .collection("payments")
+                    .where("bookingId", "==", bookingId)
+                    .get();
+
+                if (paymentRef.empty) {
+                    return res.status(400).json({
+                        error: "Payment document not found",
+                        bookingId: bookingId,
+                    });
+                }
+
+                // Cancel the payment intent in Stripe (this will release the hold)
+                const paymentIntent = await stripe.paymentIntents.cancel(
+                    bookingData.paymentId
+                );
+
+                await paymentRef.docs[0].ref.update({
+                    status: "cancelled",
+                    cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    stripeCancellationId: paymentIntent.latest_charge,
+                });
+
+                // Update the booking status to rejected
+                await bookingRef.update({
+                    status: "rejected",
+                    paymentStatus: "cancelled",
+                    rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    paymentCancelledAt:
+                        admin.firestore.FieldValue.serverTimestamp(),
+                    stripeCancellationId: paymentIntent.latest_charge,
+                });
+
+                // Create notification for the client about booking rejection
+                await db.collection("notifications").add({
+                    userId: bookingData.clientId,
+                    type: "booking_rejected",
+                    title: "Booking Rejected",
+                    message: `Your booking for ${bookingData.serviceName} on ${bookingData.date} at ${bookingData.time} has been rejected by ${bookingData.stylistName}.`,
+                    read: false,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    data: {
+                        bookingId: bookingId,
+                        serviceName: bookingData.serviceName,
+                        date: bookingData.date,
+                        time: bookingData.time,
+                        stylistName: bookingData.stylistName,
+                    },
+                });
+
+                // Create notification for the stylist about booking rejection
+                await db.collection("notifications").add({
+                    userId: userId,
+                    type: "booking_rejected_stylist",
+                    title: "Booking Rejected",
+                    message: `You have rejected the booking for ${bookingData.serviceName} on ${bookingData.date} at ${bookingData.time} with ${bookingData.clientName}.`,
+                    read: false,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    data: {
+                        bookingId: bookingId,
+                        serviceName: bookingData.serviceName,
+                        date: bookingData.date,
+                        time: bookingData.time,
+                        clientName: bookingData.clientName,
+                    },
+                });
+
+                //TODO: rejected email/sms to client
+
+                setTimeout(async () => {
+                    try {
+                        await SmsService.sendAppointmentRejectedClientSms({
+                            clientName: bookingData.clientName,
+                            phoneNumber: bookingData.clientPhone,
+                            stylistName: bookingData.stylistName,
+                            appointmentDate: bookingData.date,
+                            appointmentTime: bookingData.time,
+                            serviceName: bookingData.serviceName,
+                        });
+                    } catch (error) {
+                        console.error(
+                            "Error sending appointment rejected sms to client:",
+                            error
+                        );
+                    }
+                }, 0);
+
+                console.log(
+                    `Booking ${bookingId} rejected by stylist ${userId}`
+                );
+
+                return res.status(200).json({
+                    success: true,
+                    message:
+                        "Payment cancelled and booking rejected successfully",
+                    bookingId: bookingId,
+                    paymentIntentId: paymentIntent.id,
+                    cancellationId: paymentIntent.latest_charge,
+                });
+            } catch (stripeError) {
+                console.error(
+                    "Stripe cancellation failed for booking:",
+                    bookingId,
+                    stripeError
+                );
+
+                return res.status(400).json({
+                    error: "Failed to cancel payment",
+                    details:
+                        stripeError instanceof Error
+                            ? stripeError.message
+                            : "Unknown Stripe error",
+                    bookingId: bookingId,
+                });
+            }
+        } catch (error) {
+            console.error("Error rejecting booking:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
 // Add a webhook handler to create the booking when payment is successful
 app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
     const sig = req.headers["stripe-signature"] as string;
@@ -851,6 +1263,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
 
     try {
         event = stripe.webhooks.constructEvent(req.rawBody, sig, webhookSecret);
+        console.log("event", event.type, event);
     } catch (err) {
         console.error(
             `Webhook signature verification failed: ${err instanceof Error ? err.message : "Unknown error"}`
@@ -871,7 +1284,6 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                 const stylistId = session.metadata?.stylistId;
                 const subscriptionId = session.subscription as string;
                 const paymentIntentId = session.payment_intent as string;
-
                 // Check if this is a booking-related payment
                 if (session.metadata?.pendingBookingId) {
                     const pendingBookingId = session.metadata.pendingBookingId;
@@ -895,8 +1307,8 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                 .doc(pendingBookingId);
                             await bookingRef.set({
                                 ...bookingData,
-                                status: "confirmed",
-                                paymentStatus: "paid",
+                                // status: "confirmed",
+                                paymentStatus: "authorized",
                                 paymentId: session.payment_intent,
                                 stripeSessionId: session.id,
                                 depositAmount: session.amount_total
@@ -922,7 +1334,9 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
 
                             if (!paymentsQuery.empty) {
                                 await paymentsQuery.docs[0].ref.update({
-                                    status: "completed",
+                                    status: "authorized",
+                                    stripePaymentIntentId:
+                                        session.payment_intent,
                                     bookingId: pendingBookingId,
                                     completedAt:
                                         admin.firestore.FieldValue.serverTimestamp(),
@@ -1337,7 +1751,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                 await bookingRef.set({
                                     ...bookingData,
                                     status: "failed",
-                                    paymentStatus: "failed",
+                                    paymentStatus: "expired",
                                     paymentId: session.payment_intent,
                                     stripeSessionId: session.id,
                                     depositAmount: session.amount_total
@@ -1425,7 +1839,6 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                 if (bookingDoc.exists) {
                                     await bookingRef.update({
                                         paymentStatus: "paid",
-                                        status: "confirmed",
                                         updatedAt:
                                             admin.firestore.FieldValue.serverTimestamp(),
                                         paymentCompletedAt:

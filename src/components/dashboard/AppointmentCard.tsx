@@ -1,6 +1,11 @@
 "use client";
 
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardFooter,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -16,6 +21,8 @@ import {
     XCircle,
     Clock3,
     Copy,
+    Check,
+    X,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Appointment } from "@/hooks/use-appointments";
@@ -25,11 +32,19 @@ interface AppointmentCardProps {
     appointment: Appointment;
     userRole: "stylist" | "client";
     onContact?: (contactInfo: { phone: string; email: string }) => void;
+    onAcceptAppointment?: (appointmentId: string) => void;
+    onRejectAppointment?: (appointmentId: string) => void;
+    onSuggestReschedule?: (appointmentId: string) => void;
+    onCancelAppointment?: (appointmentId: string) => void;
 }
 
 export function AppointmentCard({
     appointment,
     userRole,
+    onAcceptAppointment,
+    onRejectAppointment,
+    // onSuggestReschedule,
+    // onCancelAppointment,
 }: AppointmentCardProps) {
     const { toast } = useToast();
 
@@ -51,8 +66,25 @@ export function AppointmentCard({
         }
     };
 
+    const handleAcceptAppointment = () => {
+        if (onAcceptAppointment) {
+            onAcceptAppointment(appointment.id);
+        }
+    };
+
+    const handleRejectAppointment = () => {
+        if (onRejectAppointment) {
+            onRejectAppointment(appointment.id);
+        }
+    };
+
     const getStatusIcon = (status: string, paymentStatus: string) => {
-        if (status === "failed" || paymentStatus === "failed") {
+        if (
+            status === "failed" ||
+            paymentStatus === "failed" ||
+            status === "cancelled" ||
+            paymentStatus === "cancelled"
+        ) {
             return <XCircle className="h-4 w-4" />;
         }
         if (status === "confirmed" && paymentStatus === "paid") {
@@ -65,16 +97,20 @@ export function AppointmentCard({
     };
 
     const getStatusColor = (status: string, paymentStatus: string) => {
-        if (status === "failed" || paymentStatus === "failed") {
-            return "destructive";
+        if (
+            status === "failed" ||
+            paymentStatus === "failed" ||
+            status === "cancelled"
+        ) {
+            return "bg-red-100 text-red-800 hover:bg-red-200";
         }
         if (status === "confirmed" && paymentStatus === "paid") {
-            return "default";
+            return "bg-green-100 text-green-800 hover:bg-green-200";
         }
         if (status === "pending") {
-            return "secondary";
+            return "bg-yellow-100 text-yellow-800 hover:bg-yellow-200";
         }
-        return "outline";
+        return "bg-gray-100 text-gray-800 hover:bg-gray-200";
     };
 
     const getStatusText = (status: string, paymentStatus: string) => {
@@ -83,6 +119,9 @@ export function AppointmentCard({
         }
         if (paymentStatus === "failed") {
             return "Payment Failed";
+        }
+        if (status === "cancelled") {
+            return "Cancelled";
         }
         if (status === "confirmed" && paymentStatus === "paid") {
             return "Confirmed";
@@ -117,60 +156,66 @@ export function AppointmentCard({
         userRole === "stylist"
             ? appointment.clientName
             : appointment.stylistName;
+
     const displayBusiness =
         userRole === "client" ? appointment.businessName : "";
+
     const contactPhone = userRole === "stylist" ? appointment.clientPhone : "";
     const contactEmail = userRole === "stylist" ? appointment.clientEmail : "";
 
+    // Determine if action buttons should be shown
+    const showPendingActions =
+        appointment.status === "pending" && userRole === "stylist";
+
+    // const showConfirmedActions =
+    //     appointment.status === "confirmed" &&
+    //     appointment.paymentStatus === "paid";
+
+    const initials = displayName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase();
+
     return (
-        <Card className="w-full border border-gray-200 shadow-sm hover:shadow-md transition-all">
-            <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-3">
-                        <Avatar className="h-12 w-12 ring-2 ring-purple-100">
-                            <AvatarImage src="/placeholder.svg" />
-                            <AvatarFallback className="bg-[#3F0052] text-white">
-                                {displayName
-                                    .split(" ")
-                                    .map((n) => n[0])
-                                    .join("")
-                                    .toUpperCase()}
-                            </AvatarFallback>
-                        </Avatar>
-                        <div>
-                            <h3 className="font-semibold text-lg text-[#3F0052]">
-                                {displayName}
-                            </h3>
-                            {displayBusiness && (
-                                <p className="text-sm text-gray-600">
+        <Card className="w-full overflow-hidden border border-gray-300 shadow-xl bg-white">
+            <CardHeader className="flex flex-row items-center justify-between gap-4 bg-gradient-to-r from-[#3F0052]/100 to-[#3F0052]/80 p-6 text-white">
+                <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12 border-2 border-white bg-white text-[#3F0052]">
+                        <AvatarImage src="/placeholder.svg" />
+                        <AvatarFallback className="text-lg font-bold bg-purple-800 text-white">
+                            {initials}
+                        </AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <h3 className="text-xl font-semibold">{displayName}</h3>
+                        {displayBusiness && (
+                            <div className="flex items-center gap-1 text-sm">
+                                <span className="text-purple-100">
                                     {displayBusiness}
-                                </p>
-                            )}
-                        </div>
+                                </span>
+                            </div>
+                        )}
                     </div>
-                    <Badge
-                        variant={getStatusColor(
-                            appointment.status,
-                            appointment.paymentStatus
-                        )}
-                        className="flex items-center gap-1 font-medium shadow-sm"
-                    >
-                        {getStatusIcon(
-                            appointment.status,
-                            appointment.paymentStatus
-                        )}
-                        {getStatusText(
-                            appointment.status,
-                            appointment.paymentStatus
-                        )}
-                    </Badge>
                 </div>
+                <Badge
+                    className={`${getStatusColor(appointment.status, appointment.paymentStatus)} px-3 py-1 text-xs font-medium flex items-center gap-1 rounded-full border-0`}
+                >
+                    {getStatusIcon(
+                        appointment.status,
+                        appointment.paymentStatus
+                    )}
+                    {getStatusText(
+                        appointment.status,
+                        appointment.paymentStatus
+                    )}
+                </Badge>
             </CardHeader>
 
-            <CardContent className="space-y-4">
+            <CardContent className="p-6 space-y-6 bg-white">
                 {/* Service Information */}
-                <div className="space-y-2 bg-gray-50 p-3 rounded-lg">
-                    <h4 className="font-medium text-[#3F0052]">
+                <div className="bg-slate-50 p-4 rounded-lg shadow-sm border border-gray-200">
+                    <h4 className="font-medium text-slate-800 mb-1">
                         {appointment.serviceName}
                     </h4>
                     {appointment.notes && (
@@ -180,49 +225,60 @@ export function AppointmentCard({
                     )}
                 </div>
 
-                <Separator className="bg-gray-200" />
-
                 {/* Date and Time */}
-                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2">
+                        <Calendar className="h-5 w-5 text-gray-500" />
+                        <span className="text-sm font-medium">
                             {formatDate(appointment.date)}
                         </span>
                     </div>
-                    <div className="flex items-center space-x-2">
-                        <Clock className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm">
+                    <div className="flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-gray-500" />
+                        <span className="text-sm font-medium">
                             {formatTime(appointment.time)}
                         </span>
                     </div>
                 </div>
 
+                <Separator />
+
                 {/* Payment Information */}
-                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                        <DollarSign className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm">
-                            {appointment.paymentType === "deposit"
-                                ? "Deposit Paid"
-                                : "Total Paid"}
-                            : ${appointment.paymentAmount}
+                <div className="grid gap-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm">
+                            <DollarSign className="h-4 w-4 text-gray-500" />
+                            <span>
+                                {appointment.paymentType === "deposit"
+                                    ? "Deposit Paid"
+                                    : "Total Paid"}
+                            </span>
+                        </div>
+                        <span className="font-semibold">
+                            ${appointment.paymentAmount}
                         </span>
                     </div>
+
                     {appointment.totalAmount !== appointment.paymentAmount && (
-                        <div className="flex items-center space-x-2">
-                            <DollarSign className="h-4 w-4 text-gray-500" />
-                            <span className="text-sm text-gray-600">
-                                Total Cost: ${appointment.totalAmount}
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-sm">
+                                <DollarSign className="h-4 w-4 text-gray-500" />
+                                <span>Total Cost</span>
+                            </div>
+                            <span className="font-semibold">
+                                ${appointment.totalAmount}
                             </span>
                         </div>
                     )}
-                    {/* Remaining Balance */}
+
                     {appointment.totalAmount !== appointment.paymentAmount && (
-                        <div className="flex items-center space-x-2">
-                            <DollarSign className="h-4 w-4 text-gray-500" />
-                            <span className="text-sm text-gray-600">
-                                Unpaid : $
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-sm">
+                                <DollarSign className="h-4 w-4 text-gray-500" />
+                                <span>Unpaid</span>
+                            </div>
+                            <span className="font-semibold text-red-600">
+                                $
                                 {appointment.totalAmount -
                                     appointment.paymentAmount}
                             </span>
@@ -233,18 +289,10 @@ export function AppointmentCard({
                 {/* Contact Information (for stylists viewing client appointments) */}
                 {userRole === "stylist" && (
                     <>
-                        <Separator className="bg-gray-200" />
-                        <div className="space-y-2 bg-gray-50 p-3 rounded-lg">
-                            <div
-                                className="flex items-center justify-between group"
-                                onClick={() =>
-                                    copyToClipboard(
-                                        contactPhone,
-                                        "Phone number"
-                                    )
-                                }
-                            >
-                                <div className="flex items-center space-x-2">
+                        <Separator />
+                        <div className="grid gap-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
                                     <Phone className="h-4 w-4 text-gray-500" />
                                     <span className="text-sm">
                                         {contactPhone}
@@ -253,32 +301,40 @@ export function AppointmentCard({
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-6 w-6 p-0 hover:bg-gray-200 rounded-full"
+                                    className="h-8 w-8"
+                                    onClick={() =>
+                                        copyToClipboard(
+                                            contactPhone,
+                                            "Phone number"
+                                        )
+                                    }
                                 >
-                                    <Copy className="h-3 w-3" />
+                                    <Copy className="h-4 w-4" />
+                                    <span className="sr-only">
+                                        Copy phone number
+                                    </span>
                                 </Button>
                             </div>
-                            <div
-                                className="flex items-center justify-between group"
-                                onClick={() =>
-                                    copyToClipboard(
-                                        contactEmail,
-                                        "Email address"
-                                    )
-                                }
-                            >
-                                <div className="flex items-center space-x-2">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
                                     <Mail className="h-4 w-4 text-gray-500" />
-                                    <span className="text-sm">
+                                    <span className="text-sm truncate max-w-[200px]">
                                         {contactEmail}
                                     </span>
                                 </div>
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-6 w-6 p-0 hover:bg-gray-200 rounded-full"
+                                    className="h-8 w-8"
+                                    onClick={() =>
+                                        copyToClipboard(
+                                            contactEmail,
+                                            "Email address"
+                                        )
+                                    }
                                 >
-                                    <Copy className="h-3 w-3" />
+                                    <Copy className="h-4 w-4" />
+                                    <span className="sr-only">Copy email</span>
                                 </Button>
                             </div>
                         </div>
@@ -288,8 +344,8 @@ export function AppointmentCard({
                 {/* Special Requests */}
                 {appointment.clientInfo?.specialRequests && (
                     <>
-                        <Separator className="bg-gray-200" />
-                        <div className="bg-gray-50 p-3 rounded-lg">
+                        <Separator />
+                        <div className="bg-slate-50 p-4 rounded-lg shadow-sm border border-gray-200">
                             <h5 className="text-sm font-medium text-gray-700 mb-1">
                                 Special Requests:
                             </h5>
@@ -304,8 +360,8 @@ export function AppointmentCard({
                 {appointment.paymentStatus === "failed" &&
                     appointment.paymentFailureReason && (
                         <>
-                            <Separator className="bg-gray-200" />
-                            <div className="bg-red-50 p-3 rounded-lg">
+                            <Separator />
+                            <div className="bg-red-50 p-4 rounded-lg shadow-sm border border-red-200">
                                 <div className="flex items-center space-x-2 text-red-700">
                                     <AlertCircle className="h-4 w-4" />
                                     <span className="text-sm font-medium">
@@ -319,6 +375,26 @@ export function AppointmentCard({
                         </>
                     )}
             </CardContent>
+
+            {/* Action Buttons */}
+            {showPendingActions && (
+                <CardFooter className="grid grid-cols-2 gap-3 p-6 pt-0">
+                    <Button
+                        onClick={handleRejectAppointment}
+                        className="border-red-200 bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-700"
+                    >
+                        <X className="h-4 w-4 mr-2" />
+                        Reject
+                    </Button>
+                    <Button
+                        onClick={handleAcceptAppointment}
+                        className="bg-green-600 text-white hover:bg-green-700"
+                    >
+                        <Check className="h-4 w-4 mr-2" />
+                        Accept
+                    </Button>
+                </CardFooter>
+            )}
         </Card>
     );
 }

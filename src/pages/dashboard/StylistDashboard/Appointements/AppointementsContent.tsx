@@ -4,68 +4,144 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+
 import { AppointmentCard } from "@/components/dashboard/AppointmentCard";
 import { useAppointments } from "@/hooks/use-appointments";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, Search, CalendarDays, Clock, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { getAuthToken } from "@/lib/firebase/auth";
+import axios from "axios";
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export function AppointementsContent() {
     const { loading, error, getStylistAppointments } = useAppointments();
 
     const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState("all");
     const [activeTab, setActiveTab] = useState("today");
 
     // Get stylist-specific appointments
     const stylistAppointments = getStylistAppointments();
 
-    // Filter appointments based on search and status
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+
+    // Filter appointments based on search
     const filteredAppointments = stylistAppointments.filter((appointment) => {
-        const matchesSearch =
-            appointment.clientName
-                .toLowerCase()
-                .includes(searchTerm.toLowerCase()) ||
-            appointment.serviceName
-                .toLowerCase()
-                .includes(searchTerm.toLowerCase());
-        const matchesStatus =
-            statusFilter === "all" || appointment.status === statusFilter;
-        return matchesSearch && matchesStatus;
+        const appointmentDateTimeStr = `${appointment.date}T${appointment.time}`;
+        const appointmentDateTime = new Date(appointmentDateTimeStr);
+        return (
+            (!searchTerm ||
+                appointment.clientName
+                    .toLowerCase()
+                    .includes(searchTerm.toLowerCase()) ||
+                appointment.serviceName
+                    .toLowerCase()
+                    .includes(searchTerm.toLowerCase())) &&
+            (appointment.status === "confirmed" ||
+                appointment.status === "pending") &&
+            appointmentDateTime >= now
+        );
     });
 
-    // Separate appointments by time
-    const upcomingAppointments = filteredAppointments.filter((appointment) => {
-        const today = new Date().toISOString().split("T")[0];
-        return appointment.date >= today;
+    // Confirmed appointments
+    const confirmedAppointments = filteredAppointments.filter(
+        (a) => a.status === "confirmed"
+    );
+
+    const todaysAppointments = confirmedAppointments.filter((appointment) => {
+        return appointment.date === todayStr;
     });
 
-    const pastAppointments = filteredAppointments.filter((appointment) => {
-        const today = new Date().toISOString().split("T")[0];
-        return appointment.date < today;
-    });
+    const upcomingAppointments = confirmedAppointments.filter(
+        (appointment) => appointment.date > todayStr
+    );
 
-    const todaysAppointments = filteredAppointments.filter((appointment) => {
-        const today = new Date().toISOString().split("T")[0];
-        return appointment.date === today;
-    });
+    const pendingAppointments = filteredAppointments.filter(
+        (appointment) => appointment.status === "pending"
+    );
 
     // Calculate statistics
-    const totalAppointments = stylistAppointments.length;
-    const confirmedAppointments = stylistAppointments.filter(
-        (a) => a.status === "confirmed"
-    ).length;
-    const pendingAppointments = stylistAppointments.filter(
-        (a) => a.status === "pending"
-    ).length;
+    const confirmedAppointmentsCount = confirmedAppointments.length;
+    const pendingAppointmentsCount = pendingAppointments.length;
+    const totalAppointments =
+        confirmedAppointmentsCount + pendingAppointments.length;
+
+    // handle accept appointment
+    const handleAcceptAppointment = async (appointmentId: string) => {
+        try {
+            const token = await getAuthToken();
+            const response = await axios.post(
+                `${API_BASE_URL}/accept-booking`,
+                { bookingId: appointmentId },
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            const result = response.data;
+
+            if (response.status === 200) {
+                toast({
+                    title: "Success",
+                    description: "Appointment accepted successfully!",
+                });
+                // Refresh appointments
+                getStylistAppointments();
+            } else {
+                toast({
+                    title: "Error",
+                    description: result.error || "Failed to accept appointment",
+                    variant: "destructive",
+                });
+            }
+        } catch (error: any) {
+            console.error("Error accepting appointment:", error);
+            const errorMessage =
+                error.response?.data?.error ||
+                "Failed to accept appointment. Please try again.";
+            toast({
+                title: "Error",
+                description: errorMessage,
+                variant: "destructive",
+            });
+        }
+    };
+
+    // handle reject appointment
+    const handleRejectAppointment = async (appointmentId: string) => {
+        try {
+            const token = await getAuthToken();
+            await axios.post(
+                `${API_BASE_URL}/reject-booking`,
+                { bookingId: appointmentId },
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            toast({
+                title: "Success",
+                description: "Appointment rejected successfully!",
+            });
+            // Refresh appointments
+            getStylistAppointments();
+        } catch (error: any) {
+            console.error("Error rejecting appointment:", error);
+            toast({
+                title: "Error",
+                description: "Failed to reject appointment. Please try again.",
+                variant: "destructive",
+            });
+        }
+    };
 
     const handleContact = (contactInfo: { phone: string; email: string }) => {
         // TODO: Implement contact functionality
@@ -137,7 +213,7 @@ export function AppointementsContent() {
                                     Confirmed
                                 </p>
                                 <p className="text-2xl font-bold text-green-600">
-                                    {confirmedAppointments}
+                                    {confirmedAppointmentsCount}
                                 </p>
                             </div>
                         </div>
@@ -153,7 +229,7 @@ export function AppointementsContent() {
                             <div>
                                 <p className="text-sm text-gray-600">Pending</p>
                                 <p className="text-2xl font-bold text-yellow-600">
-                                    {pendingAppointments}
+                                    {pendingAppointmentsCount}
                                 </p>
                             </div>
                         </div>
@@ -161,44 +237,21 @@ export function AppointementsContent() {
                 </Card>
             </div>
 
-            {/* Filters */}
+            {/* Search Only */}
             <Card className="border border-gray-200 shadow-sm">
                 <CardContent className="p-4">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                <Input
-                                    placeholder="Search by client name or service..."
-                                    value={searchTerm}
-                                    onChange={(e) =>
-                                        setSearchTerm(e.target.value)
-                                    }
-                                    className="pl-10"
-                                />
-                            </div>
-                        </div>
-                        <Select
-                            value={statusFilter}
-                            onValueChange={setStatusFilter}
-                        >
-                            <SelectTrigger className="w-full md:w-48">
-                                <SelectValue placeholder="Filter by status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Status</SelectItem>
-                                <SelectItem value="confirmed">
-                                    Confirmed
-                                </SelectItem>
-                                <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="failed">Failed</SelectItem>
-                            </SelectContent>
-                        </Select>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                            placeholder="Search by client name or service..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10"
+                        />
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Appointments Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 rounded-lg">
                     <TabsTrigger
@@ -215,9 +268,9 @@ export function AppointementsContent() {
                     </TabsTrigger>
                     <TabsTrigger
                         className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
-                        value="past"
+                        value="pending"
                     >
-                        Past ({pastAppointments.length})
+                        Pending ({pendingAppointments.length})
                     </TabsTrigger>
                 </TabsList>
 
@@ -230,8 +283,8 @@ export function AppointementsContent() {
                                     No appointments today
                                 </h3>
                                 <p className="text-gray-600">
-                                    You don't have any appointments scheduled
-                                    for today.
+                                    You don't have any confirmed appointments
+                                    scheduled for today.
                                 </p>
                             </CardContent>
                         </Card>
@@ -243,6 +296,12 @@ export function AppointementsContent() {
                                     appointment={appointment}
                                     userRole="stylist"
                                     onContact={handleContact}
+                                    onAcceptAppointment={
+                                        handleAcceptAppointment
+                                    }
+                                    onRejectAppointment={
+                                        handleRejectAppointment
+                                    }
                                 />
                             ))}
                         </div>
@@ -258,8 +317,8 @@ export function AppointementsContent() {
                                     No upcoming appointments
                                 </h3>
                                 <p className="text-gray-600">
-                                    You don't have any upcoming appointments at
-                                    the moment.
+                                    You don't have any confirmed upcoming
+                                    appointments at the moment.
                                 </p>
                             </CardContent>
                         </Card>
@@ -271,34 +330,46 @@ export function AppointementsContent() {
                                     appointment={appointment}
                                     userRole="stylist"
                                     onContact={handleContact}
+                                    onAcceptAppointment={
+                                        handleAcceptAppointment
+                                    }
+                                    onRejectAppointment={
+                                        handleRejectAppointment
+                                    }
                                 />
                             ))}
                         </div>
                     )}
                 </TabsContent>
 
-                <TabsContent value="past" className="space-y-4">
-                    {pastAppointments.length === 0 ? (
+                <TabsContent value="pending" className="space-y-4">
+                    {pendingAppointments.length === 0 ? (
                         <Card className="border border-gray-200 shadow-sm">
                             <CardContent className="p-8 text-center">
                                 <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                                 <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                    No past appointments
+                                    No pending appointments
                                 </h3>
                                 <p className="text-gray-600">
-                                    You don't have any past appointments to
-                                    display.
+                                    You don't have any pending appointments
+                                    requiring your action.
                                 </p>
                             </CardContent>
                         </Card>
                     ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            {pastAppointments.map((appointment) => (
+                            {pendingAppointments.map((appointment: any) => (
                                 <AppointmentCard
                                     key={appointment.id}
                                     appointment={appointment}
                                     userRole="stylist"
                                     onContact={handleContact}
+                                    onAcceptAppointment={
+                                        handleAcceptAppointment
+                                    }
+                                    onRejectAppointment={
+                                        handleRejectAppointment
+                                    }
                                 />
                             ))}
                         </div>

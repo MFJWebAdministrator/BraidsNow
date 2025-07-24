@@ -10,28 +10,25 @@ export function StylistDashboardContent() {
     const { user } = useAuth();
     const { userData } = useUserData(user?.uid);
     const { favoriteClients } = useStylistFavorites();
-    const { getStylistAppointments } = useAppointments();
+    const { getAppointmentsByStatus } = useAppointments();
 
     if (!userData) return null;
 
     // Get today's appointments for the stylist
-    const stylistAppointments = getStylistAppointments();
-    const today = new Date().toISOString().split("T")[0];
-    const todaysAppointments = stylistAppointments.filter(
-        (appointment) => appointment.date === today
-    );
+    const now = new Date();
+    const stylistAppointments = getAppointmentsByStatus("confirmed");
 
-    // // monthly earnings
-    // const monthlyEarnings = stylistAppointments
-    //     .filter((a) => {
-    //         const today = new Date();
-    //         const appointmentDate = new Date(a.date);
-    //         return (
-    //             appointmentDate.getMonth() === today.getMonth() &&
-    //             appointmentDate.getFullYear() === today.getFullYear()
-    //         );
-    //     })
-    //     .reduce((sum, a) => sum + a.totalAmount, 0);
+    const todaysAppointments = stylistAppointments.filter((appointment) => {
+        // Combine date and time into a single string
+        const appointmentDateTimeStr = `${appointment.date}T${appointment.time}`;
+        // Parse into a Date object
+        const appointmentDateTime = new Date(appointmentDateTimeStr);
+        // Compare to now
+        return (
+            appointment.date === now.toISOString().split("T")[0] &&
+            appointmentDateTime >= now
+        );
+    });
 
     return (
         <div className="space-y-6">

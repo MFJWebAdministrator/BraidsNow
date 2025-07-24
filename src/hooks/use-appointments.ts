@@ -35,10 +35,17 @@ export interface Appointment {
     paymentFailedAt?: Timestamp;
     paymentFailureReason?: string;
     paymentId?: string | null;
-    paymentStatus: "pending" | "paid" | "failed";
+    paymentStatus:
+        | "pending"
+        | "authorized"
+        | "paid"
+        | "failed"
+        | "cancelled"
+        | "refunded"
+        | "expired";
     paymentType: string;
     serviceName: string;
-    status: "pending" | "confirmed" | "cancelled" | "failed";
+    status: "pending" | "confirmed" | "rejected" | "cancelled" | "failed";
     stripeSessionId: string;
     stylistId: string;
     stylistName: string;
@@ -68,8 +75,9 @@ export function useAppointments() {
         const stylistQuery = query(
             appointmentsRef,
             where("stylistId", "==", user.uid),
-            orderBy("date", "desc"),
-            orderBy("createdAt", "desc")
+            orderBy("date", "asc"),
+            orderBy("time", "asc")
+            // orderBy("createdAt", "desc")
         );
 
         const unsubscribeStylist = onSnapshot(
@@ -131,10 +139,10 @@ export function useAppointments() {
                     index === self.findIndex((a) => a.id === appointment.id)
             );
 
-            // Sort by creation date (newest first)
+            // Sort by updatedAt date (newest first)
             uniqueAppointments.sort((a, b) => {
-                const aTime = a.createdAt?.toMillis() || 0;
-                const bTime = b.createdAt?.toMillis() || 0;
+                const aTime = a.updatedAt?.toMillis() || 0;
+                const bTime = b.updatedAt?.toMillis() || 0;
                 return bTime - aTime;
             });
 

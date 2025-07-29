@@ -9,6 +9,8 @@ import * as functions from "firebase-functions";
 import Stripe from "stripe";
 import { EmailService } from "./services/email-service";
 import { SmsService } from "./services/sms-service";
+import { onSchedule } from "firebase-functions/v2/scheduler";
+import { getBookingExpiresAt } from "./utils/utils";
 
 const app = express();
 
@@ -790,6 +792,7 @@ app.post(
             const [hour, minute] = bookingData.time.split(":").map(Number);
             const start = new Date(bookingDate);
             start.setHours(hour, minute, 0, 0);
+
             // Calculate total service duration (minutes)
             const duration =
                 (bookingData.service?.duration?.hours || 0) * 60 +
@@ -797,6 +800,7 @@ app.post(
             const bufferBefore = schedule.bufferTime?.before || 0;
             const bufferAfter = schedule.bufferTime?.after || 0;
             const totalDuration = duration + bufferBefore + bufferAfter;
+
             // Calculate end time
             const end = new Date(start.getTime() + totalDuration * 60000);
             // Stylist closing time
@@ -811,10 +815,16 @@ app.post(
 
             // Create the booking
             const bookingRef = db.collection("bookings").doc();
+            const expiresAt = getBookingExpiresAt(
+                bookingData.date,
+                bookingData.time
+            );
+
             await bookingRef.set({
                 ...bookingData,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                expiresAt,
             });
 
             // Notify the stylist about the new booking
@@ -1255,6 +1265,144 @@ app.post(
     }
 );
 
+// scheduled function to check for expired bookings and cancel them
+export const expirePendingBookings = onSchedule(
+    {
+        schedule: "every 5 minutes",
+    },
+    async (context) => {
+        console.log(
+            "Running scheduled function to expire pending bookings",
+            new Date().toISOString()
+        );
+
+        const now = admin.firestore.Timestamp.now();
+        const expiredBookingsQuery = await db
+            .collection("bookings")
+            .where("status", "==", "pending")
+            .where("expiresAt", "<=", now)
+            .get();
+
+        if (expiredBookingsQuery.empty) {
+            console.log("No expired pending bookings found.");
+            return null;
+        }
+
+        const expiredBookingIds: string[] = [];
+        const errors: any[] = [];
+
+        await Promise.all(
+            expiredBookingsQuery.docs.map(async (doc) => {
+                const bookingId = doc.id;
+                const bookingData = doc.data();
+                expiredBookingIds.push(bookingId);
+                let paymentCancelled = false;
+                let paymentError = null;
+                const paymentIntentId = bookingData.paymentId;
+
+                // Find the payment document
+                let paymentDoc = null;
+                let paymentDocRef = null;
+                if (paymentIntentId) {
+                    const paymentQuery = await db
+                        .collection("payments")
+                        .where("bookingId", "==", bookingId)
+                        .get();
+                    if (!paymentQuery.empty) {
+                        paymentDoc = paymentQuery.docs[0].data();
+                        paymentDocRef = paymentQuery.docs[0].ref;
+                    }
+                }
+
+                // Cancel the payment intent in Stripe if exists
+                if (paymentIntentId) {
+                    console.log(
+                        `Cancelling paymentIntent ${paymentIntentId} for booking ${bookingId}`
+                    );
+                    try {
+                        await stripe.paymentIntents.cancel(paymentIntentId);
+                        paymentCancelled = true;
+                        console.log(
+                            `PaymentIntent ${paymentIntentId} cancelled successfully for booking ${bookingId}`
+                        );
+                    } catch (err) {
+                        paymentError = err instanceof Error ? err.message : err;
+                        console.error(
+                            `Failed to cancel paymentIntent ${paymentIntentId} for booking ${bookingId}:`,
+                            paymentError
+                        );
+                    }
+                }
+
+                // Update booking document
+                await doc.ref.update({
+                    status: "auto-cancelled",
+                    paymentStatus: "auto-cancelled",
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    paymentCancelledAt:
+                        admin.firestore.FieldValue.serverTimestamp(),
+                });
+
+                // Update payment document
+                if (paymentDocRef) {
+                    await paymentDocRef.update({
+                        status: "auto-cancelled",
+                        cancelledAt:
+                            admin.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    });
+                }
+
+                // Send notifications to client and stylist
+
+                setTimeout(async () => {
+                    try {
+                        await SmsService.sendAppointmentAutoCancelledClientSms({
+                            clientName: bookingData.clientName,
+                            phoneNumber: bookingData.clientPhone,
+                            stylistName: bookingData.stylistName,
+                            appointmentDate: bookingData.date,
+                            appointmentTime: bookingData.time,
+                            serviceName: bookingData.serviceName,
+                        });
+                    } catch (error) {
+                        console.error(
+                            `Error sending sms to client ${bookingData.clientName} for booking ${bookingId}:`,
+                            error
+                        );
+                    }
+                }, 0);
+
+                setTimeout(async () => {
+                    try {
+                        await SmsService.sendAppointmentAutoCancelledStylistSms(
+                            {
+                                stylistName: bookingData.stylistName,
+                                phoneNumber: bookingData.stylistPhone,
+                                clientName: bookingData.clientName,
+                                appointmentDate: bookingData.date,
+                                appointmentTime: bookingData.time,
+                                serviceName: bookingData.serviceName,
+                            }
+                        );
+                    } catch (error) {
+                        console.error(
+                            `Error sending sms to stylist ${bookingData.stylistName} for booking ${bookingId}:`,
+                            error
+                        );
+                    }
+                }, 0);
+            })
+        );
+
+        console.log(
+            `Auto-cancelled ${expiredBookingIds.length} pending bookings:`,
+            expiredBookingIds
+        );
+        return null;
+    }
+);
+
 // Add a webhook handler to create the booking when payment is successful
 app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
     const sig = req.headers["stripe-signature"] as string;
@@ -1301,13 +1449,16 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                         console.log("bookingData", bookingData);
 
                         if (bookingData) {
+                            const expiresAt = getBookingExpiresAt(
+                                bookingData.date,
+                                bookingData.time
+                            );
                             // Create the actual booking
                             const bookingRef = db
                                 .collection("bookings")
                                 .doc(pendingBookingId);
                             await bookingRef.set({
                                 ...bookingData,
-                                // status: "confirmed",
                                 paymentStatus: "authorized",
                                 paymentId: session.payment_intent,
                                 stripeSessionId: session.id,
@@ -1320,6 +1471,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                     admin.firestore.FieldValue.serverTimestamp(),
                                 paymentCompletedAt:
                                     admin.firestore.FieldValue.serverTimestamp(),
+                                expiresAt,
                             });
 
                             console.log(

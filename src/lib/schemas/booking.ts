@@ -52,12 +52,29 @@ export const bookingSchema = z.object({
     clientEmail: z.string().email().optional(),
     clientPhone: z.string().min(1).optional(),
     notes: z.string().optional(),
-    status: z.enum(["pending", "confirmed", "cancelled"]).optional(),
+    status: z
+        .enum([
+            "pending",
+            "confirmed",
+            "rejected",
+            "cancelled",
+            "auto-cancelled",
+        ])
+        .optional(),
     paymentType: z.enum(["deposit", "full"]).optional(),
     paymentAmount: z.number().min(0).optional(),
     depositAmount: z.number().min(0).optional(),
     totalAmount: z.number().min(0).optional(),
-    paymentStatus: z.enum(["pending", "paid", "failed"]).optional(),
+    paymentStatus: z
+        .enum([
+            "pending",
+            "paid",
+            "failed",
+            "expired",
+            "auto-cancelled",
+            "refunded",
+        ])
+        .optional(),
     bookingSource: z.enum(["website", "app"]).optional(),
     createdAt: z.date().optional(),
 });

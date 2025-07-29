@@ -14,7 +14,9 @@ type SmsType =
     | "subscriptionPaymentFailedStylist"
     | "newMessageStylist"
     | "newMessageClient"
-    | "fullPaymentReminderClient";
+    | "fullPaymentReminderClient"
+    | "AppointmentAutoCancelledClient"
+    | "AppointmentAutoCancelledStylist";
 
 interface SmsData {
     phoneNumber: string;
@@ -59,6 +61,12 @@ interface FullPaymentReminderClientSmsData {
     balanceAmount: string;
 }
 
+interface AppointmentAutoCancelledStylistSmsData
+    extends AppointmentBookedStylistSmsData {}
+
+interface AppointmentAutoCancelledClientSmsData
+    extends AppointmentBookedStylistSmsData {}
+
 export class SmsService {
     private static smsTemplates: Record<SmsType, (data: any) => string> = {
         welcomeClient: (data) =>
@@ -77,6 +85,14 @@ export class SmsService {
             `Hi ${data.clientName},\nYou’ve received a new message from ${data.stylistName} about your appointment.\nView Message 👉 https://braidsnow.com/dashboard/client/messages.\nWe recommend checking your messages to stay connected with your stylist.\n\nThank you,\n- BraidsNow.com Team`,
         fullPaymentReminderClient: (data: FullPaymentReminderClientSmsData) =>
             `Hi ${data.clientName}, please remember full payment is due at time of service. Balance: ${data.balanceAmount}\n\uD83D\uDCC5 ${data.appointmentDate} \u23F0 ${data.appointmentTime}\nService: ${data.serviceName}\nStylist: ${data.stylistName}\n— BraidsNow.com`,
+        AppointmentAutoCancelledClient: (
+            data: AppointmentAutoCancelledClientSmsData
+        ) =>
+            `Hi ${data.clientName}, your booking for ${data.serviceName} with ${data.stylistName} on ${data.appointmentDate} at ${data.appointmentTime} was automatically cancelled because the stylist did not respond in time. You have not been charged. - BraidsNow.com`,
+        AppointmentAutoCancelledStylist: (
+            data: AppointmentAutoCancelledStylistSmsData
+        ) =>
+            `Hi ${data.stylistName}, the booking for ${data.serviceName} with ${data.clientName} on ${data.appointmentDate} at ${data.appointmentTime} was automatically cancelled because you did not respond in time. - BraidsNow.com`,
     };
 
     /**
@@ -210,6 +226,30 @@ export class SmsService {
             type: null,
             data,
             customMessage: message,
+        });
+    }
+
+    /**
+     * Notify client that their appointment was auto-cancelled
+     */
+    static async sendAppointmentAutoCancelledClientSms(
+        data: AppointmentAutoCancelledClientSmsData
+    ) {
+        return this.sendSms({
+            type: "AppointmentAutoCancelledClient",
+            data,
+        });
+    }
+
+    /**
+     * Notify stylist that the appointment was auto-cancelled
+     */
+    static async sendAppointmentAutoCancelledStylistSms(
+        data: AppointmentAutoCancelledStylistSmsData
+    ) {
+        return this.sendSms({
+            type: "AppointmentAutoCancelledStylist",
+            data,
         });
     }
 }

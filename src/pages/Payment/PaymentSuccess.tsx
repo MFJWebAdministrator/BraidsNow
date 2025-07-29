@@ -8,6 +8,8 @@ import axios from "axios";
 import { auth } from "@/lib/firebase/config";
 import { SEO } from "@/components/SEO";
 import { getPageMetadata } from "@/lib/metadata";
+import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 
 export function PaymentSuccess() {
     const [searchParams] = useSearchParams();
@@ -17,6 +19,9 @@ export function PaymentSuccess() {
     const sessionId = searchParams.get("session_id");
     const stylistId = searchParams.get("stylistId");
     const API_BASE_URL = import.meta.env.VITE_API_URL;
+
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
     useEffect(() => {
         const fetchPaymentDetails = async () => {
             if (!user || !sessionId) {
@@ -38,6 +43,8 @@ export function PaymentSuccess() {
                         },
                     }
                 );
+
+                console.log("response", response.data);
 
                 setPaymentDetails(response.data);
             } catch (error) {
@@ -88,7 +95,13 @@ export function PaymentSuccess() {
                         <div className="flex justify-between">
                             <span className="text-gray-600">Date:</span>
                             <span className="font-medium">
-                                {new Date().toLocaleDateString()}
+                                {`${format(
+                                    toZonedTime(
+                                        paymentDetails.bookingDateTime,
+                                        browserTz
+                                    ),
+                                    "MMM dd, yyyy h:mm a"
+                                )} ${browserTz}`}
                             </span>
                         </div>
                     </div>

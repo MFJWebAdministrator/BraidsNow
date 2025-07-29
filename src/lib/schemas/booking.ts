@@ -37,7 +37,7 @@ export const clientInformationSchema = z.object({
 // Combined booking schema
 export const bookingSchema = z.object({
     service: serviceSelectionSchema,
-    dateTime: dateTimeSelectionSchema,
+    dateTime: z.date().optional(),
     clientInfo: clientInformationSchema,
     stylistId: z.string().min(1).optional(),
     clientId: z.string().min(1).optional(),
@@ -46,8 +46,8 @@ export const bookingSchema = z.object({
     stylistEmail: z.string().email().optional(),
     stylistPhone: z.string().min(1).optional(),
     businessName: z.string().min(1).optional(),
-    date: z.date().optional(),
-    time: z.string().min(1).optional(),
+    // date: z.date().optional(),
+    // time: z.string().min(1).optional(),
     clientName: z.string().min(1).optional(),
     clientEmail: z.string().email().optional(),
     clientPhone: z.string().min(1).optional(),
@@ -87,5 +87,7 @@ export type BookingForm = z.infer<typeof bookingSchema>;
 export interface Booking extends BookingForm {
     id: string;
     status: "pending" | "confirmed" | "cancelled";
+    date?: string;
+    time?: string;
     updatedAt: Date;
 }

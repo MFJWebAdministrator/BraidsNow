@@ -9,6 +9,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { useAuth } from "./use-auth";
+import { toZonedTime } from "date-fns-tz";
 
 export interface Appointment {
     id: string;
@@ -28,7 +29,8 @@ export interface Appointment {
     clientName: string;
     clientPhone: string;
     createdAt: Timestamp;
-    date: string;
+    dateTime: Date;
+    // date: string;
     depositAmount: number;
     notes: string;
     paymentAmount: number;
@@ -45,11 +47,21 @@ export interface Appointment {
         | "expired";
     paymentType: string;
     serviceName: string;
+    service: {
+        depositAmount: number;
+        duration: {
+            hours: number;
+            minutes: number;
+        };
+        price: number;
+        serviceId: string;
+        stylistId: string;
+    };
     status: "pending" | "confirmed" | "rejected" | "cancelled" | "failed";
     stripeSessionId: string;
     stylistId: string;
     stylistName: string;
-    time: string;
+    // time: string;
     totalAmount: number;
     updatedAt: Timestamp;
 }
@@ -59,6 +71,7 @@ export function useAppointments() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     useEffect(() => {
         if (!user) {
@@ -75,9 +88,8 @@ export function useAppointments() {
         const stylistQuery = query(
             appointmentsRef,
             where("stylistId", "==", user.uid),
-            orderBy("date", "asc"),
-            orderBy("time", "asc")
-            // orderBy("createdAt", "desc")
+            orderBy("dateTime", "desc"),
+            orderBy("createdAt", "desc")
         );
 
         const unsubscribeStylist = onSnapshot(
@@ -104,7 +116,7 @@ export function useAppointments() {
         const clientQuery = query(
             appointmentsRef,
             where("clientId", "==", user.uid),
-            orderBy("date", "desc"),
+            orderBy("dateTime", "desc"),
             orderBy("createdAt", "desc")
         );
 
@@ -146,7 +158,12 @@ export function useAppointments() {
                 return bTime - aTime;
             });
 
-            setAppointments(uniqueAppointments);
+            const mappedAppointments = uniqueAppointments.map((appointment) => {
+                const dateTime = toZonedTime(appointment.dateTime, browserTz);
+                return { ...appointment, dateTime };
+            });
+
+            setAppointments(mappedAppointments);
             setLoading(false);
         }
 
@@ -178,20 +195,29 @@ export function useAppointments() {
 
     // Get upcoming appointments (today and future)
     const getUpcomingAppointments = () => {
-        const today = new Date().toISOString().split("T")[0];
-        return appointments.filter((appointment) => appointment.date >= today);
+        const today = new Date().toString().split("T")[0];
+        return appointments.filter(
+            (appointment) =>
+                appointment.dateTime.toString().split("T")[0] >= today
+        );
     };
 
     // Get past appointments
     const getPastAppointments = () => {
-        const today = new Date().toISOString().split("T")[0];
-        return appointments.filter((appointment) => appointment.date < today);
+        const today = new Date().toString().split("T")[0];
+        return appointments.filter(
+            (appointment) =>
+                appointment.dateTime.toString().split("T")[0] < today
+        );
     };
 
     // Get today's appointments
     const getTodaysAppointments = () => {
-        const today = new Date().toISOString().split("T")[0];
-        return appointments.filter((appointment) => appointment.date === today);
+        const today = new Date().toString().split("T")[0];
+        return appointments.filter(
+            (appointment) =>
+                appointment.dateTime.toString().split("T")[0] === today
+        );
     };
 
     return {

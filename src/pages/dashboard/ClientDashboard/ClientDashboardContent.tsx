@@ -5,6 +5,7 @@ import { useFavorites } from "@/hooks/use-favorites";
 import { useAppointments } from "@/hooks/use-appointments";
 import { DashboardCard } from "@/components/dashboard/shared/DashboardCard";
 import { WelcomeBanner } from "@/components/dashboard/shared/WelcomeBanner";
+import { format } from "date-fns";
 
 export function ClientDashboardContent() {
     const { user } = useAuth();
@@ -18,14 +19,12 @@ export function ClientDashboardContent() {
     const clientAppointments = getAppointmentsByStatus("confirmed");
     const now = new Date();
     const nowsAppointments = clientAppointments.filter((appointment) => {
-        // Combine date and time into a single string
-        const appointmentDateTimeStr = `${appointment.date}T${appointment.time}`;
-        // Parse into a Date object
-        const appointmentDateTime = new Date(appointmentDateTimeStr);
-        // Compare to now
+        const appointmentDateTime = new Date(appointment.dateTime.toString());
+
         return (
-            appointment.date === now.toISOString().split("T")[0] &&
-            appointmentDateTime >= now
+            format(appointment.dateTime, "yyyy-MM-dd") ===
+                format(now, "yyyy-MM-dd") &&
+            appointmentDateTime.getTime() >= now.getTime()
         );
     });
 

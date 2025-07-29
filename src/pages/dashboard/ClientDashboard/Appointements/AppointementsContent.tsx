@@ -16,6 +16,7 @@ import {
     Plus,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 
 export function AppointementsContent() {
     const { loading, error, getClientAppointments } = useAppointments();
@@ -27,14 +28,10 @@ export function AppointementsContent() {
     // Get client-specific appointments
     const clientAppointments = getClientAppointments();
 
-    // Tab logic as per new requirements
-    const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
-
     // Filter appointments based on search only
     const filteredAppointments = clientAppointments.filter((appointment) => {
-        const appointmentDateTimeStr = `${appointment.date}T${appointment.time}`;
-        const appointmentDateTime = new Date(appointmentDateTimeStr);
+        const appointmentDateTime = new Date(appointment.dateTime);
+        const now = new Date();
         return (
             (!searchTerm ||
                 appointment.stylistName
@@ -57,11 +54,17 @@ export function AppointementsContent() {
     );
 
     const todaysAppointments = confirmedAppointments.filter((appointment) => {
-        return appointment.date === todayStr;
+        const now = new Date();
+        const todayStr = format(now, "yyyy-MM-dd");
+        const appointmentDateStr = format(appointment.dateTime, "yyyy-MM-dd");
+        return appointmentDateStr === todayStr;
     });
-    const upcomingAppointments = confirmedAppointments.filter(
-        (appointment) => appointment.date > todayStr
-    );
+    const upcomingAppointments = confirmedAppointments.filter((appointment) => {
+        const now = new Date();
+        const todayStr = format(now, "yyyy-MM-dd");
+        const appointmentDateStr = format(appointment.dateTime, "yyyy-MM-dd");
+        return appointmentDateStr > todayStr;
+    });
     const pendingAppointments = filteredAppointments.filter(
         (appointment) => appointment.status === "pending"
     );

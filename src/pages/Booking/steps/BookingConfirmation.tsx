@@ -17,20 +17,31 @@ interface BookingConfirmationProps {
 export function BookingConfirmation({
     booking,
     onComplete,
-}: BookingConfirmationProps | any) {
+}: BookingConfirmationProps) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const { toast } = useToast();
     const navigate = useNavigate();
     const { user } = useAuth();
     const API_BASE_URL = import.meta.env.VITE_API_URL;
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     // Calculate payment amount based on payment type (in cents for Stripe)
     const paymentAmount =
-        booking.paymentType === "deposit"
+        booking.paymentType === "deposit" && booking.depositAmount
             ? booking.depositAmount * 100
-            : booking.totalAmount * 100;
+            : booking.totalAmount
+              ? booking.totalAmount * 100
+              : 0;
     const isPaymentRequired = paymentAmount > 0;
+    const date: any =
+        booking.dateTime instanceof Date
+            ? format(booking.dateTime, "yyyy-MM-dd")
+            : undefined;
+    const time: any =
+        booking.dateTime instanceof Date
+            ? format(booking.dateTime, "HH:mm")
+            : undefined;
 
     const handleConfirm = async () => {
         try {
@@ -41,8 +52,7 @@ export function BookingConfirmation({
             if (
                 !booking.stylistId ||
                 !booking.serviceName ||
-                !booking.date ||
-                !booking.time
+                !booking.dateTime
             ) {
                 throw new Error("Missing required booking information");
             }
@@ -53,16 +63,9 @@ export function BookingConfirmation({
                 );
             }
 
-            const formattedDate =
-                booking.date instanceof Date
-                    ? format(booking.date, "yyyy-MM-dd")
-                    : typeof booking.date === "string"
-                      ? booking.date
-                      : format(new Date(booking.date), "yyyy-MM-dd");
-
             const completeBookingData = {
                 ...booking,
-                date: formattedDate,
+                dateTime: booking.dateTime.toISOString(),
                 clientId: user.uid,
                 status: "pending",
                 paymentStatus: isPaymentRequired ? "pending" : "not_required",
@@ -215,13 +218,15 @@ export function BookingConfirmation({
                     </p>
                     <p>
                         Date:{" "}
-                        {booking.date instanceof Date
-                            ? format(booking.date, "MMMM d, yyyy")
-                            : booking.dateTime?.date
-                              ? format(booking.dateTime.date, "MMMM d, yyyy")
+                        {date instanceof Date
+                            ? format(date, "MMMM d, yyyy")
+                            : date
+                              ? format(date, "MMMM d, yyyy")
                               : "Not specified"}
                     </p>
-                    <p>Time: {booking.time || booking.dateTime?.time}</p>
+                    <p>
+                        Time: {time} {browserTz}
+                    </p>
                     <p>Stylist: {booking.stylistName}</p>
                     {booking.businessName && (
                         <p>Business: {booking.businessName}</p>
@@ -268,7 +273,9 @@ export function BookingConfirmation({
                     {booking.paymentType === "deposit" && (
                         <p className="text-sm text-gray-600">
                             Remaining Balance: $
-                            {booking.totalAmount - booking.depositAmount}
+                            {booking.totalAmount && booking.depositAmount
+                                ? booking.totalAmount - booking.depositAmount
+                                : null}
                         </p>
                     )}
                 </div>

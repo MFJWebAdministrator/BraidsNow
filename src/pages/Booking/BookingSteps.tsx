@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/use-auth";
 import type { BookingForm } from "@/lib/schemas/booking";
 import type {
     ServiceSelection as ServiceSelectionType,
-    DateTimeSelection as DateTimeSelectionType,
+    // DateTimeSelection as DateTimeSelectionType,
     ClientInformation as ClientInformationType,
 } from "@/lib/schemas/booking";
 import { useStylist } from "@/hooks/use-stylist";
@@ -24,7 +24,7 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
     const [step, setStep] = useState(1);
     const [bookingData, setBookingData] = useState({
         service: null as ServiceSelectionType | null,
-        dateTime: null as DateTimeSelectionType | null,
+        dateTime: null as Date | null,
         clientInfo: null as ClientInformationType | null,
     });
     const navigate = useNavigate();
@@ -54,8 +54,10 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
         setStep(2);
     };
 
-    const handleDateTimeSelect = (dateTime: DateTimeSelectionType) => {
-        setBookingData((prev) => ({ ...prev, dateTime }));
+    const handleDateTimeSelect = (dateTime: Date) => {
+        const date = dateTime ? dateTime.toISOString().split("T")[0] : null;
+        const time = dateTime ? dateTime.toTimeString().slice(0, 5) : null;
+        setBookingData((prev) => ({ ...prev, dateTime, date, time }));
         setStep(3);
     };
 
@@ -103,8 +105,8 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
             stylistEmail: stylist.email,
             stylistPhone: stylist.phone,
             businessName: stylist.businessName || "",
-            date: bookingData.dateTime.date,
-            time: bookingData.dateTime.time,
+            // date: bookingData.dateTime.date,
+            // time: bookingData.dateTime.time,
             clientName: `${bookingData.clientInfo.firstName} ${bookingData.clientInfo.lastName}`,
             clientEmail: bookingData.clientInfo.email,
             clientPhone: bookingData.clientInfo.phone,

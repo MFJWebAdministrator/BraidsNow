@@ -20,10 +20,7 @@ import {
     addMinutes,
 } from "date-fns";
 import { getBookingsForDate } from "@/lib/firebase/booking/getBookings";
-import type {
-    ServiceSelection,
-    DateTimeSelection as DateTimeSelectionType,
-} from "@/lib/schemas/booking";
+import type { ServiceSelection } from "@/lib/schemas/booking";
 import type { Schedule } from "@/lib/schemas/schedule";
 import { Matcher } from "react-day-picker";
 import { isOvertimeBooking } from "@/lib/utils/schedule-conflicts";
@@ -34,11 +31,11 @@ import {
     checkBreakOverlap,
     calculateTotalBookingTime,
 } from "@/lib/utils/booking-time-utils";
-
+import { toZonedTime } from "date-fns-tz";
 interface DateTimeSelectionProps {
     stylistId: string;
     selectedService: ServiceSelection;
-    onSelect: (dateTime: DateTimeSelectionType) => void;
+    onSelect: (dateTime: Date) => void;
 }
 
 interface TimeSlotInfo {
@@ -73,6 +70,87 @@ export function DateTimeSelection({
             return docSnap.data() as Schedule;
         },
     });
+
+    // Convert schedule and breaks to browser's local timezone
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    let localSchedule = schedule;
+    if (schedule) {
+        // Convert workHours
+        localSchedule = {
+            ...schedule,
+            workHours: Object.fromEntries(
+                Object.entries(schedule.workHours).map(([day, wh]) => {
+                    // Create a date for conversion (arbitrary date, just for time)
+                    const baseDate = new Date();
+                    const startUtc = Date.UTC(
+                        baseDate.getFullYear(),
+                        baseDate.getMonth(),
+                        baseDate.getDate(),
+                        wh.start.hour,
+                        wh.start.minute
+                    );
+
+                    const endUtc = Date.UTC(
+                        baseDate.getFullYear(),
+                        baseDate.getMonth(),
+                        baseDate.getDate(),
+                        wh.end.hour,
+                        wh.end.minute
+                    );
+
+                    const startLocal = toZonedTime(startUtc, browserTz);
+                    const endLocal = toZonedTime(endUtc, browserTz);
+
+                    return [
+                        day,
+                        {
+                            ...wh,
+                            start: {
+                                hour: startLocal.getHours(),
+                                minute: startLocal.getMinutes(),
+                            },
+                            end: {
+                                hour: endLocal.getHours(),
+                                minute: endLocal.getMinutes(),
+                            },
+                        },
+                    ];
+                })
+            ) as Schedule["workHours"],
+            breaks: schedule.breaks.map((br) => {
+                const baseDate = new Date();
+                const startUtc = Date.UTC(
+                    baseDate.getFullYear(),
+                    baseDate.getMonth(),
+                    baseDate.getDate(),
+                    br.start.hour,
+                    br.start.minute
+                );
+
+                const endUtc = Date.UTC(
+                    baseDate.getFullYear(),
+                    baseDate.getMonth(),
+                    baseDate.getDate(),
+                    br.end.hour,
+                    br.end.minute
+                );
+                const startLocal = toZonedTime(startUtc, browserTz);
+                const endLocal = toZonedTime(endUtc, browserTz);
+
+                return {
+                    ...br,
+                    start: {
+                        hour: startLocal.getHours(),
+                        minute: startLocal.getMinutes(),
+                    },
+                    end: {
+                        hour: endLocal.getHours(),
+                        minute: endLocal.getMinutes(),
+                    },
+                };
+            }),
+        };
+    }
 
     // Fetch bookings for selected date
     const { data: bookings, isLoading: isLoadingBookings } = useQuery({
@@ -111,11 +189,11 @@ export function DateTimeSelection({
 
         // Check if service period overlaps with any break periods
         const isBreakTimeSlot =
-            schedule && schedule.breaks
+            localSchedule && localSchedule.breaks
                 ? checkBreakOverlap(
                       time24,
                       serviceDuration,
-                      schedule.breaks,
+                      localSchedule.breaks,
                       dayName
                   )
                 : false;
@@ -126,7 +204,7 @@ export function DateTimeSelection({
             const slotStartTime = format(timeSlot, "HH:mm");
 
             // Get buffer time from schedule
-            const bufferTime = schedule?.bufferTime?.after || 0;
+            const bufferTime = localSchedule?.bufferTime?.after || 0;
 
             isBooked = bookings.some((booking) => {
                 if (booking.status === "cancelled") {
@@ -134,7 +212,22 @@ export function DateTimeSelection({
                 }
 
                 // Handle different possible time field names
-                const bookingTime = booking.time || booking.dateTime?.time;
+                // Parse the time from the dateTime field (assume ISO string or Date object)
+                let bookingTime: string | undefined;
+                if (!booking.dateTime) {
+                    return false;
+                }
+
+                // booking.dateTime may be a string or Date
+                const dateObj =
+                    typeof booking.dateTime === "string"
+                        ? new Date(booking.dateTime)
+                        : booking.dateTime;
+
+                if (!isNaN(dateObj.getTime())) {
+                    bookingTime = format(dateObj, "HH:mm");
+                }
+
                 if (!bookingTime) {
                     return false;
                 }
@@ -158,8 +251,8 @@ export function DateTimeSelection({
 
         // Check for overtime booking
         let isOvertime = false;
-        if (schedule) {
-            const workHours = schedule.workHours[dayOfWeek];
+        if (localSchedule) {
+            const workHours = localSchedule.workHours[dayOfWeek];
 
             // For overtime checking, we need to consider if this is the last appointment of the day
             // If it is, we add buffer time to ensure the stylist can finish on time
@@ -171,7 +264,7 @@ export function DateTimeSelection({
             let overtimeDuration = serviceDuration;
             if (isLastAppointment) {
                 // Add buffer time only for the last appointment of the day
-                const bufferTime = schedule.bufferTime?.after || 0;
+                const bufferTime = localSchedule.bufferTime?.after || 0;
                 overtimeDuration = calculateTotalBookingTime(
                     serviceDuration,
                     bufferTime
@@ -198,13 +291,13 @@ export function DateTimeSelection({
     };
 
     const getTimeSlotsForDate = (date: Date): TimeSlotInfo[] => {
-        if (!schedule) return [];
+        if (!localSchedule) return [];
 
         const dayOfWeek = format(
             date,
             "EEEE"
         ).toLowerCase() as keyof Schedule["workHours"];
-        const workHours = schedule.workHours[dayOfWeek];
+        const workHours = localSchedule.workHours[dayOfWeek];
 
         if (!workHours.isEnabled) return [];
 
@@ -240,7 +333,11 @@ export function DateTimeSelection({
             parse(selectedTime, "h:mm a", new Date()),
             "HH:mm"
         );
-        onSelect({ date: selectedDate, time: time24 });
+        // Combine selectedDate and time24 into a single Date object
+        const [hours, minutes] = time24.split(":").map(Number);
+        const dateTime = new Date(selectedDate);
+        dateTime.setHours(hours, minutes, 0, 0);
+        onSelect(dateTime);
     };
 
     if (isLoadingSchedule || isLoadingBookings) {
@@ -251,7 +348,7 @@ export function DateTimeSelection({
         );
     }
 
-    if (!schedule) {
+    if (!localSchedule) {
         return (
             <div className="text-center py-12 bg-gray-50 rounded-lg">
                 <p className="text-gray-500">Schedule not available</p>
@@ -304,7 +401,8 @@ export function DateTimeSelection({
 
                                 return (
                                     isBefore(date, today) ||
-                                    !schedule.workHours[dayOfWeek]?.isEnabled
+                                    !localSchedule.workHours[dayOfWeek]
+                                        ?.isEnabled
                                 );
                             }}
                         />

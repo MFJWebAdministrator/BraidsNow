@@ -47,6 +47,7 @@ export function AppointmentCard({
     // onCancelAppointment,
 }: AppointmentCardProps) {
     const { toast } = useToast();
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     const copyToClipboard = async (text: string, type: string) => {
         try {
@@ -147,7 +148,8 @@ export function AppointmentCard({
             const date = new Date();
             date.setHours(Number.parseInt(hours), Number.parseInt(minutes));
             return format(date, "h:mm a");
-        } catch {
+        } catch (error) {
+            console.log("formatTime error", error);
             return timeString;
         }
     };
@@ -218,8 +220,15 @@ export function AppointmentCard({
                     <h4 className="font-medium text-slate-800 mb-1">
                         {appointment.serviceName}
                     </h4>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Clock className="h-4 w-4" />
+                        <span>
+                            {appointment.service.duration.hours} hours{" "}
+                            {appointment.service.duration.minutes} minutes
+                        </span>
+                    </div>
                     {appointment.notes && (
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-600 mt-2">
                             {appointment.notes}
                         </p>
                     )}
@@ -230,13 +239,19 @@ export function AppointmentCard({
                     <div className="flex items-center gap-2">
                         <Calendar className="h-5 w-5 text-gray-500" />
                         <span className="text-sm font-medium">
-                            {formatDate(appointment.date)}
+                            {formatDate(appointment.dateTime.toString())}
                         </span>
                     </div>
                     <div className="flex items-center gap-2">
                         <Clock className="h-5 w-5 text-gray-500" />
                         <span className="text-sm font-medium">
-                            {formatTime(appointment.time)}
+                            {formatTime(
+                                appointment.dateTime.getHours() +
+                                    ":" +
+                                    appointment.dateTime.getMinutes()
+                            ) +
+                                " " +
+                                browserTz}
                         </span>
                     </div>
                 </div>

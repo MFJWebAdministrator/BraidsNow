@@ -11,6 +11,7 @@ import { EmailService } from "./services/email-service";
 import { SmsService } from "./services/sms-service";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { getBookingExpiresAt } from "./utils/utils";
+import { format } from "date-fns";
 
 const app = express();
 
@@ -962,7 +963,11 @@ app.post(
                     paymentCapturedAt:
                         admin.firestore.FieldValue.serverTimestamp(),
                     stripeCaptureId: paymentIntent.latest_charge,
+                    expiresAt: null,
                 });
+
+                const date = format(bookingData.dateTime, "yyyy-MM-dd");
+                const time = format(bookingData.dateTime, "HH:mm");
 
                 await paymentRef.docs[0].ref.update({
                     status: "paid",
@@ -982,8 +987,8 @@ app.post(
                     data: {
                         bookingId: bookingId,
                         serviceName: bookingData.serviceName,
-                        date: bookingData.date,
-                        time: bookingData.time,
+                        date,
+                        time,
                         stylistName: bookingData.stylistName,
                     },
                 });
@@ -999,13 +1004,30 @@ app.post(
                     data: {
                         bookingId: bookingId,
                         serviceName: bookingData.serviceName,
-                        date: bookingData.date,
-                        time: bookingData.time,
+                        date,
+                        time,
                         clientName: bookingData.clientName,
                     },
                 });
 
-                //TODO: accepted email/sms to client
+                // Send email/sms notification
+                setTimeout(async () => {
+                    try {
+                        await EmailService.sendAppointmentConfirmationClient({
+                            clientName: bookingData.clientName,
+                            clientEmail: bookingData.clientEmail,
+                            stylistName: bookingData.stylistName,
+                            appointmentDate: date,
+                            appointmentTime: time + " UTC",
+                            serviceName: bookingData.serviceName,
+                        });
+                    } catch (error) {
+                        console.log(
+                            "Error sending appointment confirmation email to client: ",
+                            error
+                        );
+                    }
+                }, 0);
 
                 setTimeout(async () => {
                     try {
@@ -1013,8 +1035,8 @@ app.post(
                             clientName: bookingData.clientName,
                             phoneNumber: bookingData.clientPhone,
                             stylistName: bookingData.stylistName,
-                            appointmentDate: bookingData.date,
-                            appointmentTime: bookingData.time,
+                            appointmentDate: date,
+                            appointmentTime: time + " UTC",
                             serviceName: bookingData.serviceName,
                         });
                     } catch (error) {
@@ -1158,7 +1180,11 @@ app.post(
                     cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
                     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                     stripeCancellationId: paymentIntent.latest_charge,
+                    expiresAt: null,
                 });
+
+                const date = format(bookingData.dateTime, "yyyy-MM-dd");
+                const time = format(bookingData.dateTime, "HH:mm");
 
                 // Update the booking status to rejected
                 await bookingRef.update({
@@ -1182,8 +1208,8 @@ app.post(
                     data: {
                         bookingId: bookingId,
                         serviceName: bookingData.serviceName,
-                        date: bookingData.date,
-                        time: bookingData.time,
+                        date,
+                        time: time + " UTC",
                         stylistName: bookingData.stylistName,
                     },
                 });
@@ -1199,13 +1225,30 @@ app.post(
                     data: {
                         bookingId: bookingId,
                         serviceName: bookingData.serviceName,
-                        date: bookingData.date,
-                        time: bookingData.time,
+                        date,
+                        time: time + " UTC",
                         clientName: bookingData.clientName,
                     },
                 });
 
-                //TODO: rejected email/sms to client
+                // Send email/sms notification to client
+                setTimeout(async () => {
+                    try {
+                        await EmailService.sendAppointmentDeniedClient({
+                            clientEmail: bookingData.clientEmail,
+                            clientName: bookingData.clientName,
+                            serviceName: bookingData.serviceName,
+                            stylistName: bookingData.stylistName,
+                            appointmentDate: date,
+                            appointmentTime: time + " UTC",
+                        });
+                    } catch (error) {
+                        console.log(
+                            "Error sending appointment rejected email to client: ",
+                            error
+                        );
+                    }
+                }, 0);
 
                 setTimeout(async () => {
                     try {
@@ -1213,8 +1256,8 @@ app.post(
                             clientName: bookingData.clientName,
                             phoneNumber: bookingData.clientPhone,
                             stylistName: bookingData.stylistName,
-                            appointmentDate: bookingData.date,
-                            appointmentTime: bookingData.time,
+                            appointmentDate: date,
+                            appointmentTime: time + " UTC",
                             serviceName: bookingData.serviceName,
                         });
                     } catch (error) {
@@ -1353,7 +1396,50 @@ export const expirePendingBookings = onSchedule(
                     });
                 }
 
-                // Send notifications to client and stylist
+                // Send email/sms notifications to client
+                const date = format(bookingData.dateTime, "yyyy-MM-dd");
+                const time = format(bookingData.dateTime, "HH:mm") + " UTC";
+
+                //TODO: email
+                setTimeout(async () => {
+                    try {
+                        await EmailService.sendAppointmentAutoCancelledForClient(
+                            {
+                                clientName: bookingData.clientName,
+                                clientEmail: bookingData.clientPhone,
+                                stylistName: bookingData.stylistName,
+                                appointmentDate: date,
+                                appointmentTime: time,
+                                serviceName: bookingData.serviceName,
+                            }
+                        );
+                    } catch (error) {
+                        console.log(
+                            `Error sending sms to client ${bookingData.clientName} for booking ${bookingId}: `,
+                            error
+                        );
+                    }
+                }, 0);
+
+                setTimeout(async () => {
+                    try {
+                        await EmailService.sendAppointmentAutoCancelledForStylist(
+                            {
+                                clientName: bookingData.clientName,
+                                stylistEmail: bookingData.clientPhone,
+                                stylistName: bookingData.stylistName,
+                                appointmentDate: date,
+                                appointmentTime: time,
+                                serviceName: bookingData.serviceName,
+                            }
+                        );
+                    } catch (error) {
+                        console.log(
+                            `Error sending sms to stylist ${bookingData.stylistName} for booking ${bookingId}: `,
+                            error
+                        );
+                    }
+                }, 0);
 
                 setTimeout(async () => {
                     try {
@@ -1361,8 +1447,8 @@ export const expirePendingBookings = onSchedule(
                             clientName: bookingData.clientName,
                             phoneNumber: bookingData.clientPhone,
                             stylistName: bookingData.stylistName,
-                            appointmentDate: bookingData.date,
-                            appointmentTime: bookingData.time,
+                            appointmentDate: date,
+                            appointmentTime: time,
                             serviceName: bookingData.serviceName,
                         });
                     } catch (error) {
@@ -1380,8 +1466,8 @@ export const expirePendingBookings = onSchedule(
                                 stylistName: bookingData.stylistName,
                                 phoneNumber: bookingData.stylistPhone,
                                 clientName: bookingData.clientName,
-                                appointmentDate: bookingData.date,
-                                appointmentTime: bookingData.time,
+                                appointmentDate: date,
+                                appointmentTime: time,
                                 serviceName: bookingData.serviceName,
                             }
                         );
@@ -1447,12 +1533,12 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                         const bookingData = pendingBookingData?.bookingData;
 
                         console.log("bookingData", bookingData);
+                        const date = format(bookingData.dateTime, "yyyy-MM-dd");
+                        const time = format(bookingData.dateTime, "HH:mm");
 
                         if (bookingData) {
-                            const expiresAt = getBookingExpiresAt(
-                                bookingData.date,
-                                bookingData.time
-                            );
+                            const expiresAt = getBookingExpiresAt(date, time);
+
                             // Create the actual booking
                             const bookingRef = db
                                 .collection("bookings")
@@ -1501,7 +1587,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                 userId: bookingData.stylistId,
                                 type: "new_booking",
                                 title: "New Booking with Deposit",
-                                message: `You have a new booking with deposit paid for ${bookingData.serviceName} on ${bookingData.date} at ${bookingData.time}`,
+                                message: `You have a new booking with deposit paid for ${bookingData.serviceName} on ${date} at ${time}`,
                                 read: false,
                                 createdAt:
                                     admin.firestore.FieldValue.serverTimestamp(),
@@ -1517,15 +1603,15 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                 userId: bookingData.clientId,
                                 type: "booking_confirmed",
                                 title: "Booking Confirmed",
-                                message: `Your booking for ${bookingData.serviceName} on ${bookingData.date} at ${bookingData.time} has been confirmed.`,
+                                message: `Your booking for ${bookingData.serviceName} on ${date} at ${time} has been confirmed.`,
                                 read: false,
                                 createdAt:
                                     admin.firestore.FieldValue.serverTimestamp(),
                                 data: {
                                     bookingId: pendingBookingId,
                                     serviceName: bookingData.serviceName,
-                                    date: bookingData.date,
-                                    time: bookingData.time,
+                                    // date: bookingData.date,
+                                    // time: bookingData.time,
                                 },
                             });
 
@@ -1633,8 +1719,8 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                             stylistEmail:
                                                 bookingData.stylistEmail,
                                             clientName: bookingData.clientName,
-                                            appointmentDate: bookingData.date,
-                                            appointmentTime: bookingData.time,
+                                            appointmentDate: date,
+                                            appointmentTime: time + " UTC",
                                             serviceName:
                                                 bookingData.serviceName,
                                         }
@@ -1647,8 +1733,8 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                                 bookingData.stylistName,
                                             phoneNumber:
                                                 bookingData.stylistPhone,
-                                            appointmentDate: bookingData.date,
-                                            appointmentTime: bookingData.time,
+                                            appointmentDate: date,
+                                            appointmentTime: time + " UTC", // TODO: timezone
                                             serviceName:
                                                 bookingData.serviceName,
                                             clientName: bookingData.clientName,
@@ -1677,10 +1763,8 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                                     bookingData.clientEmail,
                                                 stylistName:
                                                     bookingData.stylistName,
-                                                appointmentDate:
-                                                    bookingData.date,
-                                                appointmentTime:
-                                                    bookingData.time,
+                                                appointmentDate: date,
+                                                appointmentTime: time + " UTC",
                                                 serviceName:
                                                     bookingData.serviceName,
                                                 balanceAmount: (
@@ -1701,10 +1785,8 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                                     bookingData.serviceName,
                                                 stylistName:
                                                     bookingData.stylistName,
-                                                appointmentDate:
-                                                    bookingData.date,
-                                                appointmentTime:
-                                                    bookingData.time,
+                                                appointmentDate: date,
+                                                appointmentTime: time + " UTC",
                                                 balanceAmount: (
                                                     bookingData.totalAmount -
                                                     bookingData.depositAmount
@@ -2001,6 +2083,8 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                         `Updated booking ${bookingId} payment status to paid`
                                     );
                                 }
+                            } else {
+                                console.log("no booking id");
                             }
 
                             // Add a notification for the stylist
@@ -2016,7 +2100,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                     paymentId: paymentDoc.id,
                                     amount: paymentIntent.amount,
                                     clientId: userId,
-                                    bookingId: bookingId,
+                                    // bookingId: bookingId,
                                 },
                             });
 
@@ -2074,6 +2158,9 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                 .get();
 
                             if (clientPaymentHistoryQuery.empty) {
+                                console.log(
+                                    "adding payment to client's payment history"
+                                );
                                 await db
                                     .collection("clients")
                                     .doc(userId)
@@ -2081,7 +2168,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                     .add({
                                         paymentId: paymentDoc.id,
                                         stylistId: stylistId,
-                                        bookingId: bookingId,
+                                        // bookingId: bookingId,
                                         amount: paymentIntent.amount,
                                         description: paymentIntent.description,
                                         status: "completed",
@@ -2530,6 +2617,8 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                 });
                         }
                     }
+                } else {
+                    console.log("no withdrawal id");
                 }
                 break;
             }
@@ -2946,9 +3035,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
 
         return res.status(200).json({ received: true });
     } catch (err) {
-        console.error(
-            `Error processing webhook: ${err instanceof Error ? err.message : "Unknown error"}`
-        );
+        console.error(`Error processing webhook: ${err}`);
         return res
             .status(500)
             .send(
@@ -3574,6 +3661,7 @@ app.get(
                 status: paymentData.status,
                 createdAt: paymentData.createdAt,
                 completedAt: paymentData.completedAt,
+                bookingDateTime: paymentData.bookingData?.dateTime,
             });
         } catch (error) {
             console.error("Error getting payment details:", error);
@@ -3907,7 +3995,14 @@ app.post(
         res: Response
     ) => {
         try {
-            const { clientName, clientEmail, stylistName } = req.body;
+            const {
+                clientName,
+                clientEmail,
+                stylistName,
+                serviceName,
+                appointmentDate,
+                appointmentTime,
+            } = req.body;
 
             if (!clientName || !clientEmail || !stylistName) {
                 return res
@@ -3919,6 +4014,9 @@ app.post(
                 clientName,
                 clientEmail,
                 stylistName,
+                serviceName,
+                appointmentDate,
+                appointmentTime,
             });
 
             return res.status(200).json({

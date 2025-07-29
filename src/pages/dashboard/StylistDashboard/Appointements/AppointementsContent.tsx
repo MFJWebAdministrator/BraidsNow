@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +10,7 @@ import { Calendar, Search, CalendarDays, Clock, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getAuthToken } from "@/lib/firebase/auth";
 import axios from "axios";
+import { format } from "date-fns";
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export function AppointementsContent() {
@@ -24,13 +23,10 @@ export function AppointementsContent() {
     // Get stylist-specific appointments
     const stylistAppointments = getStylistAppointments();
 
-    const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
-
     // Filter appointments based on search
     const filteredAppointments = stylistAppointments.filter((appointment) => {
-        const appointmentDateTimeStr = `${appointment.date}T${appointment.time}`;
-        const appointmentDateTime = new Date(appointmentDateTimeStr);
+        const now = new Date();
+
         return (
             (!searchTerm ||
                 appointment.clientName
@@ -41,7 +37,7 @@ export function AppointementsContent() {
                     .includes(searchTerm.toLowerCase())) &&
             (appointment.status === "confirmed" ||
                 appointment.status === "pending") &&
-            appointmentDateTime >= now
+            appointment.dateTime.getTime() >= now.getTime()
         );
     });
 
@@ -51,12 +47,23 @@ export function AppointementsContent() {
     );
 
     const todaysAppointments = confirmedAppointments.filter((appointment) => {
-        return appointment.date === todayStr;
+        /*
+        TODO:
+        Here we are comparing the date string of the appointment with the date string of the current date. A more consistent way to work with 
+        dates is needed.
+        */
+        const now = new Date();
+        const todayStr = format(now, "yyyy-MM-dd");
+        const appointmentDateStr = format(appointment.dateTime, "yyyy-MM-dd");
+        return appointmentDateStr === todayStr;
     });
 
-    const upcomingAppointments = confirmedAppointments.filter(
-        (appointment) => appointment.date > todayStr
-    );
+    const upcomingAppointments = confirmedAppointments.filter((appointment) => {
+        const now = new Date();
+        const todayStr = format(now, "yyyy-MM-dd");
+        const appointmentDateStr = format(appointment.dateTime, "yyyy-MM-dd");
+        return appointmentDateStr > todayStr;
+    });
 
     const pendingAppointments = filteredAppointments.filter(
         (appointment) => appointment.status === "pending"

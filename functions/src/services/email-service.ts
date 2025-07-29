@@ -63,6 +63,9 @@ export interface AppointmentDeniedData {
     clientName: string;
     clientEmail: string;
     stylistName: string;
+    serviceName: string;
+    appointmentDate: string;
+    appointmentTime: string;
 }
 
 export interface FullPaymentReminderData {
@@ -89,11 +92,16 @@ export class EmailService {
     private static readonly TEMPLATE_IDS = {
         WELCOME_CLIENT: "d-dbd9d2febc2c49c8b6f65e78a77f4afa",
         WELCOME_STYLIST: "d-d5a94d15d6a54b0db3c7e7e0662f11af",
-        APPOINTMENT_CONFIRMATION_CLIENT: "d-cc30e8a95686446982237661f1039c64",
         NEW_APPOINTMENT_STYLIST: "d-820164bfe177443cb64e676dbd5b391c",
+        APPOINTMENT_CONFIRMATION_CLIENT: "d-cc30e8a95686446982237661f1039c64",
+        APPOINTMENT_DENIED_CLIENT: "d-fe871d8b2cda4185b06da9298ea2c33f",
+        APPOINTMENT_AUTO_CANCELLED_CLIENT: "d-68772c7964ec4b70a04cbf17afd95c5d",
+        APPOINTMENT_AUTO_CANCELLED_STYLIST:
+            "d-b50b1471906d487fbea8a99860d20f7b",
+        APPOINTMENT_CANCELLED_CLIENT: "d-d8243e24a5484130814ec6644fd3df72",
+        APPOINTMENT_CANCELLED_STYLIST: "d-62c1442cb3c04f67955c421424fd7c35 ",
         PAYMENT_FAILURE_STYLIST: "d-a644b936e4ee4c83b5e7df7b04e9d884",
         ACCOUNT_CANCELLATION_STYLIST: "d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        APPOINTMENT_DENIED_CLIENT: "d-fe871d8b2cda4185b06da9298ea2c33f",
         FULL_PAYMENT_REMINDER_CLIENT: "d-79af3603646a4d218a406bcdf401af97",
         MESSAGE_NOTIFICATION_STYLIST: "d-68598dcf61564e578cb04e7de2e869c7",
         MESSAGE_NOTIFICATION_CLIENT: "d-923ac4cd221c45318d58f167f3bcaafb",
@@ -162,26 +170,7 @@ export class EmailService {
         });
     }
 
-    // 3. Appointment Confirmation – Client
-    static async sendAppointmentConfirmationClient(
-        data: AppointmentConfirmationData
-    ): Promise<void> {
-        await this.sendEmail({
-            to: data.clientEmail,
-            templateId:
-                EmailService.TEMPLATE_IDS.APPOINTMENT_CONFIRMATION_CLIENT,
-            dynamicTemplateData: {
-                clientName: data.clientName,
-                stylistName: data.stylistName,
-                appointmentDate: data.appointmentDate,
-                appointmentTime: data.appointmentTime,
-                serviceName: data.serviceName,
-                dashboardUrl: "https://braidsnow.com/dashboard/client",
-            },
-        });
-    }
-
-    // 4. Appointment Confirmation – Stylist
+    // 3. Appointment Confirmation – Stylist
     static async sendNewAppointmentForStylist(
         data: StylistAppointmentData
     ): Promise<void> {
@@ -200,7 +189,113 @@ export class EmailService {
         });
     }
 
-    // 5. Payment Failure – Stylist
+    // 4. Appointment Confirmation – Client
+    static async sendAppointmentConfirmationClient(
+        data: AppointmentConfirmationData
+    ): Promise<void> {
+        await this.sendEmail({
+            to: data.clientEmail,
+            templateId:
+                EmailService.TEMPLATE_IDS.APPOINTMENT_CONFIRMATION_CLIENT,
+            dynamicTemplateData: {
+                clientName: data.clientName,
+                stylistName: data.stylistName,
+                appointmentDate: data.appointmentDate,
+                appointmentTime: data.appointmentTime,
+                serviceName: data.serviceName,
+            },
+        });
+    }
+
+    // 5. Appointment Denied – Client
+    static async sendAppointmentDeniedClient(
+        data: AppointmentDeniedData
+    ): Promise<void> {
+        await this.sendEmail({
+            to: data.clientEmail,
+            templateId: EmailService.TEMPLATE_IDS.APPOINTMENT_DENIED_CLIENT,
+            dynamicTemplateData: {
+                clientName: data.clientName,
+                stylistName: data.stylistName,
+                serviceName: data.serviceName,
+                appointmentDate: data.appointmentDate,
+                appointmentTime: data.appointmentTime,
+                findStylistsUrl: "https://braidsnow.com/find-stylists",
+            },
+        });
+    }
+
+    // Automatically rejected email
+    static async sendAppointmentAutoCancelledForClient(
+        data: AppointmentDeniedData
+    ): Promise<void> {
+        await this.sendEmail({
+            to: data.clientEmail,
+            templateId:
+                EmailService.TEMPLATE_IDS.APPOINTMENT_AUTO_CANCELLED_CLIENT,
+            dynamicTemplateData: {
+                clientName: data.clientName,
+                stylistName: data.stylistName,
+                serviceName: data.serviceName,
+                appointmentDate: data.appointmentDate,
+                appointmentTime: data.appointmentTime,
+                findStylistsUrl: "https://braidsnow.com/find-stylists",
+            },
+        });
+    }
+
+    static async sendAppointmentAutoCancelledForStylist(
+        data: StylistAppointmentData
+    ): Promise<void> {
+        await this.sendEmail({
+            to: data.stylistEmail,
+            templateId:
+                EmailService.TEMPLATE_IDS.APPOINTMENT_AUTO_CANCELLED_STYLIST,
+            dynamicTemplateData: {
+                clientName: data.clientName,
+                stylistName: data.stylistName,
+                serviceName: data.serviceName,
+                appointmentDate: data.appointmentDate,
+                appointmentTime: data.appointmentTime,
+                findStylistsUrl: "https://braidsnow.com/find-stylists",
+            },
+        });
+    }
+
+    // Appointment cancelled
+    static async sendAppointmentCancelledEmailForClient(
+        data: AppointmentDeniedData
+    ): Promise<void> {
+        await this.sendEmail({
+            to: data.clientEmail,
+            templateId: EmailService.TEMPLATE_IDS.APPOINTMENT_CANCELLED_CLIENT,
+            dynamicTemplateData: {
+                clientName: data.clientName,
+                stylistName: data.stylistName,
+                serviceName: data.serviceName,
+                appointmentDate: data.appointmentDate,
+                appointmentTime: data.appointmentTime,
+            },
+        });
+    }
+
+    static async sendAppointmentCancelledEmailForStylist(
+        data: StylistAppointmentData
+    ): Promise<void> {
+        await this.sendEmail({
+            to: data.stylistEmail,
+            templateId: EmailService.TEMPLATE_IDS.APPOINTMENT_CANCELLED_STYLIST,
+            dynamicTemplateData: {
+                clientName: data.clientName,
+                stylistName: data.stylistName,
+                serviceName: data.serviceName,
+                appointmentDate: data.appointmentDate,
+                appointmentTime: data.appointmentTime,
+            },
+        });
+    }
+
+    // 6. Payment Failure – Stylist
     static async sendPaymentFailureForStylist(
         data: PaymentFailureData
     ): Promise<void> {
@@ -213,7 +308,7 @@ export class EmailService {
         });
     }
 
-    // 6. Account Cancellation – Stylist
+    // 7. Account Cancellation – Stylist
     static async sendAccountCancellationStylist(
         data: AccountCancellationData
     ): Promise<void> {
@@ -223,21 +318,6 @@ export class EmailService {
             dynamicTemplateData: {
                 stylistName: data.stylistName,
                 reactivateUrl: "https://braidsnow.com/stylist-community",
-            },
-        });
-    }
-
-    // 7. Appointment Denied – Client
-    static async sendAppointmentDeniedClient(
-        data: AppointmentDeniedData
-    ): Promise<void> {
-        await this.sendEmail({
-            to: data.clientEmail,
-            templateId: EmailService.TEMPLATE_IDS.APPOINTMENT_DENIED_CLIENT,
-            dynamicTemplateData: {
-                clientName: data.clientName,
-                stylistName: data.stylistName,
-                findStylistsUrl: "https://braidsnow.com/find-stylists",
             },
         });
     }

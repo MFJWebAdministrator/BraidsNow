@@ -16,7 +16,9 @@ type SmsType =
     | "newMessageClient"
     | "fullPaymentReminderClient"
     | "AppointmentAutoCancelledClient"
-    | "AppointmentAutoCancelledStylist";
+    | "AppointmentAutoCancelledStylist"
+    | "AppointmentCancelledByClient"
+    | "AppointmentCancelledByStylist";
 
 interface SmsData {
     phoneNumber: string;
@@ -24,7 +26,7 @@ interface SmsData {
     stylistName?: string;
 }
 
-interface AppointmentBookedStylistSmsData {
+interface AppointmentSmsData {
     stylistName: string;
     phoneNumber: string;
     appointmentDate: string;
@@ -61,11 +63,9 @@ interface FullPaymentReminderClientSmsData {
     balanceAmount: string;
 }
 
-interface AppointmentAutoCancelledStylistSmsData
-    extends AppointmentBookedStylistSmsData {}
+interface AppointmentAutoCancelledStylistSmsData extends AppointmentSmsData {}
 
-interface AppointmentAutoCancelledClientSmsData
-    extends AppointmentBookedStylistSmsData {}
+interface AppointmentAutoCancelledClientSmsData extends AppointmentSmsData {}
 
 export class SmsService {
     private static smsTemplates: Record<SmsType, (data: any) => string> = {
@@ -73,7 +73,7 @@ export class SmsService {
             `Hi ${data.clientName}! Welcome to BraidsNow.com 🎉 You can now book with top stylists near you. Ready to get started? 👉 https://braidsnow.com/find-stylists\n— BraidsNow.com`,
         welcomeStylist: (data) =>
             `Hi ${data.stylistName}! Welcome to BraidsNow.com 🎉 Setup payouts, add services, and set your schedule now 👉 https://braidsnow.com/dashboard/stylist\n— BraidsNow.com`,
-        appointmentBookedStylist: (data: AppointmentBookedStylistSmsData) =>
+        appointmentBookedStylist: (data: AppointmentSmsData) =>
             `Hi ${data.stylistName},\nYou have a new appointment request.\n\nDate: ${data.appointmentDate}\nTime: ${data.appointmentTime}\nService: ${data.serviceName}\nClient: ${data.clientName}\n\nPlease review and accept or reject this booking in your dashboard.\n\nThank you,\nBraidsNow.com Team`,
         subscriptionPaymentFailedStylist: (
             data: SubscriptionPaymentFailedStylistSmsData
@@ -85,14 +85,15 @@ export class SmsService {
             `Hi ${data.clientName},\nYou’ve received a new message from ${data.stylistName} about your appointment.\nView Message 👉 https://braidsnow.com/dashboard/client/messages.\nWe recommend checking your messages to stay connected with your stylist.\n\nThank you,\n- BraidsNow.com Team`,
         fullPaymentReminderClient: (data: FullPaymentReminderClientSmsData) =>
             `Hi ${data.clientName}, please remember full payment is due at time of service. Balance: ${data.balanceAmount}\n\uD83D\uDCC5 ${data.appointmentDate} \u23F0 ${data.appointmentTime}\nService: ${data.serviceName}\nStylist: ${data.stylistName}\n— BraidsNow.com`,
-        AppointmentAutoCancelledClient: (
-            data: AppointmentAutoCancelledClientSmsData
-        ) =>
+        AppointmentAutoCancelledClient: (data: AppointmentSmsData) =>
             `Hi ${data.clientName}, your booking for ${data.serviceName} with ${data.stylistName} on ${data.appointmentDate} at ${data.appointmentTime} was automatically cancelled because the stylist did not respond in time. You have not been charged. - BraidsNow.com`,
-        AppointmentAutoCancelledStylist: (
-            data: AppointmentAutoCancelledStylistSmsData
-        ) =>
+        AppointmentAutoCancelledStylist: (data: AppointmentSmsData) =>
             `Hi ${data.stylistName}, the booking for ${data.serviceName} with ${data.clientName} on ${data.appointmentDate} at ${data.appointmentTime} was automatically cancelled because you did not respond in time. - BraidsNow.com`,
+        AppointmentCancelledByClient: (data: AppointmentSmsData) =>
+            `Hi ${data.stylistName}, the appointment for ${data.serviceName} with ${data.clientName} on ${data.appointmentDate} at ${data.appointmentTime} was cancelled by the client. The time slot is now available. - BraidsNow.com`,
+
+        AppointmentCancelledByStylist: (data: AppointmentSmsData) =>
+            `Hi ${data.clientName}, your appointment for ${data.serviceName} with ${data.stylistName} on ${data.appointmentDate} at ${data.appointmentTime} was cancelled by the stylist. Any held funds have been released. - BraidsNow.com`,
     };
 
     /**
@@ -150,7 +151,7 @@ export class SmsService {
      * Appointment booked SMS for Stylist
      */
     static async sendAppointmentBookedStylistSms(
-        data: AppointmentBookedStylistSmsData
+        data: AppointmentSmsData
     ): Promise<void> {
         await this.sendSms({ type: "appointmentBookedStylist", data });
     }
@@ -233,7 +234,7 @@ export class SmsService {
      * Notify client that their appointment was auto-cancelled
      */
     static async sendAppointmentAutoCancelledClientSms(
-        data: AppointmentAutoCancelledClientSmsData
+        data: AppointmentSmsData
     ) {
         return this.sendSms({
             type: "AppointmentAutoCancelledClient",
@@ -245,10 +246,34 @@ export class SmsService {
      * Notify stylist that the appointment was auto-cancelled
      */
     static async sendAppointmentAutoCancelledStylistSms(
-        data: AppointmentAutoCancelledStylistSmsData
+        data: AppointmentSmsData
     ) {
         return this.sendSms({
             type: "AppointmentAutoCancelledStylist",
+            data,
+        });
+    }
+
+    /**
+     * Notify client that the appointment was cancelled by the stylist
+     */
+    static async sendAppointmentCancelledSmsForClient(
+        data: AppointmentSmsData
+    ) {
+        return this.sendSms({
+            type: "AppointmentCancelledByStylist",
+            data,
+        });
+    }
+
+    /**
+     * Notify stylist that the appointment was cancelled by the client
+     */
+    static async sendAppointmentCancelledSmsForStylist(
+        data: AppointmentSmsData
+    ) {
+        return this.sendSms({
+            type: "AppointmentCancelledByClient",
             data,
         });
     }

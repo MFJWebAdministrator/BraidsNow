@@ -12,19 +12,18 @@ import * as admin from "firebase-admin";
 export function getBookingExpiresAt(
     bookingDate: string,
     bookingTime: string,
-    bufferMinutes = 30,
-    defaultWindowMinutes = 120
+    bufferMinutes = 10,
+    defaultWindowMinutes = 10
 ): admin.firestore.Timestamp {
     const now = admin.firestore.Timestamp.now();
     const [year, month, day] = bookingDate.split("-").map(Number);
     const [hour, minute] = bookingTime.split(":").map(Number);
-    const bookingDateTime = new Date(year, month - 1, day, hour, minute);
-    const bookingTimestamp =
-        admin.firestore.Timestamp.fromDate(bookingDateTime);
+    const bookingDateTimeMillis = Date.UTC(year, month - 1, day, hour, minute);
+
     const bufferTimeMs = bufferMinutes * 60 * 1000;
     const defaultWindowMs = defaultWindowMinutes * 60 * 1000;
     const expiresAtMs = Math.min(
-        bookingTimestamp.toMillis() - bufferTimeMs,
+        bookingDateTimeMillis - bufferTimeMs,
         now.toMillis() + defaultWindowMs
     );
     return admin.firestore.Timestamp.fromMillis(expiresAtMs);

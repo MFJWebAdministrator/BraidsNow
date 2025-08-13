@@ -13,6 +13,8 @@ export function FindStylistsPage() {
         loading,
         error,
         searchParams,
+        pagination,
+        setPagination,
         setSearchParams,
         handleToggleFavorite,
         handleViewProfile,
@@ -25,7 +27,7 @@ export function FindStylistsPage() {
             <FindStylistsHeader />
 
             {/* Search Section */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 relative z-10">
                 <SearchSection
                     searchParams={searchParams}
                     onSearchChange={setSearchParams}
@@ -33,13 +35,18 @@ export function FindStylistsPage() {
             </div>
 
             {/* Results Section */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+            <div
+                className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20"
+                data-results-section
+            >
                 <StylistsGrid
                     stylists={stylists}
                     loading={loading}
                     error={error}
+                    pagination={pagination}
                     onToggleFavorite={handleToggleFavorite}
                     onViewProfile={handleViewProfile}
+                    setPagination={setPagination}
                 />
             </div>
 

@@ -4341,6 +4341,210 @@ app.get(
     }
 );
 
+// Search stylists with filtering and pagination
+app.post(
+    "/search-stylists",
+    async (
+        req: Request & {
+            body: {
+                businessName?: string;
+                braidStyle?: string;
+                location?: string;
+                servicePreference?: string[];
+                minDepositAmount?: number;
+                maxDepositAmount?: number;
+                page?: number;
+                pageSize?: number;
+            };
+        },
+        res: Response
+    ) => {
+        try {
+            const {
+                businessName = "",
+                braidStyle = "",
+                location = "",
+                servicePreference = [],
+                minDepositAmount = 1,
+                maxDepositAmount = 500,
+                page = 1,
+                pageSize = 4,
+            } = req.body || {};
+
+            // Merge both filters into Firestore query where possible
+            const stylistsSnap = await db
+                .collection("stylists")
+                .where("subscription.status", "==", "active")
+                .where("stripeAccountStatus", "==", "active")
+                .get();
+
+            const allStylists = stylistsSnap.docs.map((doc) => ({
+                id: doc.id,
+                data: doc.data(),
+            }));
+
+            const lcBusiness = businessName.trim().toLowerCase();
+            const lcStyle = braidStyle.trim().toLowerCase();
+            const lcLocation = location.trim().toLowerCase();
+
+            const filtered = allStylists
+                .filter(({ data }) => {
+                    // Business name contains
+                    const matchBusinessName = lcBusiness
+                        ? (data.businessName || "")
+                              .toLowerCase()
+                              .includes(lcBusiness)
+                        : true;
+
+                    // Braid style contained in any service name
+                    const matchStyle = lcStyle
+                        ? Array.isArray(data.services) &&
+                          data.services.some((s: any) =>
+                              (s?.name || "").toLowerCase().includes(lcStyle)
+                          )
+                        : true;
+
+                    // Location match: city, state, zip, or "city, state"
+                    const city = (data.city || "").toLowerCase();
+                    const state = (data.state || "").toLowerCase();
+                    const zip = String(data.zipCode || "");
+                    const matchLocation = lcLocation
+                        ? city.includes(lcLocation) ||
+                          state.includes(lcLocation) ||
+                          zip.includes(lcLocation) ||
+                          `${city}, ${state}`.includes(lcLocation)
+                        : true;
+
+                    // Service preference intersection
+                    const stylistPrefs: string[] = Array.isArray(
+                        data.servicePreference
+                    )
+                        ? data.servicePreference
+                        : data.servicePreference
+                          ? [data.servicePreference]
+                          : [];
+                    const matchServicePref =
+                        servicePreference && servicePreference.length > 0
+                            ? servicePreference.some((p) =>
+                                  stylistPrefs.includes(p)
+                              )
+                            : true;
+
+                    // Deposit amount range
+                    const deposit =
+                        Number.parseFloat(String(data.depositAmount ?? 0)) || 0;
+                    const matchDeposit =
+                        deposit >= minDepositAmount &&
+                        deposit <= maxDepositAmount;
+
+                    return (
+                        matchBusinessName &&
+                        matchStyle &&
+                        matchLocation &&
+                        matchServicePref &&
+                        matchDeposit
+                    );
+                })
+                // Map and sort stably by businessName for consistent pagination
+                .map(({ id, data }) => {
+                    const services = Array.isArray(data.services)
+                        ? data.services
+                        : [];
+                    const prices = services
+                        .map(
+                            (s: any) =>
+                                Number.parseFloat(String(s?.price ?? 0)) || 0
+                        )
+                        .filter((n: number) => Number.isFinite(n));
+                    const priceFrom = prices.length ? Math.min(...prices) : 50;
+                    const priceTo = prices.length ? Math.max(...prices) : 200;
+                    const servicePreferenceArray: string[] = Array.isArray(
+                        data.servicePreference
+                    )
+                        ? data.servicePreference
+                        : data.servicePreference
+                          ? [data.servicePreference]
+                          : ["shop"]; // default
+
+                    return {
+                        id,
+                        name: `${data.firstName || ""} ${data.lastName || ""}`.trim(),
+                        username: data.username || "",
+                        businessName: data.businessName || "",
+                        introduction: data.introduction || "",
+                        specialInstructions: data.specialInstructions || "",
+                        policyAndProcedures: data.policyAndProcedures || "",
+                        location:
+                            `${data.city || ""}, ${data.state || ""}`.trim(),
+                        zipCode: data.zipCode || "",
+                        city: data.city || "",
+                        state: data.state || "",
+                        servicePreference: servicePreferenceArray,
+                        image:
+                            data.profileImage ||
+                            "https://images.unsplash.com/photo-1605980776566-0486c3ac7617?auto=format&fit=crop&q=80",
+                        availability: "Available",
+                        depositAmount:
+                            Number.parseFloat(
+                                String(data.depositAmount ?? 0)
+                            ) || 0,
+                        washesHair: Boolean(data.washesHair),
+                        providesHair: Boolean(data.providesHair),
+                        stylesMensHair: Boolean(data.stylesMensHair),
+                        stylesChildrensHair: Boolean(data.stylesChildrensHair),
+                        price: {
+                            from: priceFrom,
+                            to: priceTo,
+                        },
+                        socialMedia: {
+                            instagram: data.instagram || "",
+                            facebook: data.facebook || "",
+                        },
+                        services,
+                    };
+                })
+                .sort((a, b) => a.businessName.localeCompare(b.businessName));
+
+            const totalItems = filtered.length;
+            const safePageSize = Math.min(
+                Math.max(Number(pageSize) || 12, 1),
+                48
+            );
+            const totalPages = Math.max(
+                Math.ceil(totalItems / safePageSize),
+                1
+            );
+            const safePage = Math.min(
+                Math.max(Number(page) || 1, 1),
+                totalPages
+            );
+            const startIndex = (safePage - 1) * safePageSize;
+            const endIndex = startIndex + safePageSize;
+            const pageItems = filtered.slice(startIndex, endIndex);
+
+            return res.status(200).json({
+                data: pageItems,
+                pagination: {
+                    currentPage: safePage,
+                    totalPages,
+                    totalItems,
+                    pageSize: safePageSize,
+                    hasNextPage: safePage < totalPages,
+                    hasPreviousPage: safePage > 1,
+                },
+            });
+        } catch (error) {
+            console.error("Error searching stylists:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
 // Email endpoints
 app.post(
     "/send-welcome-client-email",

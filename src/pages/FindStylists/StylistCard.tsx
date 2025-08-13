@@ -27,6 +27,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { LazyCard } from "@/components/ui/lazy-card";
 
 interface StylistCardProps {
     stylist: Stylist;
@@ -99,8 +100,12 @@ export function StylistCard({
 
         return;
     };
+    const primaryPreference = Array.isArray(stylist.servicePreference)
+        ? stylist.servicePreference[0]
+        : (stylist.servicePreference as any);
+
     const getServicePreferenceIcon = () => {
-        switch (stylist.servicePreference) {
+        switch (primaryPreference) {
             case "home":
                 return <Home className="w-4 h-4 mr-1" />;
             case "mobile":
@@ -111,7 +116,7 @@ export function StylistCard({
     };
 
     const getServicePreferenceText = () => {
-        switch (stylist.servicePreference) {
+        switch (primaryPreference) {
             case "home":
                 return "Styles From Home";
             case "mobile":
@@ -123,7 +128,7 @@ export function StylistCard({
 
     return (
         <>
-            <div className="group">
+            <LazyCard className="group" delay={Math.random() * 200}>
                 <div className="bg-white rounded-3xl p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden">
                     {/* Gradient Background */}
                     <div className="absolute inset-0">
@@ -256,7 +261,7 @@ export function StylistCard({
                         </Button>
                     </div>
                 </div>
-            </div>
+            </LazyCard>
 
             {/* Payment Dialog - Keep for backward compatibility */}
             <Dialog

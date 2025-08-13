@@ -26,6 +26,7 @@ export function useRegisterStylist() {
                 title: "Welcome to BraidsNow.com!",
                 // description:
                 //     "Your stylist account has been created successfully.",
+                duration: 3000,
             });
 
             // send welcome email
@@ -62,6 +63,7 @@ export function useRegisterStylist() {
                 title: "Registration failed",
                 description: errorMessage,
                 variant: "destructive",
+                duration: 3000,
             });
 
             throw error;

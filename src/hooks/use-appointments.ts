@@ -40,6 +40,7 @@ export interface Appointment {
     paymentStatus:
         | "pending"
         | "authorized"
+        | "captured"
         | "paid"
         | "failed"
         | "cancelled"
@@ -57,13 +58,30 @@ export interface Appointment {
         serviceId: string;
         stylistId: string;
     };
-    status: "pending" | "confirmed" | "rejected" | "cancelled" | "failed";
+    status:
+        | "pending"
+        | "confirmed"
+        | "rejected"
+        | "cancelled"
+        | "failed"
+        | "to-be-paid"
+        | "completed";
     stripeSessionId: string;
     stylistId: string;
     stylistName: string;
     // time: string;
     totalAmount: number;
     updatedAt: Timestamp;
+    paymentRequested?: boolean;
+    paymentRequestedAt?: Timestamp;
+
+    // Reschedule fields
+    rescheduleProposal?: {
+        proposedDateTime: Date;
+        proposedBy: "client" | "stylist";
+        proposedAt: Timestamp;
+        reason?: string;
+    };
 }
 
 export function useAppointments() {
@@ -160,6 +178,14 @@ export function useAppointments() {
 
             const mappedAppointments = uniqueAppointments.map((appointment) => {
                 const dateTime = toZonedTime(appointment.dateTime, browserTz);
+                if (appointment.rescheduleProposal) {
+                    const proposedDateTime = toZonedTime(
+                        appointment.rescheduleProposal?.proposedDateTime,
+                        browserTz
+                    );
+                    appointment.rescheduleProposal.proposedDateTime =
+                        proposedDateTime;
+                }
                 return { ...appointment, dateTime };
             });
 

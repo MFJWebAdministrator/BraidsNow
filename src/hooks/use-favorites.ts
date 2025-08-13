@@ -48,6 +48,7 @@ export function useFavorites() {
                 title: "Sign in required",
                 description: "Please sign in to save favorites",
                 variant: "destructive",
+                duration: 3000,
             });
             return;
         }
@@ -64,6 +65,7 @@ export function useFavorites() {
                 toast({
                     title: "Removed from favorites",
                     description: `${stylist.businessName} has been removed from your favorites`,
+                    duration: 3000,
                 });
             } else {
                 setFavorites((prev) => [
@@ -75,6 +77,7 @@ export function useFavorites() {
                 toast({
                     title: "Added to favorites",
                     description: `${stylist.businessName} has been added to your favorites`,
+                    duration: 3000,
                 });
             }
         } catch (error) {

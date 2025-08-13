@@ -51,6 +51,7 @@ function PaymentFormContent({ amount, onSuccess, onError }: Omit<PaymentFormProp
       toast({
         title: "Payment successful",
         description: "Your payment has been processed successfully.",
+        duration: 3000,
       });
 
       onSuccess?.();
@@ -60,6 +61,7 @@ function PaymentFormContent({ amount, onSuccess, onError }: Omit<PaymentFormProp
         title: "Payment failed",
         description: error.message || "An error occurred during payment.",
         variant: "destructive",
+        duration: 3000,
       });
       onError?.(error);
     } finally {

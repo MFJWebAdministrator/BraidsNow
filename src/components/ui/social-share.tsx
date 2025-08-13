@@ -24,6 +24,7 @@ export function SocialShare({ url, trigger, className }: SocialShareProps) {
             toast({
                 title: "Link copied!",
                 description: "Profile link has been copied to clipboard",
+                duration: 3000,
             });
 
             // Reset the copied state after 2 seconds
@@ -33,6 +34,7 @@ export function SocialShare({ url, trigger, className }: SocialShareProps) {
                 title: "Copy failed",
                 description: "Unable to copy link to clipboard",
                 variant: "destructive",
+                duration: 3000,
             });
         }
     };

@@ -38,7 +38,8 @@ export function StyleBoardContent() {
       toast({
         title: "Upload failed",
         description: error.message || "Failed to upload image",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 3000,
       });
     }
   };
@@ -50,7 +51,8 @@ export function StyleBoardContent() {
       toast({
         title: "Error",
         description: error.message || "Failed to delete image",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 3000,
       });
     }
   };

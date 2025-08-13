@@ -24,7 +24,8 @@ export function HairTypeSection({ hairType, onUpdate }: HairTypeSectionProps) {
       toast({
         title: "Error",
         description: error.message || "Failed to update hair type",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 3000,
       });
     } finally {
       setIsSubmitting(false);

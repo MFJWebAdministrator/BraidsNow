@@ -73,6 +73,7 @@ export function useClientSettings() {
             toast({
                 title: "Success",
                 description: "Your profile has been updated.",
+                duration: 3000,
             });
 
             setHasChanges(false);
@@ -82,6 +83,7 @@ export function useClientSettings() {
                 title: "Error",
                 description: "Failed to update profile. Please try again.",
                 variant: "destructive",
+                duration: 3000,
             });
         } finally {
             setIsLoading(false);
@@ -98,6 +100,7 @@ export function useClientSettings() {
             toast({
                 title: "Success",
                 description: "Profile image updated successfully.",
+                duration: 3000,
             });
         } catch (error) {
             console.error("Error updating profile image:", error);
@@ -106,6 +109,7 @@ export function useClientSettings() {
                 description:
                     "Failed to update profile image. Please try again.",
                 variant: "destructive",
+                duration: 3000,
             });
         } finally {
             setIsLoading(false);

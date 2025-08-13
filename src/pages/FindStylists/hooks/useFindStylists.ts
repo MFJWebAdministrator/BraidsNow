@@ -10,8 +10,6 @@ import {
 import { db } from "@/lib/firebase/config";
 import { useFavorites } from "@/hooks/use-favorites";
 import type { SearchParams, Stylist } from "../types";
-import axios from "axios";
-import { SubscriptionStatus } from "@/hooks/use-subscription";
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export function useFindStylists() {
@@ -42,23 +40,9 @@ export function useFindStylists() {
             const filteredDocs = [];
             for (const doc of querySnapshot.docs) {
                 try {
-                    const response = await axios.post(
-                        `${API_BASE_URL}/get-stripe-account-details`,
-                        {
-                            stylistId: doc.id,
-                        },
-                        {
-                            headers: {
-                                "Content-Type": "application/json",
-                            },
-                        }
-                    );
+                    const data = doc.data();
 
-                    const subscriptionStatus: SubscriptionStatus =
-                        response.data;
-
-                    // Only include stylists with active Stripe accounts
-                    if (subscriptionStatus.status === "active") {
+                    if (data.stripeAccountStatus === "active") {
                         filteredDocs.push(doc);
                     }
                 } catch (error) {
@@ -67,12 +51,16 @@ export function useFindStylists() {
                         doc.id,
                         error
                     );
-                    // Skip this stylist if there's an error
                 }
             }
 
             const stylistsData = filteredDocs.map((doc) => {
                 const data = doc.data();
+                console.log(
+                    "data",
+                    data.stripeAccountId,
+                    data.stripeAccountStatus
+                );
 
                 return {
                     id: doc.id,
@@ -84,7 +72,7 @@ export function useFindStylists() {
                     zipCode: data.zipCode || "",
                     city: data.city || "",
                     state: data.state || "",
-                    servicePreference: data.servicePreference || "shop",
+                    servicePreference: data.servicePreference || ["shop"],
                     image:
                         data.profileImage ||
                         "https://images.unsplash.com/photo-1605980776566-0486c3ac7617?auto=format&fit=crop&q=80",
@@ -117,6 +105,8 @@ export function useFindStylists() {
                     isFavorite: favorites.some((fav) => fav.id === doc.id),
                 } as Stylist;
             });
+
+            console.log("stylistsData", stylistsData);
 
             setAllStylists(stylistsData);
             setFilteredStylists(stylistsData);

@@ -24,7 +24,8 @@ export function StyleUpload({ open, onClose, onUpload }: StyleUploadProps) {
         toast({
           title: "File too large",
           description: "Image must be less than 5MB",
-          variant: "destructive"
+          variant: "destructive",
+          duration: 3000,
         });
         return;
       }
@@ -32,7 +33,8 @@ export function StyleUpload({ open, onClose, onUpload }: StyleUploadProps) {
         toast({
           title: "Invalid file type",
           description: "Only PNG, JPG, or WebP files are allowed",
-          variant: "destructive"
+          variant: "destructive",
+          duration: 3000,
         });
         return;
       }

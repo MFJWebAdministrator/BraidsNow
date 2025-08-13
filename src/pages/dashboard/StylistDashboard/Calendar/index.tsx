@@ -427,6 +427,7 @@ export function CalendarPage() {
                 description:
                     "This time slot is not available. Please select a different time.",
                 variant: "destructive",
+                duration: 3000,
             });
             return;
         }

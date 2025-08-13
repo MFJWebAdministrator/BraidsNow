@@ -141,6 +141,7 @@ export function useStyleBoard(userId: string) {
             toast({
                 title: "Success",
                 description: "Image uploaded successfully",
+                duration: 3000,
             });
 
             return newImage;
@@ -154,6 +155,7 @@ export function useStyleBoard(userId: string) {
                 title: "Error",
                 description: errorMessage,
                 variant: "destructive",
+                duration: 3000,
             });
             throw error;
         }
@@ -201,6 +203,7 @@ export function useStyleBoard(userId: string) {
             toast({
                 title: "Success",
                 description: "Image deleted successfully",
+                duration: 3000,
             });
         } catch (error) {
             console.error("Error deleting image:", error);
@@ -208,6 +211,7 @@ export function useStyleBoard(userId: string) {
                 title: "Error",
                 description: "Failed to delete image",
                 variant: "destructive",
+                duration: 3000,
             });
             throw error;
         }
@@ -238,6 +242,7 @@ export function useStyleBoard(userId: string) {
             toast({
                 title: "Success",
                 description: "Hair type updated successfully",
+                duration: 3000,
             });
         } catch (error) {
             console.error("Error updating hair type:", error);

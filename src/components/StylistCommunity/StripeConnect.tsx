@@ -47,6 +47,7 @@ export function StripeConnect({
                 title: "Authentication Error",
                 description: "You must be logged in to subscribe.",
                 variant: "destructive",
+                duration: 3000,
             });
             return;
         }
@@ -57,6 +58,7 @@ export function StripeConnect({
                 title: "Subscription Active",
                 description: "You already have an active subscription.",
                 variant: "destructive",
+                duration: 3000,
             });
             return;
         }
@@ -101,6 +103,7 @@ export function StripeConnect({
                 description:
                     "You're being redirected to the secure payment page.",
                 variant: "default",
+                duration: 3000,
             });
 
             // Redirect to Stripe Checkout
@@ -140,6 +143,7 @@ export function StripeConnect({
                 title: "Subscription Error",
                 description: errorMessage,
                 variant: "destructive",
+                duration: 3000,
             });
         } finally {
             setLoading(null);

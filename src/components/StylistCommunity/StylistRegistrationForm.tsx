@@ -136,6 +136,7 @@ export function StylistRegistrationForm() {
                 description:
                     "Failed to process subscription. Please try again.",
                 variant: "destructive",
+                duration: 3000,
             });
         }
     };

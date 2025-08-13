@@ -186,6 +186,7 @@ export function MessagesContent() {
                 title: "Image too large",
                 description: "Each image must be less than 5MB after cropping.",
                 variant: "destructive",
+                duration: 3000,
             });
             // Move to next image in queue
             const [, ...rest] = croppingQueue;

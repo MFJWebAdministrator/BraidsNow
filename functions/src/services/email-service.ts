@@ -84,6 +84,44 @@ export interface MessageNotificationData {
     senderName: string;
 }
 
+export interface PaymentRequestedData {
+    clientName: string;
+    clientEmail: string;
+    stylistName: string;
+    serviceName: string;
+    appointmentDate: string;
+    appointmentTime: string;
+}
+
+export interface RescheduleProposalData {
+    recipientName: string;
+    recipientEmail: string;
+    proposedBy: string; // Name of person who proposed the reschedule
+    serviceName: string;
+    oldAppointmentDate: string;
+    oldAppointmentTime: string;
+    newAppointmentDate: string;
+    newAppointmentTime: string;
+}
+
+export interface RescheduleAcceptedData {
+    recipientName: string;
+    recipientEmail: string;
+    acceptedBy: string; // Name of person who accepted the reschedule
+    serviceName: string;
+    newAppointmentDate: string;
+    newAppointmentTime: string;
+}
+
+export interface RescheduleRejectedData {
+    recipientName: string;
+    recipientEmail: string;
+    rejectedBy: string; // Name of person who rejected the reschedule
+    serviceName: string;
+    oldAppointmentDate: string;
+    oldAppointmentTime: string;
+}
+
 export class EmailService {
     private static readonly FROM_EMAIL = "noreply@braidsnow.com";
     private static readonly FROM_NAME = "BraidsNow.com Team";
@@ -99,12 +137,16 @@ export class EmailService {
         APPOINTMENT_AUTO_CANCELLED_STYLIST:
             "d-b50b1471906d487fbea8a99860d20f7b",
         APPOINTMENT_CANCELLED_CLIENT: "d-d8243e24a5484130814ec6644fd3df72",
-        APPOINTMENT_CANCELLED_STYLIST: "d-62c1442cb3c04f67955c421424fd7c35 ",
+        APPOINTMENT_CANCELLED_STYLIST: "d-62c1442cb3c04f67955c421424fd7c35",
         PAYMENT_FAILURE_STYLIST: "d-a644b936e4ee4c83b5e7df7b04e9d884",
         ACCOUNT_CANCELLATION_STYLIST: "d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
         FULL_PAYMENT_REMINDER_CLIENT: "d-79af3603646a4d218a406bcdf401af97",
         MESSAGE_NOTIFICATION_STYLIST: "d-68598dcf61564e578cb04e7de2e869c7",
         MESSAGE_NOTIFICATION_CLIENT: "d-923ac4cd221c45318d58f167f3bcaafb",
+        PAYMENT_REQUESTED_CLIENT: "d-88c8f0652d9d4b39802b5864325a1bb8",
+        RESCHEDULE_PROPOSAL: "d-c4dcc8b85ead46e3a228c2227d50e3f6",
+        RESCHEDULE_ACCEPTED: "d-6e355af5524c4cf781a9dc43603dca22",
+        RESCHEDULE_REJECTED: "d-08bb1d1a74fb494cb58dfce8e780180c",
     };
 
     private static async sendEmail(emailData: EmailData): Promise<void> {
@@ -369,29 +411,75 @@ export class EmailService {
         });
     }
 
-    // Add this method to your EmailService class
-    static async sendTestEmail(to: string): Promise<void> {
-        try {
-            if (!apiKey) {
-                console.warn("SendGrid not configured. Skipping test email.");
-                return;
-            }
+    // 11. Payment Requested – Client
+    static async sendPaymentRequestedClient(
+        data: PaymentRequestedData
+    ): Promise<void> {
+        await this.sendEmail({
+            to: data.clientEmail,
+            templateId: EmailService.TEMPLATE_IDS.PAYMENT_REQUESTED_CLIENT,
+            dynamicTemplateData: {
+                clientName: data.clientName,
+                stylistName: data.stylistName,
+                serviceName: data.serviceName,
+                appointmentDate: data.appointmentDate,
+                appointmentTime: data.appointmentTime,
+                dashboardUrl:
+                    "https://braidsnow.com/dashboard/client/appointments",
+            },
+        });
+    }
 
-            const msg = {
-                to: to,
-                from: {
-                    email: EmailService.FROM_EMAIL,
-                    name: EmailService.FROM_NAME,
-                },
-                subject: "Test Email from BraidsNow",
-                html: "<p>This is a test email to verify SendGrid is working.</p>",
-            };
+    // 12. Reschedule Proposal Notification
+    static async sendRescheduleProposalNotification(
+        data: RescheduleProposalData
+    ): Promise<void> {
+        await this.sendEmail({
+            to: data.recipientEmail,
+            templateId: EmailService.TEMPLATE_IDS.RESCHEDULE_PROPOSAL,
+            dynamicTemplateData: {
+                recipientName: data.recipientName,
+                proposedBy: data.proposedBy,
+                serviceName: data.serviceName,
+                oldAppointmentDate: data.oldAppointmentDate,
+                oldAppointmentTime: data.oldAppointmentTime,
+                newAppointmentDate: data.newAppointmentDate,
+                newAppointmentTime: data.newAppointmentTime,
+            },
+        });
+    }
 
-            await sgMail.send(msg);
-            console.log(`Test email sent successfully to ${to}`);
-        } catch (error) {
-            console.error("Error sending test email:", error);
-            throw error;
-        }
+    // 13. Reschedule Accepted Notification
+    static async sendRescheduleAcceptedNotification(
+        data: RescheduleAcceptedData
+    ): Promise<void> {
+        await this.sendEmail({
+            to: data.recipientEmail,
+            templateId: EmailService.TEMPLATE_IDS.RESCHEDULE_ACCEPTED,
+            dynamicTemplateData: {
+                recipientName: data.recipientName,
+                acceptedBy: data.acceptedBy,
+                serviceName: data.serviceName,
+                newAppointmentDate: data.newAppointmentDate,
+                newAppointmentTime: data.newAppointmentTime,
+            },
+        });
+    }
+
+    // 14. Reschedule Rejected Notification
+    static async sendRescheduleRejectedNotification(
+        data: RescheduleRejectedData
+    ): Promise<void> {
+        await this.sendEmail({
+            to: data.recipientEmail,
+            templateId: EmailService.TEMPLATE_IDS.RESCHEDULE_REJECTED,
+            dynamicTemplateData: {
+                recipientName: data.recipientName,
+                rejectedBy: data.rejectedBy,
+                serviceName: data.serviceName,
+                oldAppointmentDate: data.oldAppointmentDate,
+                oldAppointmentTime: data.oldAppointmentTime,
+            },
+        });
     }
 }

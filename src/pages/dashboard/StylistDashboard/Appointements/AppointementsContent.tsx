@@ -69,11 +69,19 @@ export function AppointementsContent() {
         (appointment) => appointment.status === "pending"
     );
 
+    // Get appointments with to-be-paid status (for stylists to see appointments waiting for payment)
+    const toBePaidAppointments = stylistAppointments.filter(
+        (appointment) => appointment.status === "to-be-paid"
+    );
+
     // Calculate statistics
     const confirmedAppointmentsCount = confirmedAppointments.length;
     const pendingAppointmentsCount = pendingAppointments.length;
+    const toBePaidAppointmentsCount = toBePaidAppointments.length;
     const totalAppointments =
-        confirmedAppointmentsCount + pendingAppointments.length;
+        confirmedAppointmentsCount +
+        pendingAppointmentsCount +
+        toBePaidAppointmentsCount;
 
     // handle accept appointment
     const handleAcceptAppointment = async (appointmentId: string) => {
@@ -96,6 +104,7 @@ export function AppointementsContent() {
                 toast({
                     title: "Success",
                     description: "Appointment accepted successfully!",
+                    duration: 3000,
                 });
                 // Refresh appointments
                 getStylistAppointments();
@@ -104,6 +113,7 @@ export function AppointementsContent() {
                     title: "Error",
                     description: result.error || "Failed to accept appointment",
                     variant: "destructive",
+                    duration: 3000,
                 });
             }
         } catch (error: any) {
@@ -115,6 +125,7 @@ export function AppointementsContent() {
                 title: "Error",
                 description: errorMessage,
                 variant: "destructive",
+                duration: 3000,
             });
         }
     };
@@ -137,6 +148,7 @@ export function AppointementsContent() {
             toast({
                 title: "Success",
                 description: "Appointment rejected successfully!",
+                duration: 3000,
             });
             // Refresh appointments
             getStylistAppointments();
@@ -146,6 +158,7 @@ export function AppointementsContent() {
                 title: "Error",
                 description: "Failed to reject appointment. Please try again.",
                 variant: "destructive",
+                duration: 3000,
             });
         }
     };
@@ -155,6 +168,7 @@ export function AppointementsContent() {
         toast({
             title: "Contact Client",
             description: `Phone: ${contactInfo.phone}, Email: ${contactInfo.email}`,
+            duration: 3000,
         });
     };
 
@@ -260,7 +274,13 @@ export function AppointementsContent() {
             </Card>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 rounded-lg">
+                <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-lg">
+                    <TabsTrigger
+                        className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
+                        value="to-be-paid"
+                    >
+                        Awaiting Payment ({toBePaidAppointmentsCount})
+                    </TabsTrigger>
                     <TabsTrigger
                         className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
                         value="today"
@@ -366,6 +386,40 @@ export function AppointementsContent() {
                     ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             {pendingAppointments.map((appointment: any) => (
+                                <AppointmentCard
+                                    key={appointment.id}
+                                    appointment={appointment}
+                                    userRole="stylist"
+                                    onContact={handleContact}
+                                    onAcceptAppointment={
+                                        handleAcceptAppointment
+                                    }
+                                    onRejectAppointment={
+                                        handleRejectAppointment
+                                    }
+                                />
+                            ))}
+                        </div>
+                    )}
+                </TabsContent>
+
+                <TabsContent value="to-be-paid" className="space-y-4">
+                    {toBePaidAppointments.length === 0 ? (
+                        <Card className="border border-gray-200 shadow-sm">
+                            <CardContent className="p-8 text-center">
+                                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                    No payments due
+                                </h3>
+                                <p className="text-gray-600">
+                                    You don't have any appointments waiting for
+                                    payment.
+                                </p>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {toBePaidAppointments.map((appointment) => (
                                 <AppointmentCard
                                     key={appointment.id}
                                     appointment={appointment}

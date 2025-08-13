@@ -671,11 +671,11 @@ app.post(
                 mode: "payment",
                 customer: stripeCustomerId,
                 payment_intent_data: {
-                    transfer_data: {
-                        destination: stylistData.stripeAccountId,
-                    },
+                    // transfer_data: {
+                    //     destination: stylistData.stripeAccountId,
+                    // },
                     metadata,
-                    application_fee_amount: amount * 0.05, // 5% fee,
+                    // application_fee_amount: amount * 0.05, // 5% fee,
                     capture_method: "manual",
                 },
                 line_items: [
@@ -1209,7 +1209,7 @@ app.post(
                         bookingId: bookingId,
                         serviceName: bookingData.serviceName,
                         date,
-                        time: time + " UTC",
+                        time,
                         stylistName: bookingData.stylistName,
                     },
                 });
@@ -1226,7 +1226,7 @@ app.post(
                         bookingId: bookingId,
                         serviceName: bookingData.serviceName,
                         date,
-                        time: time + " UTC",
+                        time,
                         clientName: bookingData.clientName,
                     },
                 });
@@ -1308,184 +1308,764 @@ app.post(
     }
 );
 
+// Add a new endpoint to cancel a booking by client
+app.post(
+    "/cancel-booking-by-client",
+    validateFirebaseIdToken,
+    async (req: RequestWithRawBody, res: Response) => {
+        try {
+            const { bookingId } = req.body;
+            const userId = req.user?.uid;
+
+            if (!bookingId) {
+                return res
+                    .status(400)
+                    .json({ error: "Booking ID is required" });
+            }
+
+            if (!userId) {
+                return res
+                    .status(401)
+                    .json({ error: "User not authenticated" });
+            }
+
+            // Get the booking document
+            const bookingRef = db.collection("bookings").doc(bookingId);
+            const bookingDoc = await bookingRef.get();
+
+            if (!bookingDoc.exists) {
+                return res.status(404).json({ error: "Booking not found" });
+            }
+
+            const bookingData = bookingDoc.data();
+
+            // Step 1: Verify Appointment Ownership
+            if (bookingData?.clientId !== userId) {
+                return res.status(403).json({
+                    error: "You can only cancel your own appointments",
+                });
+            }
+
+            // Step 2: Check if booking is already cancelled
+            // only for confirmed bookings status
+            if (bookingData?.status !== "confirmed") {
+                return res.status(400).json({
+                    error: "This booking cannot be cancelled in its current status",
+                });
+            }
+
+            // Step 3: Check Time Constraint - Only allow cancellation if current time is before appointment start time
+            const appointmentDateTime = new Date(
+                `${bookingData.date}T${bookingData.time}`
+            );
+            const currentTime = admin.firestore.Timestamp.now();
+            console.log("currentDateTime", currentTime.toDate());
+
+            if (
+                currentTime.toDate().getTime() >= appointmentDateTime.getTime()
+            ) {
+                return res.status(400).json({
+                    error: "Cannot cancel appointments that have already started or passed",
+                });
+            }
+
+            // Step 4: Calculate Refund
+            const paymentAmount = bookingData.paymentAmount;
+            const cancellationFeePercentage = 0.04; // 4%
+            const cancellationFee = paymentAmount * cancellationFeePercentage;
+            const refundAmount = paymentAmount - cancellationFee;
+
+            // Step 5: Process Refund through Stripe
+            let refundResult = null;
+            const paymentIntentId = bookingData.paymentId;
+
+            if (paymentIntentId) {
+                try {
+                    // Get the payment intent to check its status
+                    const paymentIntent =
+                        await stripe.paymentIntents.retrieve(paymentIntentId);
+
+                    if (paymentIntent.status === "succeeded") {
+                        // Payment was captured, create a refund
+                        refundResult = await stripe.refunds.create({
+                            payment_intent: paymentIntentId,
+                            amount: refundAmount * 100, // Convert to cents
+                            reason: "requested_by_customer",
+                            metadata: {
+                                bookingId: bookingId,
+                                cancellationFee: cancellationFee * 100,
+                                refundAmount: refundAmount * 100,
+                            },
+                        });
+                    } else if (paymentIntent.status === "requires_capture") {
+                        // Payment not yet captured, cancel the payment intent
+                        await stripe.paymentIntents.cancel(paymentIntentId);
+                        refundResult = { status: "cancelled" };
+                    } else {
+                        console.log(
+                            `Payment cannot be refunded in its current state: ${paymentIntent.status}`
+                        );
+                        return res.status(400).json({
+                            error: `Payment cannot be refunded in its current state`,
+                        });
+                    }
+                } catch (error) {
+                    console.error("Error processing refund:", error);
+                    return res.status(500).json({
+                        error: "Failed to process refund. Please contact support.",
+                    });
+                }
+            }
+
+            // Step 6: Update Booking Status
+            await bookingRef.update({
+                status: "cancelled",
+                cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                paymentStatus: "refunded",
+                cancelledBy: "client",
+                refundAmount: refundAmount,
+                refundId: refundResult?.id || null,
+            });
+
+            // Step 7: Update Payment Document
+            if (paymentIntentId) {
+                const paymentQuery = await db
+                    .collection("payments")
+                    .where("bookingId", "==", bookingId)
+                    .get();
+
+                if (!paymentQuery.empty) {
+                    const paymentDoc = paymentQuery.docs[0];
+                    await paymentDoc.ref.update({
+                        status: "refunded",
+                        cancelledBy: "client",
+                        cancelledAt:
+                            admin.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                        refundAmount: refundAmount,
+                        refundId: refundResult?.id || null,
+                    });
+                }
+            }
+
+            // Step 8: Log the Refund & Fee
+            await db.collection("refunds").add({
+                bookingId: bookingId,
+                clientId: userId,
+                stylistId: bookingData.stylistId,
+                originalPaidAmount: paymentAmount,
+                cancellationFee: cancellationFee,
+                refundAmount: refundAmount,
+                refundStripeId: refundResult?.id || null,
+                reason: "client_cancellation",
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            const date = format(bookingData.dateTime, "yyyy-MM-dd");
+            const time = format(bookingData.dateTime, "HH:mm") + " UTC";
+
+            // Send email to client
+            setTimeout(async () => {
+                try {
+                    await EmailService.sendAppointmentCancelledEmailForClient({
+                        clientName: bookingData.clientName,
+                        clientEmail: bookingData.clientEmail,
+                        stylistName: bookingData.stylistName,
+                        serviceName: bookingData.serviceName,
+                        appointmentDate: date,
+                        appointmentTime: time,
+                    });
+                } catch (error) {
+                    console.error(
+                        "Error sending cancellation email to client:",
+                        error
+                    );
+                }
+            }, 0);
+
+            // Send email to stylist
+            setTimeout(async () => {
+                try {
+                    await EmailService.sendAppointmentCancelledEmailForStylist({
+                        stylistName: bookingData.stylistName || "Stylist",
+                        stylistEmail: bookingData.stylistEmail,
+                        clientName: bookingData.clientName || "Client",
+                        serviceName: bookingData.serviceName,
+                        appointmentDate: date,
+                        appointmentTime: time,
+                    });
+                } catch (error) {
+                    console.error(
+                        "Error sending cancellation email to stylist:",
+                        error
+                    );
+                }
+            }, 0);
+
+            // Send SMS to stylist
+            setTimeout(async () => {
+                try {
+                    await SmsService.sendAppointmentCancelledSmsForStylist({
+                        stylistName: bookingData.stylistName || "Stylist",
+                        phoneNumber: bookingData.stylistPhone,
+                        clientName: bookingData.clientName || "Client",
+                        serviceName: bookingData.serviceName,
+                        appointmentDate: bookingData.date,
+                        appointmentTime: bookingData.time,
+                    });
+                } catch (error) {
+                    console.error(
+                        "Error sending cancellation SMS to stylist:",
+                        error
+                    );
+                }
+            }, 0);
+
+            // Send SMS to client
+            setTimeout(async () => {
+                try {
+                    await SmsService.sendAppointmentCancelledSmsForClient({
+                        clientName: bookingData.clientName || "Client",
+                        phoneNumber: bookingData.clientPhone,
+                        stylistName: bookingData.stylistName || "Stylist",
+                        serviceName: bookingData.serviceName,
+                        appointmentDate: date,
+                        appointmentTime: time,
+                    });
+                } catch (error) {
+                    console.error(
+                        "Error sending cancellation SMS to client:",
+                        error
+                    );
+                }
+            }, 0);
+
+            // TODO: send push notification to stylist and client
+
+            return res.status(200).json({
+                success: true,
+                message: "Booking cancelled successfully",
+                refundAmount: refundAmount,
+                cancellationFee: cancellationFee,
+                refundId: refundResult?.id || null,
+            });
+        } catch (error) {
+            console.error("Error cancelling booking:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+// Add a new endpoint to cancel a booking by stylist
+app.post(
+    "/cancel-booking-by-stylist",
+    validateFirebaseIdToken,
+    async (req: RequestWithRawBody, res: Response) => {
+        try {
+            const { bookingId } = req.body;
+            const userId = req.user?.uid;
+
+            if (!bookingId) {
+                return res
+                    .status(400)
+                    .json({ error: "Booking ID is required" });
+            }
+
+            if (!userId) {
+                return res
+                    .status(401)
+                    .json({ error: "User not authenticated" });
+            }
+
+            // Get the booking document
+            const bookingRef = db.collection("bookings").doc(bookingId);
+            const bookingDoc = await bookingRef.get();
+
+            if (!bookingDoc.exists) {
+                return res.status(404).json({ error: "Booking not found" });
+            }
+
+            const bookingData = bookingDoc.data();
+
+            // Step 1: Verify Stylist Ownership
+            if (bookingData?.stylistId !== userId) {
+                return res.status(403).json({
+                    error: "You can only cancel appointments assigned to you",
+                });
+            }
+
+            // Step 2: Check if booking is confirmed
+            if (bookingData?.status !== "confirmed") {
+                return res.status(400).json({
+                    error: "This booking cannot be cancelled in its current status",
+                });
+            }
+
+            // Step 3: Check Time Constraint - Only allow cancellation if current time is before appointment start time
+            const appointmentDateTime = new Date(
+                `${bookingData.date}T${bookingData.time}`
+            );
+            // current time in UTC using firebase timestamp
+            const currentTime = admin.firestore.Timestamp.now();
+
+            if (
+                currentTime.toDate().getTime() >= appointmentDateTime.getTime()
+            ) {
+                return res.status(400).json({
+                    error: "Cannot cancel appointments that have already started or passed",
+                });
+            }
+
+            // Step 4: Calculate Stylist Fine
+            const paymentAmount = bookingData.paymentAmount;
+            const stylistFinePercentage = 0.04; // 4%
+            const stylistFine = paymentAmount * stylistFinePercentage;
+
+            // Step 5: Process Payment Cancellation/Refund
+            let refundResult = null;
+            const paymentIntentId = bookingData.paymentId;
+
+            if (paymentIntentId) {
+                try {
+                    // Get the payment intent to check its status
+                    const paymentIntent =
+                        await stripe.paymentIntents.retrieve(paymentIntentId);
+
+                    if (paymentIntent.status === "succeeded") {
+                        // Payment was captured, create a full refund to client
+                        refundResult = await stripe.refunds.create({
+                            payment_intent: paymentIntentId,
+                            reason: "requested_by_customer",
+                            metadata: {
+                                bookingId: bookingId,
+                                stylistFine: stylistFine * 100,
+                                refundType: "stylist_cancellation_full_refund",
+                            },
+                        });
+                    } else if (paymentIntent.status === "requires_capture") {
+                        // Payment not yet captured, cancel the payment intent
+                        await stripe.paymentIntents.cancel(paymentIntentId);
+                        refundResult = { status: "cancelled" };
+                    } else {
+                        console.log(
+                            `Payment cannot be refunded in its current state: ${paymentIntent.status}`
+                        );
+                        return res.status(400).json({
+                            error: `Payment cannot be refunded in its current state`,
+                        });
+                    }
+                } catch (error) {
+                    console.error(
+                        "Error processing payment cancellation:",
+                        error
+                    );
+                    return res.status(500).json({
+                        error: "Failed to process payment cancellation. Please contact support.",
+                    });
+                }
+            }
+
+            // Step 6: Update Booking Status
+            await bookingRef.update({
+                status: "cancelled",
+                cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                paymentStatus: "refunded",
+                cancelledBy: "stylist",
+                stylistFine: stylistFine,
+                refundAmount: paymentAmount,
+                refundId: refundResult?.id || null,
+            });
+
+            // Step 7: Update Payment Document
+            if (paymentIntentId) {
+                const paymentQuery = await db
+                    .collection("payments")
+                    .where("bookingId", "==", bookingId)
+                    .get();
+
+                if (!paymentQuery.empty) {
+                    const paymentDoc = paymentQuery.docs[0];
+                    await paymentDoc.ref.update({
+                        status: "refunded",
+                        cancelledBy: "stylist",
+                        cancelledAt:
+                            admin.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                        stylistFine: stylistFine,
+                        refundAmount: paymentAmount,
+                        refundId: refundResult?.id || null,
+                    });
+                }
+            }
+
+            // add a new document to the refunds collection
+            const refundDoc = await db.collection("refunds").add({
+                bookingId: bookingId,
+                clientId: bookingData.clientId,
+                stylistId: userId,
+                originalPaidAmount: paymentAmount,
+                refundAmount: paymentAmount,
+                cancellationFee: stylistFine,
+                refundStripeId: refundResult?.id || null,
+                reason: "stylist_cancellation",
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            // Step 8: Log the Stylist Fine and Refund
+            await db.collection("stylist_fines").add({
+                bookingId: bookingId,
+                stylistId: userId,
+                clientId: bookingData.clientId,
+                originalPaidAmount: paymentAmount,
+                fineAmount: stylistFine,
+                deductedAmount: 0,
+                remainingAmount: stylistFine,
+                refundId: refundDoc.id,
+                reason: "stylist_cancellation",
+                status: "pending", // Will be deducted from next payout
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            const date = format(bookingData.dateTime, "yyyy-MM-dd");
+            const time = format(bookingData.dateTime, "HH:mm") + " UTC";
+
+            // Send email to client
+            setTimeout(async () => {
+                try {
+                    await EmailService.sendAppointmentCancelledEmailForClient({
+                        clientName: bookingData.clientName || "Client",
+                        clientEmail: bookingData.clientEmail,
+                        stylistName: bookingData.stylistName || "Stylist",
+                        serviceName: bookingData.serviceName,
+                        appointmentDate: date,
+                        appointmentTime: time,
+                    });
+                } catch (error) {
+                    console.error(
+                        "Error sending cancellation email to client:",
+                        error
+                    );
+                }
+            }, 0);
+
+            // Send email to stylist
+            setTimeout(async () => {
+                try {
+                    await EmailService.sendAppointmentCancelledEmailForStylist({
+                        stylistName: bookingData.stylistName || "Stylist",
+                        stylistEmail: bookingData.stylistEmail,
+                        clientName: bookingData.clientName || "Client",
+                        serviceName: bookingData.serviceName,
+                        appointmentDate: date,
+                        appointmentTime: time,
+                    });
+                } catch (error) {
+                    console.error(
+                        "Error sending cancellation email to stylist:",
+                        error
+                    );
+                }
+            }, 0);
+
+            // Send SMS Notifications
+            // Send SMS to client
+            setTimeout(async () => {
+                try {
+                    await SmsService.sendAppointmentCancelledSmsForClient({
+                        clientName: bookingData.clientName || "Client",
+                        phoneNumber: bookingData.clientPhone,
+                        stylistName: bookingData.stylistName || "Stylist",
+                        serviceName: bookingData.serviceName,
+                        appointmentDate: date,
+                        appointmentTime: time,
+                    });
+                } catch (error) {
+                    console.error(
+                        "Error sending cancellation SMS to client:",
+                        error
+                    );
+                }
+            }, 0);
+
+            // Send SMS to stylist
+            setTimeout(async () => {
+                try {
+                    await SmsService.sendAppointmentCancelledSmsForStylist({
+                        stylistName: bookingData.stylistName || "Stylist",
+                        phoneNumber: bookingData.stylistPhone,
+                        clientName: bookingData.clientName || "Client",
+                        serviceName: bookingData.serviceName,
+                        appointmentDate: date,
+                        appointmentTime: time,
+                    });
+                } catch (error) {
+                    console.error(
+                        "Error sending cancellation SMS to stylist:",
+                        error
+                    );
+                }
+            }, 0);
+
+            // TODO: send push notification to stylist and client
+
+            return res.status(200).json({
+                success: true,
+                message: "Booking cancelled successfully",
+                stylistFine: stylistFine,
+                refundAmount: paymentAmount,
+                refundId: refundResult?.id || null,
+            });
+        } catch (error) {
+            console.error("Error cancelling booking:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
 // scheduled function to check for expired bookings and cancel them
-export const expirePendingBookings = onSchedule(
+export const cronJob = onSchedule(
     {
         schedule: "every 5 minutes",
     },
     async (context) => {
-        console.log(
-            "Running scheduled function to expire pending bookings",
-            new Date().toISOString()
-        );
+        try {
+            console.log(
+                "Running scheduled function to expire pending bookings",
+                new Date().toISOString()
+            );
 
-        const now = admin.firestore.Timestamp.now();
-        const expiredBookingsQuery = await db
-            .collection("bookings")
-            .where("status", "==", "pending")
-            .where("expiresAt", "<=", now)
-            .get();
+            const now = admin.firestore.Timestamp.now();
+            const expiredBookingsQuery = await db
+                .collection("bookings")
+                .where("status", "==", "pending")
+                .where("expiresAt", "<=", now)
+                .get();
 
-        if (expiredBookingsQuery.empty) {
-            console.log("No expired pending bookings found.");
-            return null;
+            if (!expiredBookingsQuery.empty) {
+                console.log("No expired pending bookings found.");
+            } else {
+                const expiredBookingIds: string[] = [];
+                const errors: any[] = [];
+
+                await Promise.all(
+                    expiredBookingsQuery.docs.map(async (doc) => {
+                        const bookingId = doc.id;
+                        const bookingData = doc.data();
+                        expiredBookingIds.push(bookingId);
+                        let paymentCancelled = false;
+                        let paymentError = null;
+                        const paymentIntentId = bookingData.paymentId;
+
+                        // Find the payment document
+                        let paymentDoc = null;
+                        let paymentDocRef = null;
+                        if (paymentIntentId) {
+                            const paymentQuery = await db
+                                .collection("payments")
+                                .where("bookingId", "==", bookingId)
+                                .get();
+                            if (!paymentQuery.empty) {
+                                paymentDoc = paymentQuery.docs[0].data();
+                                paymentDocRef = paymentQuery.docs[0].ref;
+                            }
+                        }
+
+                        // Cancel the payment intent in Stripe if exists
+                        if (paymentIntentId) {
+                            console.log(
+                                `Cancelling paymentIntent ${paymentIntentId} for booking ${bookingId}`
+                            );
+                            try {
+                                await stripe.paymentIntents.cancel(
+                                    paymentIntentId
+                                );
+                                paymentCancelled = true;
+                                console.log(
+                                    `PaymentIntent ${paymentIntentId} cancelled successfully for booking ${bookingId}`
+                                );
+                            } catch (err) {
+                                paymentError =
+                                    err instanceof Error ? err.message : err;
+                                console.error(
+                                    `Failed to cancel paymentIntent ${paymentIntentId} for booking ${bookingId}:`,
+                                    paymentError
+                                );
+                            }
+                        }
+
+                        // Update booking document
+                        await doc.ref.update({
+                            status: "auto-cancelled",
+                            paymentStatus: "auto-cancelled",
+                            updatedAt:
+                                admin.firestore.FieldValue.serverTimestamp(),
+                            paymentCancelledAt:
+                                admin.firestore.FieldValue.serverTimestamp(),
+                        });
+
+                        // Update payment document
+                        if (paymentDocRef) {
+                            await paymentDocRef.update({
+                                status: "auto-cancelled",
+                                cancelledAt:
+                                    admin.firestore.FieldValue.serverTimestamp(),
+                                updatedAt:
+                                    admin.firestore.FieldValue.serverTimestamp(),
+                            });
+                        }
+
+                        // Send email/sms notifications to client
+                        const date = format(bookingData.dateTime, "yyyy-MM-dd");
+                        const time =
+                            format(bookingData.dateTime, "HH:mm") + " UTC";
+
+                        //TODO: email
+                        setTimeout(async () => {
+                            try {
+                                await EmailService.sendAppointmentAutoCancelledForClient(
+                                    {
+                                        clientName: bookingData.clientName,
+                                        clientEmail: bookingData.clientPhone,
+                                        stylistName: bookingData.stylistName,
+                                        appointmentDate: date,
+                                        appointmentTime: time,
+                                        serviceName: bookingData.serviceName,
+                                    }
+                                );
+                            } catch (error) {
+                                console.log(
+                                    `Error sending sms to client ${bookingData.clientName} for booking ${bookingId}: `,
+                                    error
+                                );
+                            }
+                        }, 0);
+
+                        setTimeout(async () => {
+                            try {
+                                await EmailService.sendAppointmentAutoCancelledForStylist(
+                                    {
+                                        clientName: bookingData.clientName,
+                                        stylistEmail: bookingData.clientPhone,
+                                        stylistName: bookingData.stylistName,
+                                        appointmentDate: date,
+                                        appointmentTime: time,
+                                        serviceName: bookingData.serviceName,
+                                    }
+                                );
+                            } catch (error) {
+                                console.log(
+                                    `Error sending sms to stylist ${bookingData.stylistName} for booking ${bookingId}: `,
+                                    error
+                                );
+                            }
+                        }, 0);
+
+                        setTimeout(async () => {
+                            try {
+                                await SmsService.sendAppointmentAutoCancelledClientSms(
+                                    {
+                                        clientName: bookingData.clientName,
+                                        phoneNumber: bookingData.clientPhone,
+                                        stylistName: bookingData.stylistName,
+                                        appointmentDate: date,
+                                        appointmentTime: time,
+                                        serviceName: bookingData.serviceName,
+                                    }
+                                );
+                            } catch (error) {
+                                console.error(
+                                    `Error sending sms to client ${bookingData.clientName} for booking ${bookingId}:`,
+                                    error
+                                );
+                            }
+                        }, 0);
+
+                        setTimeout(async () => {
+                            try {
+                                await SmsService.sendAppointmentAutoCancelledStylistSms(
+                                    {
+                                        stylistName: bookingData.stylistName,
+                                        phoneNumber: bookingData.stylistPhone,
+                                        clientName: bookingData.clientName,
+                                        appointmentDate: date,
+                                        appointmentTime: time,
+                                        serviceName: bookingData.serviceName,
+                                    }
+                                );
+                            } catch (error) {
+                                console.error(
+                                    `Error sending sms to stylist ${bookingData.stylistName} for booking ${bookingId}:`,
+                                    error
+                                );
+                            }
+                        }, 0);
+                    })
+                );
+
+                console.log(
+                    `Auto-cancelled ${expiredBookingIds.length} pending bookings:`,
+                    expiredBookingIds
+                );
+            }
+        } catch (error) {
+            console.error("Error in expirePendingBookings:", error);
         }
 
-        const expiredBookingIds: string[] = [];
-        const errors: any[] = [];
+        try {
+            console.log(
+                "Running scheduled function to update confirmed bookings to be paid"
+            );
 
-        await Promise.all(
-            expiredBookingsQuery.docs.map(async (doc) => {
-                const bookingId = doc.id;
-                const bookingData = doc.data();
-                expiredBookingIds.push(bookingId);
-                let paymentCancelled = false;
-                let paymentError = null;
-                const paymentIntentId = bookingData.paymentId;
+            // get all confirmed bookings
+            const confirmedBookingsQuery = await db
+                .collection("bookings")
+                .where("status", "==", "confirmed")
+                .get();
 
-                // Find the payment document
-                let paymentDoc = null;
-                let paymentDocRef = null;
-                if (paymentIntentId) {
-                    const paymentQuery = await db
-                        .collection("payments")
-                        .where("bookingId", "==", bookingId)
-                        .get();
-                    if (!paymentQuery.empty) {
-                        paymentDoc = paymentQuery.docs[0].data();
-                        paymentDocRef = paymentQuery.docs[0].ref;
-                    }
-                }
+            // check if the confirmed bookings are started, if so we can update their status to be-paid
+            const confirmedBookings = confirmedBookingsQuery.docs.map((doc) =>
+                doc.data()
+            );
 
-                // Cancel the payment intent in Stripe if exists
-                if (paymentIntentId) {
-                    console.log(
-                        `Cancelling paymentIntent ${paymentIntentId} for booking ${bookingId}`
-                    );
-                    try {
-                        await stripe.paymentIntents.cancel(paymentIntentId);
-                        paymentCancelled = true;
-                        console.log(
-                            `PaymentIntent ${paymentIntentId} cancelled successfully for booking ${bookingId}`
-                        );
-                    } catch (err) {
-                        paymentError = err instanceof Error ? err.message : err;
-                        console.error(
-                            `Failed to cancel paymentIntent ${paymentIntentId} for booking ${bookingId}:`,
-                            paymentError
-                        );
-                    }
-                }
+            console.log("confirmedBookings", confirmedBookings.length);
 
-                // Update booking document
-                await doc.ref.update({
-                    status: "auto-cancelled",
-                    paymentStatus: "auto-cancelled",
-                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    paymentCancelledAt:
-                        admin.firestore.FieldValue.serverTimestamp(),
-                });
+            for (const booking of confirmedBookings) {
+                const bookingDate = booking.dateTime;
 
-                // Update payment document
-                if (paymentDocRef) {
-                    await paymentDocRef.update({
-                        status: "auto-cancelled",
-                        cancelledAt:
-                            admin.firestore.FieldValue.serverTimestamp(),
-                        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    });
-                }
+                const now = admin.firestore.Timestamp.now();
+                const bookingDateTimestamp =
+                    admin.firestore.Timestamp.fromDate(bookingDate);
 
-                // Send email/sms notifications to client
-                const date = format(bookingData.dateTime, "yyyy-MM-dd");
-                const time = format(bookingData.dateTime, "HH:mm") + " UTC";
-
-                //TODO: email
-                setTimeout(async () => {
-                    try {
-                        await EmailService.sendAppointmentAutoCancelledForClient(
-                            {
-                                clientName: bookingData.clientName,
-                                clientEmail: bookingData.clientPhone,
-                                stylistName: bookingData.stylistName,
-                                appointmentDate: date,
-                                appointmentTime: time,
-                                serviceName: bookingData.serviceName,
-                            }
-                        );
-                    } catch (error) {
-                        console.log(
-                            `Error sending sms to client ${bookingData.clientName} for booking ${bookingId}: `,
-                            error
-                        );
-                    }
-                }, 0);
-
-                setTimeout(async () => {
-                    try {
-                        await EmailService.sendAppointmentAutoCancelledForStylist(
-                            {
-                                clientName: bookingData.clientName,
-                                stylistEmail: bookingData.clientPhone,
-                                stylistName: bookingData.stylistName,
-                                appointmentDate: date,
-                                appointmentTime: time,
-                                serviceName: bookingData.serviceName,
-                            }
-                        );
-                    } catch (error) {
-                        console.log(
-                            `Error sending sms to stylist ${bookingData.stylistName} for booking ${bookingId}: `,
-                            error
-                        );
-                    }
-                }, 0);
-
-                setTimeout(async () => {
-                    try {
-                        await SmsService.sendAppointmentAutoCancelledClientSms({
-                            clientName: bookingData.clientName,
-                            phoneNumber: bookingData.clientPhone,
-                            stylistName: bookingData.stylistName,
-                            appointmentDate: date,
-                            appointmentTime: time,
-                            serviceName: bookingData.serviceName,
+                if (now > bookingDateTimestamp) {
+                    await db
+                        .collection("bookings")
+                        .doc(booking.bookingId)
+                        .update({
+                            status: "to-be-paid",
                         });
-                    } catch (error) {
-                        console.error(
-                            `Error sending sms to client ${bookingData.clientName} for booking ${bookingId}:`,
-                            error
-                        );
-                    }
-                }, 0);
+                }
+            }
 
-                setTimeout(async () => {
-                    try {
-                        await SmsService.sendAppointmentAutoCancelledStylistSms(
-                            {
-                                stylistName: bookingData.stylistName,
-                                phoneNumber: bookingData.stylistPhone,
-                                clientName: bookingData.clientName,
-                                appointmentDate: date,
-                                appointmentTime: time,
-                                serviceName: bookingData.serviceName,
-                            }
-                        );
-                    } catch (error) {
-                        console.error(
-                            `Error sending sms to stylist ${bookingData.stylistName} for booking ${bookingId}:`,
-                            error
-                        );
-                    }
-                }, 0);
-            })
-        );
-
-        console.log(
-            `Auto-cancelled ${expiredBookingIds.length} pending bookings:`,
-            expiredBookingIds
-        );
-        return null;
+            return null;
+        } catch (error) {
+            console.error(
+                "Error in updateConfirmedBookings to be paid:",
+                error
+            );
+            return null;
+        }
     }
 );
 
@@ -1518,6 +2098,87 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                 const stylistId = session.metadata?.stylistId;
                 const subscriptionId = session.subscription as string;
                 const paymentIntentId = session.payment_intent as string;
+
+                // Handle payment checkout (for appointments that need payment)
+                if (session.metadata?.paymentType === "final_payment") {
+                    const appointmentId = session.metadata.appointmentId;
+                    const stylistId = session.metadata.stylistId;
+                    const clientId = session.metadata.clientId;
+
+                    if (appointmentId && stylistId && clientId) {
+                        // Get appointment details
+                        const appointmentRef = db
+                            .collection("bookings")
+                            .doc(appointmentId);
+                        const appointmentDoc = await appointmentRef.get();
+
+                        if (appointmentDoc.exists) {
+                            const appointmentData = appointmentDoc.data();
+
+                            try {
+                                // Update appointment to mark that payment was received
+                                await appointmentRef.update({
+                                    finalPaymentReceived: true,
+                                    finalPaymentReceivedAt:
+                                        admin.firestore.FieldValue.serverTimestamp(),
+                                    updatedAt:
+                                        admin.firestore.FieldValue.serverTimestamp(),
+                                });
+
+                                console.log(
+                                    `Processing transfer for appointment ${appointmentId} after payment received`
+                                );
+
+                                // Reuse the handleTransferFlow function to process the transfer
+                                const transferResult = await handleTransferFlow(
+                                    appointmentId,
+                                    appointmentData
+                                );
+
+                                console.log(
+                                    `Transfer completed for appointment ${appointmentId}:`,
+                                    transferResult
+                                );
+
+                                // Send additional notification to client about successful payment
+                                await db.collection("notifications").add({
+                                    userId: clientId,
+                                    type: "payment_completed",
+                                    title: "Payment Completed",
+                                    message: `Your payment for appointment ${appointmentId} has been processed successfully.`,
+                                    read: false,
+                                    createdAt:
+                                        admin.firestore.FieldValue.serverTimestamp(),
+                                    data: {
+                                        appointmentId,
+                                        amountPaid: session.amount_total / 100,
+                                    },
+                                });
+
+                                console.log(
+                                    `Payment processed for appointment ${appointmentId}`
+                                );
+                            } catch (error) {
+                                console.error(
+                                    `Error processing payment for appointment ${appointmentId}:`,
+                                    error
+                                );
+
+                                // Update appointment to mark the error
+                                await appointmentRef.update({
+                                    finalPaymentError:
+                                        error instanceof Error
+                                            ? error.message
+                                            : "Unknown error",
+                                    finalPaymentErrorAt:
+                                        admin.firestore.FieldValue.serverTimestamp(),
+                                });
+                            }
+                        }
+                    }
+                    break;
+                }
+
                 // Check if this is a booking-related payment
                 if (session.metadata?.pendingBookingId) {
                     const pendingBookingId = session.metadata.pendingBookingId;
@@ -1554,8 +2215,6 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                 createdAt:
                                     admin.firestore.FieldValue.serverTimestamp(),
                                 updatedAt:
-                                    admin.firestore.FieldValue.serverTimestamp(),
-                                paymentCompletedAt:
                                     admin.firestore.FieldValue.serverTimestamp(),
                                 expiresAt,
                             });
@@ -1938,6 +2597,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                             });
                     }
                 }
+
                 break;
             }
 
@@ -2052,15 +2712,15 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                         const paymentData = paymentDoc.data();
 
                         // Only process if payment is not already completed
-                        if (paymentData.status !== "completed") {
+                        if (paymentData.status !== "captured") {
                             await paymentDoc.ref.update({
-                                status: "completed",
-                                completedAt:
+                                status: "captured",
+                                capturedAt:
                                     admin.firestore.FieldValue.serverTimestamp(),
                             });
 
                             console.log(
-                                `Updated payment status for payment intent ${paymentIntent.id} to completed`
+                                `Updated payment status for payment intent ${paymentIntent.id} to captured`
                             );
 
                             // If this payment is for a booking, update the booking
@@ -2072,10 +2732,8 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
 
                                 if (bookingDoc.exists) {
                                     await bookingRef.update({
-                                        paymentStatus: "paid",
+                                        paymentStatus: "captured",
                                         updatedAt:
-                                            admin.firestore.FieldValue.serverTimestamp(),
-                                        paymentCompletedAt:
                                             admin.firestore.FieldValue.serverTimestamp(),
                                     });
 
@@ -4531,6 +5189,1167 @@ app.post(
                 "Error sending new message notification SMS to client:",
                 error
             );
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+// Request Payment Interface
+interface RequestPaymentRequest {
+    stylistId: string;
+    appointmentId: string;
+}
+
+// Pay Appointment Interface
+interface PayAppointmentRequest {
+    clientId: string;
+    appointmentId: string;
+}
+
+// Request Payment Endpoint
+app.post(
+    "/appointments/:id/request-payment",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: RequestPaymentRequest;
+            user?: admin.auth.DecodedIdToken;
+            params: { id: string };
+        },
+        res: Response
+    ) => {
+        try {
+            const { stylistId } = req.body;
+            const appointmentId = req.params.id;
+
+            // Verify authenticated user is the stylist
+            if (stylistId !== req.user?.uid) {
+                return res.status(403).json({ error: "Unauthorized access" });
+            }
+
+            // Get appointment details
+            const appointmentRef = db.collection("bookings").doc(appointmentId);
+            const appointmentDoc = await appointmentRef.get();
+
+            if (!appointmentDoc.exists) {
+                return res.status(404).json({ error: "Appointment not found" });
+            }
+
+            const appointmentData = appointmentDoc.data();
+
+            // Check if appointment belongs to this stylist
+            if (appointmentData?.stylistId !== stylistId) {
+                return res.status(403).json({ error: "Unauthorized access" });
+            }
+
+            // Check if appointment is in a valid state for payment request
+            // TODO: these values should be stored in enums
+            if (appointmentData?.status !== "to-be-paid") {
+                return res.status(400).json({
+                    error: "Appointment must be confirmed or completed to request payment",
+                });
+            }
+
+            // Send email and sms notification to client to get paid
+            const date = format(appointmentData.dateTime, "yyyy-MM-dd");
+            const time = format(appointmentData.dateTime, "HH:mm");
+            // const amount =
+            //     appointmentData.paymentAmount ||
+            //     appointmentData.totalAmount
+            // Send email notification
+            setTimeout(async () => {
+                try {
+                    console.log(
+                        "Sending email notification to client, payment request"
+                    );
+                    await EmailService.sendPaymentRequestedClient({
+                        clientName: appointmentData.clientName,
+                        clientEmail: appointmentData.clientEmail,
+                        stylistName: appointmentData.stylistName,
+                        serviceName: appointmentData.serviceName,
+                        appointmentDate: date,
+                        appointmentTime: time + " UTC",
+                    });
+                    console.log(
+                        "Email notification sent to client, payment requested"
+                    );
+                } catch (error) {
+                    console.error(
+                        "Error sending payment requested email:",
+                        error
+                    );
+                }
+            }, 0);
+
+            // Send SMS notification
+            setTimeout(async () => {
+                try {
+                    await SmsService.sendPaymentRequestedClientSms({
+                        clientName: appointmentData.clientName,
+                        phoneNumber: appointmentData.clientPhone,
+                        stylistName: appointmentData.stylistName,
+                        serviceName: appointmentData.serviceName,
+                        appointmentDate: date,
+                        appointmentTime: time + " UTC",
+                    });
+                } catch (error) {
+                    console.error(
+                        "Error sending payment requested SMS:",
+                        error
+                    );
+                }
+            }, 0);
+
+            return res.status(200).json({
+                success: true,
+                message: "Payment request sent to client successfully",
+            });
+        } catch (error) {
+            console.error("Error requesting payment:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+// Pay Appointment Endpoint
+app.post(
+    "/appointments/:id/pay",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: PayAppointmentRequest;
+            user?: admin.auth.DecodedIdToken;
+            params: { id: string };
+        },
+        res: Response
+    ) => {
+        try {
+            const { clientId } = req.body;
+            const bookingId = req.params.id;
+
+            // Verify authenticated user is the client
+            if (clientId !== req.user?.uid) {
+                return res.status(403).json({ error: "Unauthorized access" });
+            }
+
+            // Get appointment details
+            const appointmentRef = db.collection("bookings").doc(bookingId);
+            const appointmentDoc = await appointmentRef.get();
+
+            if (!appointmentDoc.exists) {
+                return res.status(404).json({ error: "Appointment not found" });
+            }
+
+            const appointmentData = appointmentDoc.data();
+
+            // Check if appointment belongs to this client
+            if (appointmentData?.clientId !== clientId) {
+                return res.status(403).json({ error: "Unauthorized access" });
+            }
+
+            console.log("appointmentData", appointmentData);
+
+            // Check if appointment is in a valid state for payment
+            const now = admin.firestore.Timestamp.now().toDate();
+            const bookingDate = appointmentData.dateTime();
+            if (now.getTime() >= bookingDate.getTime()) {
+                return res.status(400).json({
+                    error: "Appointment must be confirmed and started to make payment",
+                });
+            }
+
+            const servicePrice = appointmentData.totalAmount || 0;
+            const depositPaid = appointmentData.paymentAmount || 0;
+            const remainingAmount = servicePrice - depositPaid;
+
+            // Check if fully paid
+            if (remainingAmount <= 0) {
+                // Go to Transfer Flow - client already paid full amount
+                console.log("client already paid full amount");
+                return await handleTransferFlow(
+                    bookingId,
+                    appointmentData,
+                    res
+                );
+            } else {
+                // Go to Stripe Checkout Flow - client only paid deposit
+                return await handleStripeCheckoutFlow(
+                    bookingId,
+                    appointmentData,
+                    remainingAmount,
+                    req,
+                    res
+                );
+            }
+        } catch (error) {
+            console.error("Error processing payment:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+// Helper function to handle transfer flow (client already paid full amount)
+async function handleTransferFlow(
+    appointmentId: string,
+    appointmentData: any,
+    res?: Response
+) {
+    try {
+        const stylistId = appointmentData.stylistId;
+        const servicePrice = appointmentData.totalAmount || 0;
+        const applicationFee = servicePrice * 0.05; // 5% application fee
+        const transferableAmount = servicePrice - applicationFee;
+
+        // Get stylist's unpaid fines
+        const finesQuery = await db
+            .collection("stylist_fines")
+            .where("stylistId", "==", stylistId)
+            .where("status", "==", "pending")
+            .orderBy("createdAt", "asc")
+            .get();
+
+        let totalFinesDeducted = 0;
+        const coveredFineIds: string[] = [];
+        let finalTransferableAmount = transferableAmount;
+
+        // Process fines deduction
+        for (const fineDoc of finesQuery.docs) {
+            const fineData = fineDoc.data();
+            const remainingFineAmount =
+                fineData.remainingAmount || fineData.fineAmount;
+
+            if (remainingFineAmount > 0 && finalTransferableAmount > 0) {
+                const amountToDeduct = Math.min(
+                    remainingFineAmount,
+                    finalTransferableAmount
+                );
+
+                // Update fine record
+                await fineDoc.ref.update({
+                    deductedAmount:
+                        (fineData.deductedAmount || 0) + amountToDeduct,
+                    remainingAmount: remainingFineAmount - amountToDeduct,
+                    status:
+                        remainingFineAmount - amountToDeduct <= 0
+                            ? "paid"
+                            : "pending",
+                    lastDeductedAt:
+                        admin.firestore.FieldValue.serverTimestamp(),
+                });
+
+                totalFinesDeducted += amountToDeduct;
+                finalTransferableAmount -= amountToDeduct;
+                coveredFineIds.push(fineDoc.id);
+
+                if (finalTransferableAmount <= 0) break;
+            }
+        }
+
+        // Get stylist's Stripe account
+        const stylistRef = db.collection("stylists").doc(stylistId);
+        const stylistDoc = await stylistRef.get();
+        const stylistData = stylistDoc.data();
+
+        if (!stylistData?.stripeAccountId) {
+            if (res) {
+                return res.status(400).json({
+                    error: "Stylist does not have an active payment account",
+                });
+            } else {
+                throw new Error(
+                    "Stylist does not have an active payment account"
+                );
+            }
+        }
+
+        // Transfer remaining amount to stylist via Stripe
+        if (finalTransferableAmount > 0) {
+            const transfer = await stripe.transfers.create({
+                amount: Math.round(finalTransferableAmount * 100), // Convert to cents
+                currency: "usd",
+                destination: stylistData.stripeAccountId,
+                metadata: {
+                    appointmentId,
+                    total_fines_deducted: totalFinesDeducted.toString(),
+                    covered_fine_ids: coveredFineIds.join(","),
+                    application_fee: applicationFee.toString(),
+                    transfer_type: "final_payment",
+                },
+            });
+
+            // Update stylist balance
+            await updateStylistBalance(
+                stylistId,
+                Math.round(finalTransferableAmount * 100),
+                `Payment for appointment ${appointmentId}`
+            );
+        }
+
+        // Update appointment status
+        await db.collection("bookings").doc(appointmentId).update({
+            status: "paid",
+            paymentStatus: "paid",
+            finalPaymentCompletedAt:
+                admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            finesDeducted: totalFinesDeducted,
+            coveredFineIds,
+            finalTransferAmount: finalTransferableAmount,
+        });
+
+        // Notify stylist
+        await db.collection("notifications").add({
+            userId: stylistId,
+            type: "payment_received",
+            title: "Payment Received",
+            message: `You received $${finalTransferableAmount.toFixed(2)} for appointment ${appointmentId}. $${totalFinesDeducted.toFixed(2)} in fines were deducted.`,
+            read: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            data: {
+                appointmentId,
+                amountReceived: finalTransferableAmount,
+                finesDeducted: totalFinesDeducted,
+                coveredFineIds,
+            },
+        });
+
+        if (res) {
+            return res.status(200).json({
+                success: true,
+                message: "Payment processed successfully",
+                data: {
+                    amountTransferred: finalTransferableAmount,
+                    finesDeducted: totalFinesDeducted,
+                    coveredFineIds,
+                },
+            });
+        } else {
+            // Webhook case - just return the data
+            return {
+                success: true,
+                amountTransferred: finalTransferableAmount,
+                finesDeducted: totalFinesDeducted,
+                coveredFineIds,
+            };
+        }
+    } catch (error) {
+        console.error("Error in transfer flow:", error);
+        throw error;
+    }
+}
+
+// Helper function to handle Stripe checkout flow (client needs to pay remaining amount)
+async function handleStripeCheckoutFlow(
+    appointmentId: string,
+    appointmentData: any,
+    remainingAmount: number,
+    req: RequestWithRawBody,
+    res: Response
+) {
+    try {
+        const clientId = appointmentData.clientId;
+        const stylistId = appointmentData.stylistId;
+
+        // Get client's Stripe customer ID
+        const clientRef = db.collection("clients").doc(clientId);
+        const clientDoc = await clientRef.get();
+        const clientData = clientDoc.data();
+
+        let stripeCustomerId: string;
+
+        if (!clientDoc.exists || !clientData?.stripeCustomerId) {
+            // Create new Stripe customer
+            const userRecord = await admin.auth().getUser(clientId);
+            const customer = await stripe.customers.create({
+                email: userRecord.email,
+                metadata: { userId: clientId },
+            });
+
+            await clientRef.set(
+                {
+                    email: userRecord.email,
+                    stripeCustomerId: customer.id,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+            );
+
+            stripeCustomerId = customer.id;
+        } else {
+            stripeCustomerId = clientData.stripeCustomerId;
+        }
+
+        // Create Stripe checkout session for remaining payment
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ["card"],
+            mode: "payment",
+            customer: stripeCustomerId,
+            line_items: [
+                {
+                    price_data: {
+                        currency: "usd",
+                        product_data: {
+                            name: `Payment - ${appointmentData.serviceName}`,
+                            metadata: {
+                                appointmentId,
+                                stylistId,
+                                clientId,
+                            },
+                        },
+                        unit_amount: Math.round(remainingAmount * 100),
+                    },
+                    quantity: 1,
+                },
+            ],
+            success_url: `${req.headers.origin}/dashboard/client?payment_success=true`,
+            cancel_url: `${req.headers.origin}/dashboard/client?payment_success=false`,
+            metadata: {
+                appointmentId,
+                stylistId,
+                clientId,
+                paymentType: "final_payment",
+            },
+        });
+
+        return res.status(200).json({
+            success: true,
+            sessionId: session.id,
+            url: session.url,
+        });
+    } catch (error) {
+        console.error("Error in Stripe checkout flow:", error);
+        throw error;
+    }
+}
+
+// Reschedule Proposal Interface
+interface ProposeRescheduleRequest {
+    appointmentId: string;
+    proposedDateTime: Date;
+    reason?: string;
+}
+
+// Accept/Reject Reschedule Interface
+interface RescheduleResponseRequest {
+    appointmentId: string;
+}
+
+// Google Calendar Interfaces
+interface GoogleCalendarTokensRequest {
+    access_token: string;
+    refresh_token?: string;
+    expiry_date?: number;
+    scope?: string;
+    token_type?: string;
+}
+
+interface GoogleCalendarSettingsRequest {
+    isConnected?: boolean;
+    autoSync?: boolean;
+}
+
+// Propose Reschedule Endpoint
+app.post(
+    "/propose-reschedule",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: ProposeRescheduleRequest;
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const { bookingId, proposedDateTime, reason } = req.body;
+            const userId = req.user?.uid;
+
+            if (!userId) {
+                return res
+                    .status(401)
+                    .json({ error: "User not authenticated" });
+            }
+
+            if (!bookingId || !proposedDateTime) {
+                return res.status(400).json({
+                    error: "Booking ID and proposed date/time are required",
+                });
+            }
+
+            // Get appointment details
+            const appointmentRef = db.collection("bookings").doc(bookingId);
+            const appointmentDoc = await appointmentRef.get();
+
+            if (!appointmentDoc.exists) {
+                return res.status(404).json({ error: "Appointment not found" });
+            }
+
+            const appointmentData = appointmentDoc.data();
+
+            // Verify user is either the client or stylist for this appointment
+            if (
+                appointmentData?.clientId !== userId &&
+                appointmentData?.stylistId !== userId
+            ) {
+                return res
+                    .status(403)
+                    .json({ error: "Unauthorized access to appointment" });
+            }
+
+            // Check if appointment is in a valid state for rescheduling
+            if (appointmentData?.status !== "confirmed") {
+                return res.status(400).json({
+                    error: "Only confirmed appointments can be rescheduled",
+                });
+            }
+
+            // Check if there's already a pending reschedule proposal
+            if (appointmentData?.rescheduleProposal?.status === "pending") {
+                return res.status(400).json({
+                    error: "There is already a pending reschedule proposal for this appointment",
+                });
+            }
+
+            // Determine who is proposing the reschedule
+            const proposedBy =
+                appointmentData?.clientId === userId ? "client" : "stylist";
+            const proposedByName =
+                appointmentData?.clientId === userId
+                    ? appointmentData?.clientName
+                    : appointmentData?.stylistName;
+
+            // Validate the proposed date/time
+            const now = new Date(admin.firestore.Timestamp.now().toDate());
+            const proposedDate = new Date(proposedDateTime);
+
+            console.log("now", now);
+            console.log("proposedDate", proposedDate);
+
+            if (proposedDate.getTime() <= now.getTime()) {
+                return res.status(400).json({
+                    error: "Proposed date/time must be in the future",
+                });
+            }
+
+            // Create reschedule proposal
+            const rescheduleProposal = {
+                proposedDateTime,
+                proposedBy,
+                proposedAt: admin.firestore.FieldValue.serverTimestamp(),
+                reason,
+                status: "pending" as const,
+            };
+
+            // Update appointment with reschedule proposal
+            await appointmentRef.update({
+                rescheduleProposal,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            // Send notifications to the other party
+            const oldDate = format(appointmentData.dateTime, "yyyy-MM-dd");
+            const oldTime = format(appointmentData.dateTime, "HH:mm");
+            const newDate = format(proposedDate, "yyyy-MM-dd");
+            const newTime = format(proposedDate, "HH:mm");
+
+            // Determine recipient details
+            const isClientProposing = proposedBy === "client";
+            const recipientName = isClientProposing
+                ? appointmentData.stylistName
+                : appointmentData.clientName;
+            const recipientEmail = isClientProposing
+                ? appointmentData.stylistEmail
+                : appointmentData.clientEmail;
+            const recipientPhone = isClientProposing
+                ? appointmentData.stylistPhone
+                : appointmentData.clientPhone;
+
+            // Send email notification
+            setTimeout(async () => {
+                try {
+                    await EmailService.sendRescheduleProposalNotification({
+                        recipientName,
+                        recipientEmail,
+                        proposedBy: proposedByName,
+                        serviceName: appointmentData.serviceName,
+                        oldAppointmentDate: oldDate,
+                        oldAppointmentTime: oldTime,
+                        newAppointmentDate: newDate,
+                        newAppointmentTime: newTime,
+                    });
+                } catch (error) {
+                    console.error(
+                        "Error sending reschedule proposal email:",
+                        error
+                    );
+                }
+            }, 0);
+
+            // Send SMS notification
+            if (recipientPhone) {
+                setTimeout(async () => {
+                    try {
+                        await SmsService.sendRescheduleProposalSms({
+                            recipientName,
+                            phoneNumber: recipientPhone,
+                            proposedBy: proposedByName,
+                            serviceName: appointmentData.serviceName,
+                            oldAppointmentDate: oldDate,
+                            oldAppointmentTime: oldTime,
+                            newAppointmentDate: newDate,
+                            newAppointmentTime: newTime,
+                        });
+                    } catch (error) {
+                        console.error(
+                            "Error sending reschedule proposal SMS:",
+                            error
+                        );
+                    }
+                }, 0);
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: "Reschedule proposal sent successfully",
+                rescheduleProposal,
+            });
+        } catch (error) {
+            console.error("Error proposing reschedule:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+// Accept Reschedule Proposal Endpoint
+app.post(
+    "/accept-reschedule",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: RescheduleResponseRequest;
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const { bookingId } = req.body;
+            const userId = req.user?.uid;
+
+            if (!userId) {
+                return res
+                    .status(401)
+                    .json({ error: "User not authenticated" });
+            }
+
+            if (!bookingId) {
+                return res
+                    .status(400)
+                    .json({ error: "Booking ID is required" });
+            }
+
+            // Get appointment details
+            const appointmentRef = db.collection("bookings").doc(bookingId);
+            const appointmentDoc = await appointmentRef.get();
+
+            if (!appointmentDoc.exists) {
+                return res.status(404).json({ error: "Appointment not found" });
+            }
+
+            const appointmentData = appointmentDoc.data();
+
+            // Verify user is the other party (not the one who proposed)
+            const rescheduleProposal = appointmentData?.rescheduleProposal;
+            if (
+                !rescheduleProposal ||
+                rescheduleProposal.status !== "pending"
+            ) {
+                return res.status(400).json({
+                    error: "No pending reschedule proposal found",
+                });
+            }
+
+            const isClient = appointmentData?.clientId === userId;
+            const isStylist = appointmentData?.stylistId === userId;
+
+            if (!isClient && !isStylist) {
+                return res
+                    .status(403)
+                    .json({ error: "Unauthorized access to appointment" });
+            }
+
+            // Check that the user is not the one who proposed the reschedule
+            const proposedBy = rescheduleProposal.proposedBy;
+            if (
+                (isClient && proposedBy === "client") ||
+                (isStylist && proposedBy === "stylist")
+            ) {
+                return res.status(400).json({
+                    error: "You cannot accept your own reschedule proposal",
+                });
+            }
+
+            // Update appointment with new date/time and remove reschedule proposal
+            const newDateTime = rescheduleProposal.proposedDateTime;
+
+            await appointmentRef.update({
+                dateTime: newDateTime,
+                rescheduleProposal: admin.firestore.FieldValue.delete(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            // Send confirmation notifications
+            const newDate = format(newDateTime, "yyyy-MM-dd");
+            const newTime = format(newDateTime, "HH:mm") + " UTC";
+
+            // Notify the person who proposed the reschedule
+            const proposerName =
+                proposedBy === "client"
+                    ? appointmentData.clientName
+                    : appointmentData.stylistName;
+            const proposerEmail =
+                proposedBy === "client"
+                    ? appointmentData.clientEmail
+                    : appointmentData.stylistEmail;
+            const proposerPhone =
+                proposedBy === "client"
+                    ? appointmentData.clientPhone
+                    : appointmentData.stylistPhone;
+
+            // Send email notification to proposer
+            setTimeout(async () => {
+                try {
+                    await EmailService.sendRescheduleAcceptedNotification({
+                        recipientName: proposerName,
+                        recipientEmail: proposerEmail,
+                        acceptedBy: isClient
+                            ? appointmentData.clientName
+                            : appointmentData.stylistName,
+                        serviceName: appointmentData.serviceName,
+                        newAppointmentDate: newDate,
+                        newAppointmentTime: newTime,
+                    });
+                } catch (error) {
+                    console.error(
+                        "Error sending reschedule acceptance email:",
+                        error
+                    );
+                }
+            }, 0);
+
+            // Send SMS notification to proposer
+            if (proposerPhone) {
+                setTimeout(async () => {
+                    try {
+                        await SmsService.sendRescheduleAcceptedSms({
+                            recipientName: proposerName,
+                            phoneNumber: proposerPhone,
+                            acceptedBy: isClient
+                                ? appointmentData.clientName
+                                : appointmentData.stylistName,
+                            serviceName: appointmentData.serviceName,
+                            newAppointmentDate: newDate,
+                            newAppointmentTime: newTime,
+                        });
+                    } catch (error) {
+                        console.error(
+                            "Error sending reschedule acceptance SMS:",
+                            error
+                        );
+                    }
+                }, 0);
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: "Reschedule proposal accepted successfully",
+                newDateTime,
+            });
+        } catch (error) {
+            console.error("Error accepting reschedule:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+// Reject Reschedule Proposal Endpoint
+app.post(
+    "/reject-reschedule",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: RescheduleResponseRequest;
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const { bookingId } = req.body;
+            const userId = req.user?.uid;
+
+            if (!userId) {
+                return res
+                    .status(401)
+                    .json({ error: "User not authenticated" });
+            }
+
+            if (!bookingId) {
+                return res
+                    .status(400)
+                    .json({ error: "Booking ID is required" });
+            }
+
+            // Get appointment details
+            const appointmentRef = db.collection("bookings").doc(bookingId);
+            const appointmentDoc = await appointmentRef.get();
+
+            if (!appointmentDoc.exists) {
+                return res.status(404).json({ error: "Appointment not found" });
+            }
+
+            const appointmentData = appointmentDoc.data();
+
+            // Verify user is the other party (not the one who proposed)
+            const rescheduleProposal = appointmentData?.rescheduleProposal;
+            if (
+                !rescheduleProposal ||
+                rescheduleProposal.status !== "pending"
+            ) {
+                return res.status(400).json({
+                    error: "No pending reschedule proposal found",
+                });
+            }
+
+            const isClient = appointmentData?.clientId === userId;
+            const isStylist = appointmentData?.stylistId === userId;
+
+            if (!isClient && !isStylist) {
+                return res
+                    .status(403)
+                    .json({ error: "Unauthorized access to appointment" });
+            }
+
+            // Check that the user is not the one who proposed the reschedule
+            const proposedBy = rescheduleProposal.proposedBy;
+            if (
+                (isClient && proposedBy === "client") ||
+                (isStylist && proposedBy === "stylist")
+            ) {
+                return res.status(400).json({
+                    error: "You cannot reject your own reschedule proposal",
+                });
+            }
+
+            // Remove reschedule proposal
+            await appointmentRef.update({
+                rescheduleProposal: admin.firestore.FieldValue.delete(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            // Send notification to the person who proposed the reschedule
+            const proposerName =
+                proposedBy === "client"
+                    ? appointmentData.clientName
+                    : appointmentData.stylistName;
+            const proposerPhone =
+                proposedBy === "client"
+                    ? appointmentData.clientPhone
+                    : appointmentData.stylistPhone;
+            const proposerEmail =
+                proposedBy === "client"
+                    ? appointmentData.clientEmail
+                    : appointmentData.stylistEmail;
+
+            const oldDateTime = appointmentData.dateTime;
+            const oldDate = format(oldDateTime, "yyyy-MM-dd");
+            const oldTime = format(oldDateTime, "HH:mm") + " UTC";
+            // Send SMS notification to proposer
+            if (proposerPhone) {
+                setTimeout(async () => {
+                    try {
+                        await SmsService.sendRescheduleRejectedSms({
+                            recipientName: proposerName,
+                            phoneNumber: proposerPhone,
+                            rejectedBy: isClient
+                                ? appointmentData.clientName
+                                : appointmentData.stylistName,
+                            serviceName: appointmentData.serviceName,
+                            oldAppointmentDate: oldDate,
+                            oldAppointmentTime: oldTime,
+                        });
+                    } catch (error) {
+                        console.error(
+                            "Error sending reschedule rejection SMS:",
+                            error
+                        );
+                    }
+                }, 0);
+            }
+
+            // Send email notification to proposer
+            if (proposerEmail) {
+                setTimeout(async () => {
+                    try {
+                        await EmailService.sendRescheduleRejectedNotification({
+                            recipientName: proposerName,
+                            recipientEmail: proposerEmail,
+                            rejectedBy: isClient
+                                ? appointmentData.clientName
+                                : appointmentData.stylistName,
+                            serviceName: appointmentData.serviceName,
+                            oldAppointmentDate: oldDate,
+                            oldAppointmentTime: oldTime,
+                        });
+                    } catch (error) {
+                        console.error(
+                            "Error sending reschedule rejection email:",
+                            error
+                        );
+                    }
+                }, 0);
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: "Reschedule proposal rejected successfully",
+            });
+        } catch (error) {
+            console.error("Error rejecting reschedule:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+// Google Calendar API Endpoints
+
+// Save Google Calendar tokens
+app.post(
+    "/google-calendar/tokens",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: GoogleCalendarTokensRequest;
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const {
+                access_token,
+                refresh_token,
+                expiry_date,
+                scope,
+                token_type,
+            } = req.body;
+            const userId = req.user?.uid;
+
+            if (!userId) {
+                return res
+                    .status(401)
+                    .json({ error: "User not authenticated" });
+            }
+
+            if (!access_token) {
+                return res
+                    .status(400)
+                    .json({ error: "Access token is required" });
+            }
+
+            // Save tokens to database
+            const docRef = db
+                .collection("users")
+                .doc(userId)
+                .collection("settings")
+                .doc("googleCalendar");
+            await docRef.set({
+                isConnected: true,
+                tokens: {
+                    access_token,
+                    refresh_token,
+                    expiry_date,
+                    scope,
+                    token_type,
+                },
+                lastSyncAt: admin.firestore.FieldValue.serverTimestamp(),
+                autoSync: true,
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: "Google Calendar tokens saved successfully",
+            });
+        } catch (error) {
+            console.error("Error saving Google Calendar tokens:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+// Get Google Calendar settings
+app.get(
+    "/google-calendar/settings",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const userId = req.user?.uid;
+
+            if (!userId) {
+                return res
+                    .status(401)
+                    .json({ error: "User not authenticated" });
+            }
+
+            // Get settings from database
+            const docRef = db
+                .collection("users")
+                .doc(userId)
+                .collection("settings")
+                .doc("googleCalendar");
+            const docSnap = await docRef.get();
+
+            if (!docSnap.exists) {
+                return res.status(200).json({
+                    isConnected: false,
+                    tokens: null,
+                    lastSyncAt: null,
+                    autoSync: true,
+                });
+            }
+
+            const data = docSnap.data();
+            return res.status(200).json(data);
+        } catch (error) {
+            console.error("Error getting Google Calendar settings:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+// Update Google Calendar settings
+app.put(
+    "/google-calendar/settings",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            body: GoogleCalendarSettingsRequest;
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const { isConnected, autoSync } = req.body;
+            const userId = req.user?.uid;
+
+            if (!userId) {
+                return res
+                    .status(401)
+                    .json({ error: "User not authenticated" });
+            }
+
+            // Update settings in database
+            const docRef = db
+                .collection("users")
+                .doc(userId)
+                .collection("settings")
+                .doc("googleCalendar");
+            await docRef.update({
+                ...(isConnected !== undefined && { isConnected }),
+                ...(autoSync !== undefined && { autoSync }),
+                lastSyncAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: "Google Calendar settings updated successfully",
+            });
+        } catch (error) {
+            console.error("Error updating Google Calendar settings:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+// Disconnect Google Calendar
+app.delete(
+    "/google-calendar/disconnect",
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & {
+            user?: admin.auth.DecodedIdToken;
+        },
+        res: Response
+    ) => {
+        try {
+            const userId = req.user?.uid;
+
+            if (!userId) {
+                return res
+                    .status(401)
+                    .json({ error: "User not authenticated" });
+            }
+
+            // Delete settings from database
+            const docRef = db
+                .collection("users")
+                .doc(userId)
+                .collection("settings")
+                .doc("googleCalendar");
+            await docRef.delete();
+
+            return res.status(200).json({
+                success: true,
+                message: "Google Calendar disconnected successfully",
+            });
+        } catch (error) {
+            console.error("Error disconnecting Google Calendar:", error);
             return res.status(500).json({
                 error:
                     error instanceof Error

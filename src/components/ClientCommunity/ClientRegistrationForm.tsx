@@ -48,6 +48,7 @@ export function ClientRegistrationForm() {
             toast({
                 title: "Success!",
                 description: "Your account has been created successfully.",
+                duration: 3000,
             });
 
             // send welcome email
@@ -83,6 +84,7 @@ export function ClientRegistrationForm() {
                 title: "Registration failed",
                 description: errorMessage,
                 variant: "destructive",
+                duration: 3000,
             });
         } finally {
             setIsLoading(false);

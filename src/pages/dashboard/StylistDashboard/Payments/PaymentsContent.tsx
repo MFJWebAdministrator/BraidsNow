@@ -52,12 +52,14 @@ export function PaymentsContent() {
                 description:
                     "Your subscription has been successfully activated.",
                 variant: "default",
+                duration: 3000,
             });
         } else if (canceled === "true") {
             toast({
                 title: "Subscription Canceled",
                 description: "Your subscription setup was canceled.",
                 variant: "destructive",
+                duration: 3000,
             });
         }
 
@@ -71,12 +73,14 @@ export function PaymentsContent() {
                 description:
                     "Your payout account has been successfully set up.",
                 variant: "default",
+                duration: 3000,
             });
         } else if (accountCanceled === "true") {
             toast({
                 title: "Account Setup Canceled",
                 description: "Your payout account setup was canceled.",
                 variant: "destructive",
+                duration: 3000,
             });
         }
     }, [searchParams, toast]);
@@ -178,6 +182,7 @@ export function PaymentsContent() {
                 description:
                     "User information not available. Please log out and log back in.",
                 variant: "destructive",
+                duration: 3000,
             });
             return;
         }
@@ -229,6 +234,7 @@ export function PaymentsContent() {
                 title: "Setup Failed",
                 description: errorMessage,
                 variant: "destructive",
+                duration: 3000,
             });
         } finally {
             setConnectLoading(false);
@@ -243,6 +249,7 @@ export function PaymentsContent() {
                 description:
                     "User information not available. Please log out and log back in.",
                 variant: "destructive",
+                duration: 3000,
             });
             return;
         }
@@ -277,6 +284,7 @@ export function PaymentsContent() {
                 description:
                     "Failed to access your payout account dashboard. Please try again.",
                 variant: "destructive",
+                duration: 3000,
             });
         } finally {
             setConnectLoading(false);
@@ -322,6 +330,7 @@ export function PaymentsContent() {
                 title: "Authentication Error",
                 description: "You must be logged in to subscribe.",
                 variant: "destructive",
+                duration: 3000,
             });
             return;
         }
@@ -332,6 +341,7 @@ export function PaymentsContent() {
                 title: "Subscription Active",
                 description: "You already have an active subscription.",
                 variant: "destructive",
+                duration: 3000,
             });
             return;
         }
@@ -376,6 +386,7 @@ export function PaymentsContent() {
                 description:
                     "You're being redirected to the secure payment page.",
                 variant: "default",
+                duration: 3000,
             });
 
             // Redirect to Stripe Checkout

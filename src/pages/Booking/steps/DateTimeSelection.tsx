@@ -36,6 +36,9 @@ interface DateTimeSelectionProps {
     stylistId: string;
     selectedService: ServiceSelection;
     onSelect: (dateTime: Date) => void;
+    buttonText?: string; // New prop for customizable button text
+    isRescheduleMode?: boolean; // New prop to indicate reschedule mode
+    hideContinueButton?: boolean; // New prop to hide the continue button
 }
 
 interface TimeSlotInfo {
@@ -50,6 +53,9 @@ export function DateTimeSelection({
     stylistId,
     selectedService,
     onSelect,
+    buttonText = "Continue", // Default to "Continue"
+    isRescheduleMode = false, // Default to false
+    hideContinueButton = false, // Default to false
 }: DateTimeSelectionProps) {
     const [selectedDate, setSelectedDate] = useState<Date>();
     const [selectedTime, setSelectedTime] = useState<string>();
@@ -170,6 +176,17 @@ export function DateTimeSelection({
     const handleDateSelect = (date: Date | undefined) => {
         setSelectedDate(date);
         setSelectedTime(undefined); // Reset time when date changes
+        // In reschedule mode, if we have a selected time, update the combined dateTime
+        if (isRescheduleMode && date && selectedTime) {
+            const time24 = format(
+                parse(selectedTime, "h:mm a", new Date()),
+                "HH:mm"
+            );
+            const [hours, minutes] = time24.split(":").map(Number);
+            const dateTime = new Date(date);
+            dateTime.setHours(hours, minutes, 0, 0);
+            onSelect(dateTime);
+        }
     };
 
     const checkTimeSlotStatus = (timeSlot: Date): TimeSlotInfo => {
@@ -312,15 +329,16 @@ export function DateTimeSelection({
         );
 
         // Only allow slots at least 30 minutes in the future
-        const now = new Date();
-        const minAllowedTime = addMinutes(now, 30);
+        // const now = new Date();
+        // const minAllowedTime = addMinutes(now, 30);
 
         while (isBefore(currentTime, endTime)) {
             // Only add slots at least 30 minutes from now
-            if (currentTime >= minAllowedTime) {
-                const timeSlotInfo = checkTimeSlotStatus(currentTime);
-                timeSlots.push(timeSlotInfo);
-            }
+            // TODO: only allow slots at least 30 minutes from now
+            // if (currentTime >= minAllowedTime) {
+            const timeSlotInfo = checkTimeSlotStatus(currentTime);
+            timeSlots.push(timeSlotInfo);
+            // }
             currentTime = addMinutes(currentTime, 30);
         }
 
@@ -359,14 +377,16 @@ export function DateTimeSelection({
     return (
         <TooltipProvider>
             <div className="space-y-6">
-                <div>
-                    <h2 className="text-2xl font-light text-[#3F0052] mb-2">
-                        Choose Date & Time
-                    </h2>
-                    <p className="text-gray-600">
-                        Select when you'd like to book your appointment
-                    </p>
-                </div>
+                {!isRescheduleMode && (
+                    <div>
+                        <h2 className="text-2xl font-light text-[#3F0052] mb-2">
+                            Choose Date & Time
+                        </h2>
+                        <p className="text-gray-600">
+                            Select when you'd like to book your appointment
+                        </p>
+                    </div>
+                )}
 
                 <div className="grid md:grid-cols-2 gap-8">
                     {/* Calendar */}
@@ -442,12 +462,54 @@ export function DateTimeSelection({
                                                                         ? "default"
                                                                         : "outline"
                                                                 }
-                                                                onClick={() =>
-                                                                    timeSlot.isAvailable &&
-                                                                    setSelectedTime(
-                                                                        timeSlot.time
-                                                                    )
-                                                                }
+                                                                onClick={() => {
+                                                                    if (
+                                                                        timeSlot.isAvailable
+                                                                    ) {
+                                                                        setSelectedTime(
+                                                                            timeSlot.time
+                                                                        );
+                                                                        // In reschedule mode, automatically call onSelect when time is selected
+                                                                        if (
+                                                                            isRescheduleMode &&
+                                                                            selectedDate
+                                                                        ) {
+                                                                            const time24 =
+                                                                                format(
+                                                                                    parse(
+                                                                                        timeSlot.time,
+                                                                                        "h:mm a",
+                                                                                        new Date()
+                                                                                    ),
+                                                                                    "HH:mm"
+                                                                                );
+                                                                            const [
+                                                                                hours,
+                                                                                minutes,
+                                                                            ] =
+                                                                                time24
+                                                                                    .split(
+                                                                                        ":"
+                                                                                    )
+                                                                                    .map(
+                                                                                        Number
+                                                                                    );
+                                                                            const dateTime =
+                                                                                new Date(
+                                                                                    selectedDate
+                                                                                );
+                                                                            dateTime.setHours(
+                                                                                hours,
+                                                                                minutes,
+                                                                                0,
+                                                                                0
+                                                                            );
+                                                                            onSelect(
+                                                                                dateTime
+                                                                            );
+                                                                        }
+                                                                    }
+                                                                }}
                                                                 disabled={
                                                                     !timeSlot.isAvailable
                                                                 }
@@ -486,15 +548,17 @@ export function DateTimeSelection({
                     </Card>
                 </div>
 
-                <div className="flex justify-end">
-                    <Button
-                        onClick={handleSubmit}
-                        disabled={!selectedDate || !selectedTime}
-                        className="rounded-full px-8"
-                    >
-                        Continue
-                    </Button>
-                </div>
+                {!hideContinueButton && (
+                    <div className="flex justify-end">
+                        <Button
+                            onClick={handleSubmit}
+                            disabled={!selectedDate || !selectedTime}
+                            className="rounded-full px-8"
+                        >
+                            {buttonText}
+                        </Button>
+                    </div>
+                )}
             </div>
         </TooltipProvider>
     );

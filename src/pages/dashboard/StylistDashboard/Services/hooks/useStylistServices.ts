@@ -49,13 +49,15 @@ export function useStylistServices() {
       toast({
         title: "Success",
         description: "Service added successfully.",
+        duration: 3000,
       });
     } catch (err) {
       console.error('Error adding service:', err);
       toast({
         title: "Error",
         description: "Failed to add service. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 3000,
       });
     }
   };
@@ -75,13 +77,15 @@ export function useStylistServices() {
       toast({
         title: "Success",
         description: "Service updated successfully.",
+        duration: 3000,
       });
     } catch (err) {
       console.error('Error updating service:', err);
       toast({
         title: "Error",
         description: "Failed to update service. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 3000,
       });
     }
   };
@@ -101,13 +105,15 @@ export function useStylistServices() {
       toast({
         title: "Success",
         description: "Service deleted successfully.",
+        duration: 3000,
       });
     } catch (err) {
       console.error('Error deleting service:', err);
       toast({
         title: "Error",
         description: "Failed to delete service. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 3000,
       });
     }
   };

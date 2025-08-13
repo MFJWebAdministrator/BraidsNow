@@ -20,12 +20,19 @@ const getIdToken = async () => {
 
 // Helper function to make authenticated API requests
 // Add error handling and logging to help debug issues
-const apiRequest = async (endpoint: string, data: any) => {
+const apiRequest = async (
+    endpoint: string,
+    data: any,
+    method: string = "POST"
+) => {
     try {
         const idToken = await getIdToken();
-        console.log(`Making API request to ${endpoint}`);
+        console.log(`Making API request to ${API_BASE_URL}${endpoint} `);
 
-        const response = await axios.post(`${API_BASE_URL}${endpoint}`, data, {
+        const response = await axios({
+            url: `${API_BASE_URL}${endpoint}`,
+            method: method,
+            data: data,
             headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${idToken}`,
@@ -234,4 +241,82 @@ export const sendNewMessageClientSms = async (data: {
     stylistName: string;
 }) => {
     return apiRequest("/send-new-message-client-sms", data);
+};
+
+// Cancellation API functions
+export const cancelBookingByClient = async (bookingId: string) => {
+    return apiRequest("/cancel-booking-by-client", { bookingId });
+};
+
+export const cancelBookingByStylist = async (bookingId: string) => {
+    return apiRequest("/cancel-booking-by-stylist", { bookingId });
+};
+
+// Payment Request API functions
+export const requestPayment = async (
+    stylistId: string,
+    appointmentId: string
+) => {
+    return apiRequest(`/appointments/${appointmentId}/request-payment`, {
+        stylistId,
+        appointmentId,
+    });
+};
+
+// Pay Appointment API function
+export const payAppointment = async (
+    clientId: string,
+    appointmentId: string
+) => {
+    return apiRequest("/pay-appointment", {
+        clientId,
+        appointmentId,
+    });
+};
+
+// Reschedule API functions
+export const proposeReschedule = async (
+    bookingId: string,
+    proposedDateTime: string,
+    reason?: string
+) => {
+    return apiRequest("/propose-reschedule", {
+        bookingId,
+        proposedDateTime,
+        reason,
+    });
+};
+
+export const acceptReschedule = async (bookingId: string) => {
+    return apiRequest("/accept-reschedule", { bookingId });
+};
+
+export const rejectReschedule = async (bookingId: string) => {
+    return apiRequest("/reject-reschedule", { bookingId });
+};
+
+// Google Calendar API functions
+export const saveGoogleCalendarTokens = async (tokens: {
+    access_token: string;
+    refresh_token?: string;
+    expiry_date?: number;
+    scope?: string;
+    token_type?: string;
+}) => {
+    return apiRequest("/google-calendar/tokens", tokens);
+};
+
+export const getGoogleCalendarSettings = async () => {
+    return apiRequest("/google-calendar/settings", {}, "GET");
+};
+
+export const updateGoogleCalendarSettings = async (settings: {
+    isConnected?: boolean;
+    autoSync?: boolean;
+}) => {
+    return apiRequest("/google-calendar/settings", settings, "PUT");
+};
+
+export const disconnectGoogleCalendar = async () => {
+    return apiRequest("/google-calendar/disconnect", {}, "DELETE");
 };

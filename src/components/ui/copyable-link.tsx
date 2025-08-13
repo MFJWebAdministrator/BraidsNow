@@ -30,6 +30,7 @@ export function CopyableLink({
                 title: "Link copied!",
                 description:
                     "Your BraidsNow.com link has been copied to clipboard",
+                duration: 3000,
             });
 
             // Reset the copied state after 2 seconds
@@ -40,6 +41,7 @@ export function CopyableLink({
                 title: "Copy failed",
                 description: "Unable to copy link to clipboard",
                 variant: "destructive",
+                duration: 3000,
             });
         }
     };

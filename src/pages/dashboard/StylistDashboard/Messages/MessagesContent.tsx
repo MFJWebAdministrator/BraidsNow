@@ -88,6 +88,7 @@ export function MessagesContent() {
                         description:
                             "You have to be favourited by the client to message them.",
                         variant: "destructive",
+                        duration: 3000,
                     });
                     return;
                 }
@@ -205,6 +206,7 @@ export function MessagesContent() {
                     description:
                         "You have to be favourited by the client to message them.",
                     variant: "destructive",
+                    duration: 3000,
                 });
             }
         } finally {
@@ -249,6 +251,7 @@ export function MessagesContent() {
                 title: "Image too large",
                 description: "Each image must be less than 5MB after cropping.",
                 variant: "destructive",
+                duration: 3000,
             });
             // Move to next image in queue
             const [, ...rest] = croppingQueue;

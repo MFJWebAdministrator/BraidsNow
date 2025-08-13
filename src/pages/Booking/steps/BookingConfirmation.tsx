@@ -181,6 +181,7 @@ export function BookingConfirmation({
                 title: "Booking Failed",
                 description: message,
                 variant: "destructive",
+                duration: 3000,
             });
 
             // Make sure to set processing to false

@@ -37,6 +37,7 @@ export function useLogin() {
         toast({
           title: "Welcome back!",
           description: `You have successfully signed in as a ${userType}.`,
+          duration: 3000,
         });
 
         // Route based on user type
@@ -60,6 +61,7 @@ export function useLogin() {
         title: "Sign in failed",
         description: errorMessage,
         variant: "destructive",
+        duration: 3000,
       });
     } finally {
       setIsLoading(false);

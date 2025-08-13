@@ -69,11 +69,21 @@ export function AppointementsContent() {
         (appointment) => appointment.status === "pending"
     );
 
+    // Get appointments that need payment (to-be-paid status or confirmed with payment requested)
+    const toBePaidAppointments = clientAppointments.filter(
+        (appointment) =>
+            appointment.status === "to-be-paid" ||
+            (appointment.status === "confirmed" && appointment.paymentRequested)
+    );
+
     // Calculate statistics
     const confirmedAppointmentsCount = confirmedAppointments.length;
     const pendingAppointmentsCount = pendingAppointments.length;
+    const toBePaidAppointmentsCount = toBePaidAppointments.length;
     const totalAppointmentsCount =
-        confirmedAppointmentsCount + pendingAppointmentsCount;
+        confirmedAppointmentsCount +
+        pendingAppointmentsCount +
+        toBePaidAppointmentsCount;
     const totalSpent = clientAppointments
         .filter((a) => a.paymentStatus === "paid")
         .reduce((sum, a) => sum + a.paymentAmount, 0);
@@ -218,7 +228,13 @@ export function AppointementsContent() {
 
             {/* Appointments Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 rounded-lg">
+                <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-lg">
+                    <TabsTrigger
+                        className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
+                        value="to-be-paid"
+                    >
+                        Payment Due ({toBePaidAppointmentsCount})
+                    </TabsTrigger>
                     <TabsTrigger
                         className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
                         value="today"
@@ -238,6 +254,40 @@ export function AppointementsContent() {
                         Pending ({pendingAppointments.length})
                     </TabsTrigger>
                 </TabsList>
+
+                <TabsContent value="to-be-paid" className="space-y-4">
+                    {toBePaidAppointments.length === 0 ? (
+                        <Card className="border border-gray-200 shadow-sm">
+                            <CardContent className="p-8 text-center">
+                                <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                    No payments due
+                                </h3>
+                                <p className="text-gray-600 mb-4">
+                                    You don't have any appointments requiring
+                                    payment at this time.
+                                </p>
+                                <Button
+                                    onClick={handleBookNew}
+                                    className="bg-[#3F0052] hover:bg-[#3F0052]/90"
+                                >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Find a Stylist
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {toBePaidAppointments.map((appointment) => (
+                                <AppointmentCard
+                                    key={appointment.id}
+                                    appointment={appointment}
+                                    userRole="client"
+                                />
+                            ))}
+                        </div>
+                    )}
+                </TabsContent>
 
                 <TabsContent value="today" className="space-y-4">
                     {todaysAppointments.length === 0 ? (

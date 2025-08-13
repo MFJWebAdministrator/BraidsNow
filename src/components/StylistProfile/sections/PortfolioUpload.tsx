@@ -28,7 +28,8 @@ export function PortfolioUpload({ images, onImageAdded, onImageDeleted }: Portfo
         toast({
           title: "File too large",
           description: "Image must be less than 5MB",
-          variant: "destructive"
+          variant: "destructive",
+          duration: 3000,
         });
         return;
       }
@@ -36,7 +37,8 @@ export function PortfolioUpload({ images, onImageAdded, onImageDeleted }: Portfo
         toast({
           title: "Invalid file type",
           description: "Only PNG, JPG, or WebP files are allowed",
-          variant: "destructive"
+          variant: "destructive",
+          duration: 3000,
         });
         return;
       }
@@ -54,13 +56,15 @@ export function PortfolioUpload({ images, onImageAdded, onImageDeleted }: Portfo
       toast({
         title: "Success",
         description: "Image uploaded successfully",
+        duration: 3000,
       });
     } catch (error) {
       console.error('Error uploading image:', error);
       toast({
         title: "Error",
         description: "Failed to upload image",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 3000,
       });
     } finally {
       setIsUploading(false);
@@ -85,7 +89,8 @@ export function PortfolioUpload({ images, onImageAdded, onImageDeleted }: Portfo
       toast({
         title: "Error",
         description: "Failed to delete image",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 3000,
       });
     } finally {
       setIsDeleting(null);

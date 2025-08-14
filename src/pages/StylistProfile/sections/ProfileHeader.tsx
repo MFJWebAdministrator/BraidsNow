@@ -50,7 +50,9 @@ export function ProfileHeader({ stylist }: ProfileHeaderProps) {
     };
 
     const getServicePreferenceIcon = () => {
-        switch (stylist.servicePreference) {
+        switch (
+            [...stylist.servicePreference].sort((a, b) => b.localeCompare(a))[0]
+        ) {
             case "home":
                 return <Home className="w-4 h-4 mr-1" />;
             case "mobile":
@@ -61,7 +63,9 @@ export function ProfileHeader({ stylist }: ProfileHeaderProps) {
     };
 
     const getServicePreferenceText = () => {
-        switch (stylist.servicePreference) {
+        switch (
+            [...stylist.servicePreference].sort((a, b) => b.localeCompare(a))[0]
+        ) {
             case "home":
                 return "Styles From Home";
             case "mobile":

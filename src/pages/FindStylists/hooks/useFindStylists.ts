@@ -55,6 +55,8 @@ export function useFindStylists() {
                 })
             );
 
+            console.log("stylists", stylistsWithFavs);
+
             setStylists(stylistsWithFavs);
             setPagination(result.pagination);
             setLoading(false);
@@ -67,11 +69,13 @@ export function useFindStylists() {
 
     // Initial fetch and setup real-time listener
     useEffect(() => {
+        console.log("initial");
         fetchStylists();
     }, [fetchStylists]);
 
     // Mark initial load as complete after first fetch
     useEffect(() => {
+        console.log("second load");
         if (isInitialLoad.current && !loading && stylists.length > 0) {
             isInitialLoad.current = false;
         }
@@ -79,6 +83,7 @@ export function useFindStylists() {
 
     // Refetch when searchParams change
     useEffect(() => {
+        console.log("params changed", searchParams);
         fetchStylists();
         // Scroll to top when search parameters change (but not on initial load)
         if (!isInitialLoad.current) {
@@ -98,6 +103,7 @@ export function useFindStylists() {
 
     // Scroll to top when page changes
     useEffect(() => {
+        console.log("pagination changed", pagination);
         // Scroll to the top of the results section smoothly (but not on initial load)
         if (!isInitialLoad.current) {
             const resultsSection = document.querySelector(

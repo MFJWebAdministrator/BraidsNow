@@ -14,9 +14,11 @@ import {
 import { db } from "@/lib/firebase/config";
 import { useAuth } from "./use-auth";
 import type { Message, MessageThread } from "@/lib/schemas/message";
+import { useUserData } from "./use-user-data";
 
 export function useMessages() {
     const { user } = useAuth();
+    const { userData } = useUserData(user?.uid);
     const [threads, setThreads] = useState<MessageThread[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
     const [selectedThreadId, setSelectedThreadId] = useState<string | null>(
@@ -35,8 +37,19 @@ export function useMessages() {
             const q = query(favoritesRef, where("stylistId", "==", user.uid));
 
             const unsubscribe = onSnapshot(q, (snapshot) => {
-                const clientIds = snapshot.docs.map((doc) => doc.data().userId);
-                setFavoriteClients(clientIds);
+                const client = snapshot.docs.map((doc) => {
+                    return {
+                        id: doc.id,
+                        ...doc.data(),
+                    } as {
+                        id: string;
+                        userId: string;
+                        stylistId: string;
+                        createdAt: string;
+                    };
+                });
+
+                setFavoriteClients(client.map((c) => c.userId));
             });
 
             return () => unsubscribe();
@@ -159,6 +172,28 @@ export function useMessages() {
         }
     }, [selectedThreadId, user]);
 
+    const getClientInfo = async (clientId: string) => {
+        try {
+            const clientRef = doc(db, "users", clientId);
+            const clientDoc = await getDoc(clientRef);
+            const clientData = clientDoc.data();
+
+            if (!clientData) {
+                return null;
+            }
+
+            return {
+                name:
+                    clientData?.firstName + " " + clientData?.lastName ||
+                    "Client",
+                image: clientData?.profileImage || "",
+            };
+        } catch (error) {
+            console.error("Error getting client info:", error);
+            return null;
+        }
+    };
+
     // Function to send mass message to favorite clients
     const sendMassMessage = async (content: string) => {
         if (!user || favoriteClients.length === 0) return;
@@ -171,6 +206,12 @@ export function useMessages() {
                 const threadId = [user.uid, clientId].sort().join("_");
                 const threadRef = doc(db, "messageThreads", threadId);
                 const messageRef = doc(collection(db, "messages"));
+                const clientInfo = await getClientInfo(clientId);
+
+                if (!clientInfo) {
+                    console.log("clientInfo not found");
+                    continue;
+                }
 
                 // Create message
                 const message = {
@@ -178,28 +219,41 @@ export function useMessages() {
                     threadId,
                     content,
                     senderId: user.uid,
-                    senderName: user.displayName || "Stylist",
-                    senderImage: user.photoURL,
+                    senderName:
+                        userData.firstName + " " + userData.lastName ||
+                        "Stylist",
+                    senderImage: userData.profileImage || "",
                     participants: [user.uid, clientId],
                     readBy: [user.uid],
                     createdAt: new Date().toISOString(),
                 };
 
-                // Update thread
-                batch.set(
-                    threadRef,
-                    {
-                        id: threadId,
-                        participants: [user.uid, clientId],
-                        lastMessage: {
-                            content,
-                            senderId: user.uid,
-                            createdAt: new Date().toISOString(),
-                        },
-                        updatedAt: new Date().toISOString(),
+                const thread = {
+                    id: threadId,
+                    participants: [user.uid, clientId],
+                    lastMessage: {
+                        content,
+                        senderId: user.uid,
+                        createdAt: new Date().toISOString(),
                     },
-                    { merge: true }
-                );
+                    participantDetails: {
+                        [user.uid]: {
+                            name:
+                                userData.firstName + " " + userData.lastName ||
+                                "Stylist",
+                            image: userData.profileImage || "",
+                        },
+                        [clientId]: {
+                            name: clientInfo.name || "Client",
+                            image: clientInfo.image || "",
+                        },
+                    },
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                };
+
+                // Update thread
+                batch.set(threadRef, thread, { merge: true });
 
                 // Add message
                 batch.set(messageRef, message);

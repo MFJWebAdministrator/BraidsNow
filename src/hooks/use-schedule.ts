@@ -7,31 +7,31 @@ import {
 } from "@/lib/firebase/stylist/schedule";
 import type { Schedule, Break } from "@/lib/schemas/schedule";
 
-const DEFAULT_SCHEDULE: Schedule = {
+export const DEFAULT_SCHEDULE: Schedule = {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     workHours: {
         monday: {
-            isEnabled: true,
+            isEnabled: false,
             start: { hour: 9, minute: 0 },
             end: { hour: 17, minute: 0 },
         },
         tuesday: {
-            isEnabled: true,
+            isEnabled: false,
             start: { hour: 9, minute: 0 },
             end: { hour: 17, minute: 0 },
         },
         wednesday: {
-            isEnabled: true,
+            isEnabled: false,
             start: { hour: 9, minute: 0 },
             end: { hour: 17, minute: 0 },
         },
         thursday: {
-            isEnabled: true,
+            isEnabled: false,
             start: { hour: 9, minute: 0 },
             end: { hour: 17, minute: 0 },
         },
         friday: {
-            isEnabled: true,
+            isEnabled: false,
             start: { hour: 9, minute: 0 },
             end: { hour: 17, minute: 0 },
         },

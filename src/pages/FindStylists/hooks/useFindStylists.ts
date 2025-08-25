@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFavorites } from "@/hooks/use-favorites";
 import type { Stylist, SearchParams, PaginationParams } from "../types";
@@ -55,8 +55,6 @@ export function useFindStylists() {
                 })
             );
 
-            console.log("stylists", stylistsWithFavs);
-
             setStylists(stylistsWithFavs);
             setPagination(result.pagination);
             setLoading(false);
@@ -69,63 +67,40 @@ export function useFindStylists() {
 
     // Initial fetch and setup real-time listener
     useEffect(() => {
-        console.log("initial");
         fetchStylists();
     }, [fetchStylists]);
 
     // Mark initial load as complete after first fetch
     useEffect(() => {
-        console.log("second load");
         if (isInitialLoad.current && !loading && stylists.length > 0) {
             isInitialLoad.current = false;
         }
     }, [loading, stylists.length]);
 
-    // Refetch when searchParams change
-    useEffect(() => {
-        console.log("params changed", searchParams);
-        fetchStylists();
-        // Scroll to top when search parameters change (but not on initial load)
-        if (!isInitialLoad.current) {
-            const resultsSection = document.querySelector(
-                "[data-results-section]"
-            );
-            if (resultsSection) {
-                setTimeout(() => {
-                    resultsSection.scrollIntoView({
-                        behavior: "smooth",
-                        block: "start",
-                    });
-                }, 100);
-            }
-        }
-    }, [searchParams, fetchStylists]);
-
     // Scroll to top when page changes
-    useEffect(() => {
-        console.log("pagination changed", pagination);
-        // Scroll to the top of the results section smoothly (but not on initial load)
-        if (!isInitialLoad.current) {
-            const resultsSection = document.querySelector(
-                "[data-results-section]"
-            );
-            if (resultsSection) {
-                // Add a small delay to ensure the new content is rendered
-                setTimeout(() => {
-                    resultsSection.scrollIntoView({
-                        behavior: "smooth",
-                        block: "start",
-                    });
-                }, 100);
-            } else {
-                // Fallback to scrolling to top of page
-                window.scrollTo({
-                    top: 0,
-                    behavior: "smooth",
-                });
-            }
-        }
-    }, [pagination.currentPage]);
+    // useEffect(() => {
+    //     // Scroll to the top of the results section smoothly (but not on initial load)
+    //     if (!isInitialLoad.current) {
+    //         const resultsSection = document.querySelector(
+    //             "[data-results-section]"
+    //         );
+    //         if (resultsSection) {
+    //             // Add a small delay to ensure the new content is rendered
+    //             setTimeout(() => {
+    //                 resultsSection.scrollIntoView({
+    //                     behavior: "smooth",
+    //                     block: "start",
+    //                 });
+    //             }, 200);
+    //         } else {
+    //             // Fallback to scrolling to top of page
+    //             window.scrollTo({
+    //                 top: 0,
+    //                 behavior: "smooth",
+    //             });
+    //         }
+    //     }
+    // }, [pagination.currentPage, pagination.pageSize]);
 
     // Improved handleToggleFavorite for real-time UI updates
     const handleToggleFavorite = (id: string) => {

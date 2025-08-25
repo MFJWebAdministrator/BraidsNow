@@ -27,7 +27,6 @@ export function SearchSection({
         braidStyle,
         location,
         servicePreference,
-        minDepositAmount,
         maxDepositAmount,
     } = searchParams;
 
@@ -63,11 +62,20 @@ export function SearchSection({
     };
 
     const handleDepositAmountChange = (value: [number, number]) => {
-        onSearchChange({
-            ...searchParams,
-            minDepositAmount: value[0],
-            maxDepositAmount: value[1],
-        });
+        console.log(
+            "Slider value changed:",
+            value,
+            "Current max:",
+            maxDepositAmount
+        );
+
+        if (value[1] !== searchParams.maxDepositAmount) {
+            onSearchChange({
+                ...searchParams,
+                minDepositAmount: 1,
+                maxDepositAmount: value[1],
+            });
+        }
     };
 
     return (
@@ -106,7 +114,7 @@ export function SearchSection({
                 </div>
 
                 {/* Filters */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+                <div className="space-y-6 pt-2">
                     {/* Service Preferences */}
                     <div className="space-y-4">
                         <Label className="text-[#3F0052] font-semibold text-lg">
@@ -141,26 +149,24 @@ export function SearchSection({
                             ))}
                         </div>
                     </div>
-
                     {/* Deposit Amount Range */}
-                    <div className="space-y-4">
+                    <div className="space-y-4 max-w-md">
                         <Label className="text-[#3F0052] font-semibold text-lg">
-                            Deposit Amount: ${minDepositAmount} - $
-                            {maxDepositAmount}
+                            Max Deposit Amount: ${maxDepositAmount}
                         </Label>
                         <div className="px-2">
                             <Slider
-                                value={[minDepositAmount, maxDepositAmount]}
+                                value={[1, maxDepositAmount]}
                                 onValueChange={(value) =>
-                                    handleDepositAmountChange(
-                                        value as [number, number]
-                                    )
+                                    handleDepositAmountChange([1, value[1]] as [
+                                        number,
+                                        number,
+                                    ])
                                 }
                                 max={500}
                                 min={1}
-                                step={10}
+                                step={1}
                                 className="w-full [&>span[data-orientation=horizontal]]:bg-gray-200 [&>span[data-orientation=horizontal]]:h-2 [&_[role=slider]]:bg-[#3F0052] [&_[role=slider]]:border-2 [&_[role=slider]]:border-[#3F0052] [&_[role=slider]]:w-6 [&_[role=slider]]:h-6 [&_[role=slider]]:shadow-lg [&>span[data-orientation=horizontal]>span]:bg-[#3F0052] [&>span[data-orientation=horizontal]>span]:h-2"
-                                // Custom styling for the slider
                             />
                             <div className="flex justify-between text-[#3F0052]/70 text-sm mt-2">
                                 <span>$1</span>

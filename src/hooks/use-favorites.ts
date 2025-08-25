@@ -39,7 +39,7 @@ export function useFavorites() {
         };
 
         fetchFavorites();
-    }, [user, toast]);
+    }, [user]); // ✅ Only depend on user
 
     // TODO
     const toggleFavorite = async (stylist: Stylist) => {

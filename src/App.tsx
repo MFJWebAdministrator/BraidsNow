@@ -37,7 +37,7 @@ import { StylistAppointmentsPage } from "./pages/dashboard/StylistDashboard/Appo
 import { ClientAppointmentsPage } from "./pages/dashboard/ClientDashboard/Appointements";
 import { CalendarPage } from "./pages/dashboard/StylistDashboard/Calendar";
 import ComingSoon from "./pages/ComingSoon";
-import NotFound from '@/pages/NotFound';
+import NotFound from "@/pages/NotFound";
 
 const COMING_SOON = import.meta.env.VITE_COMING_SOON;
 
@@ -202,6 +202,7 @@ export function App() {
                             </ProtectedRoute>
                         }
                     />
+
                     <Route
                         path="/dashboard/stylist/appointments"
                         element={

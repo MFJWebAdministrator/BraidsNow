@@ -1,4 +1,5 @@
 import { Calendar, Users } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { useStylistFavorites } from "@/hooks/use-stylist-favorites";
@@ -8,6 +9,7 @@ import { WelcomeBanner } from "@/components/dashboard/shared/WelcomeBanner";
 import { format } from "date-fns";
 
 export function StylistDashboardContent() {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const { userData } = useUserData(user?.uid);
     const { favoriteClients } = useStylistFavorites();
@@ -37,16 +39,14 @@ export function StylistDashboardContent() {
                     description="View your schedule for today"
                     icon={Calendar}
                     value={todaysAppointments.length.toString()}
-                    onClick={() =>
-                        (window.location.href =
-                            "/dashboard/stylist/appointments")
-                    }
+                    onClick={() => navigate("/dashboard/stylist/appointments")}
                 />
                 <DashboardCard
                     title="Total Favorites"
                     description="Clients who favorited you"
                     icon={Users}
                     value={favoriteClients.length.toString()}
+                    onClick={() => navigate("/dashboard/stylist/favorites")}
                 />
                 {/* <DashboardCard
                     title="Monthly Earnings"

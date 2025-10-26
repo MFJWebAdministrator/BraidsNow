@@ -6,13 +6,14 @@ import { useAppointments } from "@/hooks/use-appointments";
 import { DashboardCard } from "@/components/dashboard/shared/DashboardCard";
 import { WelcomeBanner } from "@/components/dashboard/shared/WelcomeBanner";
 import { format } from "date-fns";
+import { useNavigate } from "react-router-dom";
 
 export function ClientDashboardContent() {
     const { user } = useAuth();
     const { userData } = useUserData(user?.uid);
     const { favorites } = useFavorites();
     const { getAppointmentsByStatus } = useAppointments();
-
+    const navigate = useNavigate();
     if (!userData) return null;
 
     // Get now's appointments for the client
@@ -38,22 +39,21 @@ export function ClientDashboardContent() {
                     description="View your appointments for today"
                     icon={Calendar}
                     value={nowsAppointments.length.toString()}
-                    onClick={() =>
-                        (window.location.href =
-                            "/dashboard/client/appointments")
-                    }
+                    onClick={() => navigate("/dashboard/client/appointments")}
                 />
                 <DashboardCard
                     title="New Messages"
                     description="Check messages from your stylists"
                     icon={MessageSquare}
                     value="0"
+                    onClick={() => navigate("/dashboard/client/messages")}
                 />
                 <DashboardCard
                     title="Favorite Stylists"
                     description="Quick access to your preferred stylists"
                     icon={Heart}
                     value={favorites.length.toString()}
+                    onClick={() => navigate("/dashboard/client/favorites")}
                 />
             </div>
         </div>

@@ -360,7 +360,7 @@ export function AppointementsContent() {
                 </TabsContent>
 
                 <TabsContent value="pending" className="space-y-4">
-                    {pendingAppointments.length === 0 ? (
+                    {pendingAppointments?.length === 0 ? (
                         <Card className="border border-gray-200 shadow-sm">
                             <CardContent className="p-8 text-center">
                                 <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -382,7 +382,7 @@ export function AppointementsContent() {
                         </Card>
                     ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            {pendingAppointments.map((appointment) => (
+                            {pendingAppointments?.map((appointment) => (
                                 <AppointmentCard
                                     key={appointment.id}
                                     appointment={appointment}

@@ -434,13 +434,13 @@ export function AppointmentCard({
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Clock className="h-4 w-4" />
                         <span>
-                            {appointment.service.duration.hours} hours{" "}
-                            {appointment.service.duration.minutes} minutes
+                            {appointment?.service?.duration?.hours||""} hours{" "}
+                            {appointment?.service?.duration?.minutes||""} minutes
                         </span>
                     </div>
-                    {appointment.notes && (
+                    {appointment?.notes && (
                         <p className="text-sm text-gray-600 mt-2">
-                            {appointment.notes}
+                            {appointment?.notes||""}
                         </p>
                     )}
                 </div>
@@ -450,16 +450,16 @@ export function AppointmentCard({
                     <div className="flex items-center gap-2">
                         <Calendar className="h-5 w-5 text-gray-500" />
                         <span className="text-sm font-medium">
-                            {formatDate(appointment.dateTime.toString())}
+                            {formatDate(appointment?.dateTime?.toString())}
                         </span>
                     </div>
                     <div className="flex items-center gap-2">
                         <Clock className="h-5 w-5 text-gray-500" />
                         <span className="text-sm font-medium">
                             {formatTime(
-                                appointment.dateTime.getHours() +
+                                appointment?.dateTime?.getHours() +
                                     ":" +
-                                    appointment.dateTime.getMinutes()
+                                    appointment?.dateTime?.getMinutes()
                             ) +
                                 " " +
                                 browserTz}
@@ -475,29 +475,29 @@ export function AppointmentCard({
                         <div className="flex items-center gap-2 text-sm">
                             <DollarSign className="h-4 w-4 text-gray-500" />
                             <span>
-                                {appointment.paymentType === "deposit"
+                                {appointment?.paymentType === "deposit"
                                     ? "Deposit Paid"
                                     : "Total Paid"}
                             </span>
                         </div>
                         <span className="font-semibold">
-                            ${appointment.paymentAmount}
+                            ${appointment?.paymentAmount}
                         </span>
                     </div>
 
-                    {appointment.totalAmount !== appointment.paymentAmount && (
+                    {appointment?.totalAmount !== appointment?.paymentAmount && (
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 text-sm">
                                 <DollarSign className="h-4 w-4 text-gray-500" />
                                 <span>Total Cost</span>
                             </div>
                             <span className="font-semibold">
-                                ${appointment.totalAmount}
+                                ${appointment?.totalAmount}
                             </span>
                         </div>
                     )}
 
-                    {appointment.totalAmount !== appointment.paymentAmount && (
+                    {appointment?.totalAmount !== appointment?.paymentAmount && (
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 text-sm">
                                 <DollarSign className="h-4 w-4 text-gray-500" />
@@ -505,8 +505,8 @@ export function AppointmentCard({
                             </div>
                             <span className="font-semibold text-red-600">
                                 $
-                                {appointment.totalAmount -
-                                    appointment.paymentAmount}
+                                {appointment?.totalAmount -
+                                    appointment?.paymentAmount}
                             </span>
                         </div>
                     )}

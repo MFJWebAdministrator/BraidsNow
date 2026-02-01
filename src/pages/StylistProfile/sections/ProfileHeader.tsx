@@ -23,9 +23,10 @@ const VITE_APP_DOMAIN = import.meta.env.VITE_APP_DOMAIN;
 
 interface ProfileHeaderProps {
     stylist: Stylist;
+    isOwner?:boolean
 }
 
-export function ProfileHeader({ stylist }: ProfileHeaderProps) {
+export function ProfileHeader({ stylist, isOwner }: ProfileHeaderProps) {
     const [showMessageDialog, setShowMessageDialog] = useState(false);
     const { toggleFavorite, isFavorite } = useFavorites();
     const { user } = useAuth();
@@ -149,14 +150,14 @@ export function ProfileHeader({ stylist }: ProfileHeaderProps) {
                                         />
                                         {isFavorited ? "My Fav!" : "Favorite"}
                                     </Button>
-                                    <Button
+                           {!isOwner&&<Button
                                         size="lg"
                                         className="rounded-full"
                                         onClick={handleMessageClick}
                                     >
                                         <MessageSquare className="w-4 h-4 mr-2" />
                                         Message Me
-                                    </Button>
+                                    </Button>}
                                 </div>
                             </div>
                         </div>

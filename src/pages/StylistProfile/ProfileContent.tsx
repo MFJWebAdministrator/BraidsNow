@@ -21,6 +21,7 @@ export function ProfileContent({ stylistId }: ProfileContentProps) {
     const { stylist, loading, error } = useStylistProfile(stylistId);
     const { user } = useAuth();
     const isOwner = user?.uid === stylistId;
+    
 
     if (loading) {
         return (
@@ -42,7 +43,7 @@ export function ProfileContent({ stylistId }: ProfileContentProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="space-y-8">
                 {/* Profile Header */}
-                <ProfileHeader stylist={stylist} />
+                <ProfileHeader stylist={stylist} isOwner={isOwner} />
 
                 {/* Main Content Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

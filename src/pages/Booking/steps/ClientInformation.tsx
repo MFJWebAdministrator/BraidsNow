@@ -130,7 +130,7 @@ export function ClientInformation({
                     <h3 className="font-medium text-[#3F0052] mb-3">
                         Payment Options
                     </h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Card
                             className={`p-4 cursor-pointer transition-all duration-300 ${
                                 paymentType === "deposit"
@@ -149,12 +149,10 @@ export function ClientInformation({
                                 />
                                 <div>
                                     <p className="font-medium">
-                                        Pay ${service.depositAmount} Deposit
-                                        Now!
+                                        Pay ${service.depositAmount} Deposit Now!
                                     </p>
                                     <p className="text-sm text-gray-600">
-                                        Paid Deposit Will Secure Your
-                                        Appointment
+                                        Paid Deposit Will Secure Your Appointment
                                     </p>
                                 </div>
                             </div>

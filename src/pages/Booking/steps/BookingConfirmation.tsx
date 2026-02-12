@@ -282,18 +282,19 @@ export function BookingConfirmation({
                 </div>
             </Card>
 
-            <div className="flex justify-end space-x-4">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 w-full">
                 <Button
                     variant="outline"
                     onClick={() => navigate(-1)}
                     disabled={isProcessing}
+                    className="w-full sm:w-auto"
                 >
                     Back
                 </Button>
                 <Button
                     onClick={handleConfirm}
                     disabled={isProcessing}
-                    className="bg-[#3F0052] hover:bg-[#3F0052]/90"
+                    className="w-full sm:w-auto bg-[#3F0052] hover:bg-[#3F0052]/90"
                 >
                     {isProcessing ? (
                         <>

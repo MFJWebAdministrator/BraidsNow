@@ -317,13 +317,13 @@ export function SettingsForm() {
                             </div>
                         </CardContent>
 
-                        <CardFooter className="flex justify-between pt-6">
+                        <CardFooter className="flex flex-col gap-4 md:flex-row md:justify-between pt-6">
                             <Button
                                 type="button"
                                 size="lg"
                                 variant="outline"
                                 onClick={() => setShowCancelDialog(true)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="w-full md:w-auto text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
                                 Cancel Account
                             </Button>
@@ -332,7 +332,7 @@ export function SettingsForm() {
                                 type="submit"
                                 size="lg"
                                 disabled={!hasChanges || isLoading}
-                                className="rounded-full font-light px-8"
+                                className="w-full md:w-auto rounded-full font-light px-8"
                             >
                                 {isLoading ? (
                                     <>

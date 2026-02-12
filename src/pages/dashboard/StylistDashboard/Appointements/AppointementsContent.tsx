@@ -274,30 +274,52 @@ export function AppointementsContent() {
             </Card>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-lg">
+                <TabsList
+                    className="
+                        grid w-full grid-cols-2 sm:grid-cols-4
+                        bg-gray-100 p-1 rounded-lg
+                        gap-1
+                    "
+                >
                     <TabsTrigger
-                        className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
+                        className="
+                            data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium
+                            text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2
+                        "
                         value="to-be-paid"
                     >
-                        Awaiting Payment ({toBePaidAppointmentsCount})
+                        Awaiting Payment
+                        <span className="ml-1 sm:ml-2">({toBePaidAppointmentsCount})</span>
                     </TabsTrigger>
                     <TabsTrigger
-                        className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
+                        className="
+                            data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium
+                            text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2
+                        "
                         value="today"
                     >
-                        Today ({todaysAppointments.length})
+                        Today
+                        <span className="ml-1 sm:ml-2">({todaysAppointments.length})</span>
                     </TabsTrigger>
                     <TabsTrigger
-                        className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
+                        className="
+                            data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium
+                            text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2
+                        "
                         value="upcoming"
                     >
-                        Upcoming ({upcomingAppointments.length})
+                        Upcoming
+                        <span className="ml-1 sm:ml-2">({upcomingAppointments.length})</span>
                     </TabsTrigger>
                     <TabsTrigger
-                        className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
+                        className="
+                            data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium
+                            text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2
+                        "
                         value="pending"
                     >
-                        Pending ({pendingAppointments.length})
+                        Pending
+                        <span className="ml-1 sm:ml-2">({pendingAppointments.length})</span>
                     </TabsTrigger>
                 </TabsList>
 

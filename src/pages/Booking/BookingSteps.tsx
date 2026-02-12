@@ -163,7 +163,7 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
                                     {index + 1}
                                 </div>
                                 <span
-                                    className={`text-sm ${step === index + 1 ? "text-[#3F0052] font-medium" : "text-gray-500"}`}
+                                        className={`text-xs sm:text-sm ${step === index + 1 ? "text-[#3F0052] font-medium" : "text-gray-500"} block text-center sm:inline sm:text-left`}
                                 >
                                     {title}
                                 </span>

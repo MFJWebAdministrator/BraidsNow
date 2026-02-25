@@ -134,7 +134,7 @@ export function ProfileHeader({ stylist, isOwner }: ProfileHeaderProps) {
 
                                 <div className="flex flex-wrap gap-3">
                                     <SocialShare
-                                        url={`${VITE_APP_DOMAIN}/stylist/${stylist.id}`}
+                                        url={`${VITE_APP_DOMAIN}/${stylist?.username}`}
                                         title={`Check out ${stylist.businessName} on BraidsNow.com!`}
                                         description={`${stylist.businessName} - Professional Hair Stylist in ${stylist.location}. ${stylist.introduction || "Specializing in beautiful braided hairstyles."}`}
                                         image={stylist.image}

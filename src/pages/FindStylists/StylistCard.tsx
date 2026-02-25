@@ -247,7 +247,11 @@ export function StylistCard({
                     <div className="flex gap-3 mt-4 relative">
                         <Button
                             variant="outline"
-                            onClick={() => onViewProfile(stylist.id)}
+                            onClick={() => { 
+                                
+                                onViewProfile(stylist?.username)
+                            }
+                            }
                             className="flex-1 rounded-full font-light text-md tracking-normal border-2 hover:bg-[#3F0052] hover:text-white transition-all duration-300"
                         >
                             View Profile

@@ -78,10 +78,7 @@ export function App() {
                         path="/find-stylists"
                         element={<FindStylistsPage />}
                     />
-                    <Route
-                        path="/stylist/:stylistId"
-                        element={<StylistProfilePage />}
-                    />
+            
                     <Route path="/book/:stylistId" element={<BookingPage />} />
                     <Route
                         path="/business-tools"
@@ -283,6 +280,11 @@ export function App() {
                     <Route
                         path="/google-calendar-callback"
                         element={<GoogleCalendarCallback />}
+                    />
+
+                            <Route
+                        path="/:stylistId"
+                        element={<StylistProfilePage />}
                     />
                     {/* 404 Catch-all route */}
                     <Route path="*" element={<NotFound />} />

@@ -37,13 +37,21 @@ export function ClientRegistrationForm() {
             state: "",
             zipCode: "",
             agreeToTerms: false,
+            agreeToSMS: false,
         },
     });
 
     const onSubmit = async (data: FormType) => {
         try {
             setIsLoading(true);
-            await registerClient(data, profileImage);
+            const formattedPhone = `+1${data.phone.replace(/\D/g, "")}`;
+            const enrichedData = {
+                ...data,
+                phone: formattedPhone, // Overwrites raw phone with E.164 format
+                smsOptIn: data.agreeToSMS,
+                smsOptInTimestamp: data.agreeToSMS ? new Date().toISOString() : null,
+            };
+            await registerClient(enrichedData, profileImage);
 
             toast({
                 title: "Success!",
@@ -59,10 +67,12 @@ export function ClientRegistrationForm() {
                 });
 
                 // send welcome sms
-                await sendWelcomeClientSms(
-                    `${data.firstName} ${data.lastName}`,
-                    data.phone
-                );
+                if (data.agreeToSMS) {
+                    await sendWelcomeClientSms(
+                        `${data.firstName} ${data.lastName}`,
+                        formattedPhone
+                    );
+                }
             } catch (error) {
                 console.error("Error sending welcome email/sms:", error);
             }

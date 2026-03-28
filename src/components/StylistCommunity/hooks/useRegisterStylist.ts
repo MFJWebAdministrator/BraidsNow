@@ -19,13 +19,13 @@ export function useRegisterStylist() {
         try {
             setIsLoading(true);
             // get user by email first to check if the email is already in use
-
-            const formattedPhone = '+1${data.phone.replace(/\D/g, "")}`;
+            // format phone and create enriched data
+            const formattedPhone = `+1${data.phone.replace(/\D/g, "")}`;
             const enrichedData = {
                 ...data,
                 phone: formattedPhone,
                 smsOptIn: data.agreeToSMS,
-                smsOptInTimestamp: data.agreeToSMS ? new Data().toISOString()
+                smsOptInTimestamp: data.agreeToSMS ? new Date().toISOString() : null,
             };
 
             const user = await registerStylist(enrichedData, profileImage);
@@ -49,7 +49,7 @@ export function useRegisterStylist() {
                     if (data.agreeToSMS) {
                         await sendWelcomeStylistSms(
                             `${data.firstName} ${data.lastName}`,
-                            data.formattedPhone
+                            formattedPhone
                         );
                     }
                 } catch (error) {

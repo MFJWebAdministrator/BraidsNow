@@ -109,6 +109,7 @@ const validPriceIdPromise: Promise<string> | null = null;
 // Middleware
 app.use(cors({ origin: true }));
 app.use(express.json());
+app.use(express.urlencoded({extended: false }));
 
 interface RequestWithRawBody extends Request {
     rawBody?: Buffer;
@@ -2068,6 +2069,64 @@ export const cronJob = onSchedule(
         }
     }
 );
+
+// Twilio STOP webhook
+app.post("/sms-webhook", async (req: Request, res: Response) => {
+    const { Body, From } = req.body;
+
+    if (!From || !Body) {
+        return res.status(400).send("Invalid Request");
+    }
+
+    const incomingPhone = From; // Format: "+15551234567"
+  const messageText = Body.trim().toUpperCase();
+
+  try {
+    let isOptedIn = true;
+    let statusReason = "";
+
+    // Check for standard Twilio STOP/START keywords
+    if (["STOP", "QUIT", "UNSUBSCRIBE", "CANCEL"].includes(messageText)) {
+      isOptedIn = false;
+      statusReason = `User opted out via SMS: ${messageText}`;
+    } else if (["START", "UNSTOP", "YES"].includes(messageText)) {
+      isOptedIn = true;
+      statusReason = `User opted back in via SMS: ${messageText}`;
+    } else {
+      // It's a normal message, no opt-in change needed
+      return res.status(200).send("<Response></Response>");
+    }
+
+    const batch = db.batch();
+    
+    // We search both 'users' (clients) and 'stylists' collections 
+    // to find the matching phone number
+    const collections = ["users", "stylists"];
+    
+    for (const col of collections) {
+      const snapshot = await db.collection(col)
+        .where("phone", "==", incomingPhone)
+        .get();
+
+      snapshot.forEach((doc) => {
+        batch.update(doc.ref, {
+          smsOptIn: isOptedIn,
+          smsStatusReason: statusReason,
+          smsLastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+    }
+
+    await batch.commit();
+    console.log(`SMS Opt-in updated for ${incomingPhone}: ${isOptedIn}`);
+
+    // Twilio expects a TwiML response (even if empty)
+    res.type('text/xml').send("<Response></Response>");
+  } catch (error) {
+    console.error("SMS Webhook Error:", error);
+    res.status(500).send("Internal Error");
+  }
+});
 
 // Add a webhook handler to create the booking when payment is successful
 app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {

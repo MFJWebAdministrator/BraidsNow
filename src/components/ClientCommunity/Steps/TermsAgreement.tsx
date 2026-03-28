@@ -52,6 +52,29 @@ export function TermsAgreement({ form }: TermsAgreementProps) {
         )}
       />
 
+      <FormField
+        control={form.control}
+        name="agreeToSMS"
+        render={({ field }) => (
+          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+            <FormControl>
+              <Checkbox
+                checked={field.value}
+                onCheckedChange={field.onChange}
+              />
+            </FormControl>
+            <div className="space-y-1 leading-none">
+              <FormLabel className="text-sm text-black font-light leading-snug cursor-pointer">
+                By checking this box, I agree to receive appointment updates and booking 
+                confirmations via SMS from **BraidsNow.com LLC**. Message and data rates 
+                may apply. Message frequency varies based on appointment activity. 
+                Reply STOP to unsubscribe.
+              </FormLabel>
+            </div>
+          </FormItem>
+        )}
+      />
+      
       <TermsModal 
         isOpen={isTermsModalOpen}
         onClose={() => setIsTermsModalOpen(false)}

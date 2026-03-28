@@ -28,6 +28,7 @@ interface SmsData {
     phoneNumber: string;
     clientName?: string;
     stylistName?: string;
+    smsOptIn?: boolean;
 }
 
 interface AppointmentSmsData {
@@ -147,7 +148,7 @@ export class SmsService {
         data,
         customMessage,
     }: {
-        type: SmsType;
+        type: SmsType; | null;
         data: SmsData;
         customMessage?: string;
     }): Promise<void> {
@@ -155,6 +156,11 @@ export class SmsService {
             console.warn("Twilio not configured. Skipping SMS send.");
             return;
         }
+
+    if (data.smsOptIn === false) {
+            console.log('SMS skipped for ${data.phoneNumber}: User has not opted in.');
+            return;
+    }
 
         try {
             const message = customMessage || this.smsTemplates[type](data);

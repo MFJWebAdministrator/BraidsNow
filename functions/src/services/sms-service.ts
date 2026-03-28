@@ -140,11 +140,11 @@ export class SmsService {
             `Hi ${data.recipientName}, ${data.rejectedBy} has declined your reschedule proposal for your ${data.serviceName} appointment.\n\nYour appointment remains scheduled for: ${data.oldAppointmentDate} at ${data.oldAppointmentTime}\n\nIf you need to reschedule, please contact your stylist directly.\n- BraidsNow.com`,
     };
 
-    /**
+/**
      * Generic SMS sender with error handling and templating
      */
-    static async sendSms(data: {
-        type: SmsType;
+    static async sendSms(params: {
+        type: SmsType | null;
         data: SmsData;
         customMessage?: string;
     }): Promise<void> {
@@ -153,21 +153,29 @@ export class SmsService {
             return;
         }
 
-        // The Opt-In Check
-        if (data.data.smsOptIn === false) {
+        // The Opt-In Check: Check the nested data object
+        if (params.data.smsOptIn === false) {
             console.log(`Skipping SMS: User has opted out.`);
             return;
         }
+
         try {
-            const message = customMessage || this.smsTemplates[type](data);
+            // Use params.customMessage and params.type
+            const message = params.customMessage || (params.type ? this.smsTemplates[params.type](params.data) : "");
+            
+            if (!message) {
+                console.error("No message content provided for SMS");
+                return;
+            }
+
             await twilioClient.messages.create({
                 body: message,
                 from: fromNumber,
-                to: data.phoneNumber,
+                to: params.data.phoneNumber,
             });
-            console.log(`SMS sent to ${data.phoneNumber} [${type}]`);
+            console.log(`SMS sent to ${params.data.phoneNumber} [${params.type || 'custom'}]`);
         } catch (error) {
-            console.error(`Failed to send SMS to ${data.phoneNumber}:`, error);
+            console.error(`Failed to send SMS to ${params.data.phoneNumber}:`, error);
             throw error;
         }
     }

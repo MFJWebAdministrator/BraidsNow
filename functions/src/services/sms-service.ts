@@ -143,25 +143,21 @@ export class SmsService {
     /**
      * Generic SMS sender with error handling and templating
      */
-    static async sendSms({
-        type,
-        data,
-        customMessage,
-    }: {
-        type: SmsType; | null;
+    static async sendSms(data: {
+        type: SmsType;
         data: SmsData;
         customMessage?: string;
     }): Promise<void> {
         if (!twilioClient) {
-            console.warn("Twilio not configured. Skipping SMS send.");
+            console.error("Twilio client not initialized");
             return;
         }
 
-    if (data.smsOptIn === false) {
-            console.log('SMS skipped for ${data.phoneNumber}: User has not opted in.');
+        // The Opt-In Check
+        if (data.data.smsOptIn === false) {
+            console.log(`Skipping SMS: User has opted out.`);
             return;
-    }
-
+        }
         try {
             const message = customMessage || this.smsTemplates[type](data);
             await twilioClient.messages.create({

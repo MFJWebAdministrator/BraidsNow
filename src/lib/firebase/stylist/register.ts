@@ -5,10 +5,10 @@ import {
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "../config";
 import { uploadProfileImage } from "../storage/uploadProfileImage";
-import type { StylistRegistrationForm } from "@/lib/schemas/stylist-registration";
+// import type { StylistRegistrationForm } from "@/lib/schemas/stylist-registration";
 
 export async function registerStylist(
-    data: StylistRegistrationForm,
+    data: any,
     profileImage: File | null
 ) {
     // Create user account

@@ -70,6 +70,7 @@ export function StylistRegistrationForm() {
             state: "",
             zipCode: "",
             agreeToTerms: false,
+            agreeToSMS: false,
         },
     });
 

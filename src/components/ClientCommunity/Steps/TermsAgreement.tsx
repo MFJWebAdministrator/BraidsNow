@@ -63,13 +63,13 @@ export function TermsAgreement({ form }: TermsAgreementProps) {
                 onCheckedChange={field.onChange}
               />
             </FormControl>
-            <div className="space-y-1 leading-none">
-              <FormLabel className="text-sm text-black font-light leading-snug cursor-pointer">
-                By checking this box, I agree to receive appointment updates and booking 
+           <div className="space-y-1 leading-none">
+              <p className="text-sm text-black tracking-normal font-light">
+                 By checking this box, I agree to receive appointment updates and booking 
                 confirmations via SMS from **BraidsNow.com LLC**. Message and data rates 
                 may apply. Message frequency varies based on appointment activity. 
                 Reply STOP to unsubscribe.
-              </FormLabel>
+              </p>
             </div>
           </FormItem>
         )}

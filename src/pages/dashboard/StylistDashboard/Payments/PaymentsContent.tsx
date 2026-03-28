@@ -1,4 +1,4 @@
-import { Key, useEffect, useState } from "react";
+import { Key, useEffect, useRef, useState } from "react";
 import {
     loadStripe,
     StripeConnect,
@@ -40,13 +40,18 @@ export function PaymentsContent() {
     // const [setCancelLoading] = useState(false);
     const [reactivateLoading, setReactivateLoading] = useState(false);
     const [connectLoading, setConnectLoading] = useState(false);
-
+    const hasShownToast = useRef(false);
+   const success = searchParams.get("success");
+        const canceled = searchParams.get("canceled");
+          const accountSuccess = searchParams.get("account_success");
+        const accountCanceled = searchParams.get("account_canceled");
     // Check for success or canceled URL parameters
     useEffect(() => {
-        const success = searchParams.get("success");
-        const canceled = searchParams.get("canceled");
+     
+         if (hasShownToast.current) return;
 
         if (success === "true") {
+             hasShownToast.current = true;
             toast({
                 title: "Subscription Activated",
                 description:
@@ -54,20 +59,24 @@ export function PaymentsContent() {
                 variant: "default",
                 duration: 3000,
             });
+            return
         } else if (canceled === "true") {
+             hasShownToast.current = true;
             toast({
                 title: "Subscription Canceled",
                 description: "Your subscription setup was canceled.",
                 variant: "destructive",
                 duration: 3000,
             });
+            return
+
         }
 
         // Check for account setup success or failure
-        const accountSuccess = searchParams.get("account_success");
-        const accountCanceled = searchParams.get("account_canceled");
+      
 
         if (accountSuccess === "true") {
+             hasShownToast.current = true;
             toast({
                 title: "Account Setup Complete",
                 description:
@@ -75,15 +84,20 @@ export function PaymentsContent() {
                 variant: "default",
                 duration: 3000,
             });
+            return
+
         } else if (accountCanceled === "true") {
+             hasShownToast.current = true;
             toast({
                 title: "Account Setup Canceled",
                 description: "Your payout account setup was canceled.",
                 variant: "destructive",
                 duration: 3000,
             });
+            return
+
         }
-    }, [searchParams, toast]);
+    }, [success, canceled, accountSuccess, accountCanceled]);
 
     // Refetch subscription status when URL params change
     useEffect(() => {
@@ -91,6 +105,7 @@ export function PaymentsContent() {
             searchParams.get("success") === "true" ||
             searchParams.get("account_success") === "true"
         ) {
+            //  hasShownToast.current = false;
             // Refetch status after successful operations
             refetch();
         }

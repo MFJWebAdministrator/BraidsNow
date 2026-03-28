@@ -41,7 +41,7 @@ export function FavoritesContent() {
           key={stylist.id}
           stylist={{ ...stylist, isFavorite: true }}
           onToggleFavorite={() => toggleFavorite(stylist)}
-          onViewProfile={() => navigate(`/stylist/${stylist.id}`)}
+          onViewProfile={() => navigate(`/${stylist?.username}`)}
         />
       ))}
     </div>

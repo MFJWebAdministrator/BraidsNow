@@ -146,7 +146,7 @@ export function useFindStylists() {
     };
 
     const handleViewProfile = (stylistId: string) => {
-        navigate(`/stylist/${stylistId}`);
+        navigate(`/${stylistId}`);
     };
 
     // Add a manual refresh function

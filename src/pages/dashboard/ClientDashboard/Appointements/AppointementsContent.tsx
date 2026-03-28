@@ -228,30 +228,69 @@ export function AppointementsContent() {
 
             {/* Appointments Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-lg">
+                <TabsList
+                    className="
+                        grid w-full 
+                        grid-cols-2 sm:grid-cols-4 
+                        bg-gray-100 p-1 rounded-lg
+                        gap-2 sm:gap-0
+                    "
+                >
                     <TabsTrigger
-                        className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
+                        className="
+                            data-[state=active]:bg-white 
+                            data-[state=active]:shadow-sm 
+                            font-medium
+                            text-xs sm:text-base
+                            px-2 py-1 sm:px-0 sm:py-2
+                            whitespace-normal
+                        "
                         value="to-be-paid"
                     >
-                        Payment Due ({toBePaidAppointmentsCount})
+                        Payment Due
+                        <span className="ml-1">({toBePaidAppointmentsCount})</span>
                     </TabsTrigger>
                     <TabsTrigger
-                        className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
+                        className="
+                            data-[state=active]:bg-white 
+                            data-[state=active]:shadow-sm 
+                            font-medium
+                            text-xs sm:text-base
+                            px-2 py-1 sm:px-0 sm:py-2
+                            whitespace-normal
+                        "
                         value="today"
                     >
-                        Today ({todaysAppointments.length})
+                        Today
+                        <span className="ml-1">({todaysAppointments.length})</span>
                     </TabsTrigger>
                     <TabsTrigger
-                        className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
+                        className="
+                            data-[state=active]:bg-white 
+                            data-[state=active]:shadow-sm 
+                            font-medium
+                            text-xs sm:text-base
+                            px-2 py-1 sm:px-0 sm:py-2
+                            whitespace-normal
+                        "
                         value="upcoming"
                     >
-                        Upcoming ({upcomingAppointments.length})
+                        Upcoming
+                        <span className="ml-1">({upcomingAppointments.length})</span>
                     </TabsTrigger>
                     <TabsTrigger
-                        className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
+                        className="
+                            data-[state=active]:bg-white 
+                            data-[state=active]:shadow-sm 
+                            font-medium
+                            text-xs sm:text-base
+                            px-2 py-1 sm:px-0 sm:py-2
+                            whitespace-normal
+                        "
                         value="pending"
                     >
-                        Pending ({pendingAppointments.length})
+                        Pending
+                        <span className="ml-1">({pendingAppointments.length})</span>
                     </TabsTrigger>
                 </TabsList>
 
@@ -360,7 +399,7 @@ export function AppointementsContent() {
                 </TabsContent>
 
                 <TabsContent value="pending" className="space-y-4">
-                    {pendingAppointments.length === 0 ? (
+                    {pendingAppointments?.length === 0 ? (
                         <Card className="border border-gray-200 shadow-sm">
                             <CardContent className="p-8 text-center">
                                 <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -382,7 +421,7 @@ export function AppointementsContent() {
                         </Card>
                     ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            {pendingAppointments.map((appointment) => (
+                            {pendingAppointments?.map((appointment) => (
                                 <AppointmentCard
                                     key={appointment.id}
                                     appointment={appointment}

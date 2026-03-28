@@ -12,6 +12,9 @@ import { AdditionalServicesSection } from "./sections/AdditionalServicesSection"
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { DEFAULT_SCHEDULE } from "@/hooks/use-schedule";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
+import { useEffect, useState } from "react";
 
 interface ProfileContentProps {
     stylistId: string;
@@ -20,7 +23,29 @@ interface ProfileContentProps {
 export function ProfileContent({ stylistId }: ProfileContentProps) {
     const { stylist, loading, error } = useStylistProfile(stylistId);
     const { user } = useAuth();
-    const isOwner = user?.uid === stylistId;
+   const [stylistDocId, setStylistDocId] = useState<string | null>(null);
+
+useEffect(() => {
+    const fetchStylistDocId = async () => {
+        try {
+            const stylistsRef = collection(db, "stylists");
+            const q = query(stylistsRef, where("username", "==", stylistId));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                setStylistDocId(querySnapshot.docs[0].id);
+            }
+        } catch (error) {
+            console.error("Error fetching stylist doc:", error);
+        }
+    };
+
+    if (stylistId) {
+        fetchStylistDocId();
+    }
+}, [stylistId]);
+    const isOwner = user?.uid === stylistDocId;
+
 
     if (loading) {
         return (
@@ -33,7 +58,11 @@ export function ProfileContent({ stylistId }: ProfileContentProps) {
     if (error || !stylist) {
         return (
             <div className="flex justify-center items-center min-h-[60vh]">
-                <p className="text-red-600">Failed to load stylist profile</p>
+                <p className="text-red-600">
+                    {error || !stylist
+                        ? `No stylist found with username: ${stylistId}`
+                        : "Failed to load stylist profile"}
+                </p>
             </div>
         );
     }
@@ -42,7 +71,7 @@ export function ProfileContent({ stylistId }: ProfileContentProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="space-y-8">
                 {/* Profile Header */}
-                <ProfileHeader stylist={stylist} />
+                <ProfileHeader stylist={stylist} isOwner={isOwner} />
 
                 {/* Main Content Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

@@ -42,6 +42,7 @@ export function SettingsForm() {
             </div>
         );
     }
+    
 
     return (
         <Form {...form}>
@@ -80,7 +81,7 @@ export function SettingsForm() {
 
                             <div className="flex-1">
                                 <CopyableLink
-                                    url={`${VITE_APP_DOMAIN}/stylist/${userData?.uid || ""}`}
+                                    url={`${VITE_APP_DOMAIN}/${userData?.username || ""}`}
                                     label="Your BraidsNow.com Unique Link"
                                     description="Share this link to promote your services"
                                 />

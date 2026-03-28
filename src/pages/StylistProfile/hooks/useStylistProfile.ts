@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import type { Stylist } from '@/pages/FindStylists/types';
 import type { Schedule } from '@/lib/schemas/schedule';
 
-export function useStylistProfile(stylistId: string) {
+export function useStylistProfile(stylistUserName: string) {
   const [stylist, setStylist] = useState<Stylist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -12,6 +12,17 @@ export function useStylistProfile(stylistId: string) {
   useEffect(() => {
     const fetchStylist = async () => {
       try {
+        const stylistsRef = collection(db, 'stylists');
+        const q = query(stylistsRef, where('username', '==', stylistUserName));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+          setError('Stylist not found');
+          setLoading(false);
+          return;
+        }
+
+        const stylistId = querySnapshot.docs[0].id;
         const stylistRef = doc(db, 'stylists', stylistId);
         const scheduleRef = doc(db, 'stylists', stylistId, 'settings', 'schedule');
         
@@ -71,7 +82,7 @@ export function useStylistProfile(stylistId: string) {
     };
 
     fetchStylist();
-  }, [stylistId]);
+  }, [stylistUserName]);
 
   return { stylist, loading, error };
 }

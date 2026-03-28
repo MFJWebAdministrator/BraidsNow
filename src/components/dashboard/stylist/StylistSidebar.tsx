@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import {
     LayoutDashboard,
@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { LogoutConfirmation } from "@/components/dashboard/client/LogoutConfirmation";
 import { useAuth } from "@/hooks/use-auth";
 import { useSubscription } from "@/hooks/use-subscription";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
 
 const links = [
     {
@@ -88,7 +90,21 @@ export function StylistSidebar() {
     const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
     const { user } = useAuth();
     const { hasAccess, isLoading, subscriptionStatus } = useSubscription();
+    const [username, setUsername] = useState<string | null>(null);
+const getUsernameFromUid = async (uid: string) => {
+  const docRef = doc(db, "stylists", uid);
+  const snapshot = await getDoc(docRef);
 
+  if (!snapshot.exists()) return null;
+
+  return snapshot.data().username;
+};
+useEffect(()=>{
+console.log("getUsernameFromUid",user?.uid);
+getUsernameFromUid(user?.uid || "").then((username) => {
+  setUsername(username);
+});
+},[user])
     const renderNavLink = (link: (typeof links)[0]) => {
         const { href, label, icon: Icon, requiresSubscription } = link;
         const isLocked = requiresSubscription && !hasAccess;
@@ -185,7 +201,7 @@ export function StylistSidebar() {
 
                 {/* My Profile Link */}
                 <NavLink
-                    to={`/stylist/${user?.uid}`}
+                    to={`/${username || ""}`}
                     className={({ isActive }) =>
                         cn(
                             "flex items-center space-x-2 px-3 py-2 rounded-lg text-sm transition-colors",

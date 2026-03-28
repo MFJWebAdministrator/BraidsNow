@@ -73,14 +73,14 @@ export function Footer() {
                                     Business Tools
                                 </Link>
                             </li>
-                            <li>
+                            {/* <li>
                                 <Link
                                     to="/success-stories"
                                     className="text-white hover:text-[#FBCC14] tracking-normal font-light"
                                 >
                                     Success Stories
                                 </Link>
-                            </li>
+                            </li> */}
                         </ul>
                     </div>
 
@@ -127,7 +127,7 @@ export function Footer() {
                 <div className="mt-12 pt-8 border-t border-[#B98EC1]">
                     <div className="text-center text-white text-md tracking-normal font-light">
                         <p>
-                            © 2025 BraidsNow.com. All Rights Reserved | Built
+                            © {new Date().getFullYear()} BraidsNow.com. All Rights Reserved | Built
                             by{" "}
                             <a
                                 href="https://mfjdev.com"

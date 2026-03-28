@@ -145,7 +145,7 @@ export class SmsService {
      */
     static async sendSms(params: {
         type: SmsType | null;
-        data: SmsData;
+        data: any; 
         customMessage?: string;
     }): Promise<void> {
         if (!twilioClient) {
@@ -153,14 +153,15 @@ export class SmsService {
             return;
         }
 
-        // The Opt-In Check: Check the nested data object
-        if (params.data.smsOptIn === false) {
-            console.log(`Skipping SMS: User has opted out.`);
+        // The Opt-In Check
+        // If smsOptIn is explicitly false, we skip. 
+        // If it's undefined or true, we proceed (to support existing users).
+        if (params.data && params.data.smsOptIn === false) {
+            console.log(`Skipping SMS to ${params.data.phoneNumber}: User has opted out.`);
             return;
         }
 
         try {
-            // Use params.customMessage and params.type
             const message = params.customMessage || (params.type ? this.smsTemplates[params.type](params.data) : "");
             
             if (!message) {

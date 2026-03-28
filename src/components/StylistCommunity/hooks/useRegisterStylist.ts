@@ -20,7 +20,15 @@ export function useRegisterStylist() {
             setIsLoading(true);
             // get user by email first to check if the email is already in use
 
-            const user = await registerStylist(data, profileImage);
+            const formattedPhone = '+1${data.phone.replace(/\D/g, "")}`;
+            const enrichedData = {
+                ...data,
+                phone: formattedPhone,
+                smsOptIn: data.agreeToSMS,
+                smsOptInTimestamp: data.agreeToSMS ? new Data().toISOString()
+            };
+
+            const user = await registerStylist(enrichedData, profileImage);
 
             toast({
                 title: "Welcome to BraidsNow.com!",
@@ -38,10 +46,12 @@ export function useRegisterStylist() {
                     });
 
                     // send welcome sms
-                    await sendWelcomeStylistSms(
-                        `${data.firstName} ${data.lastName}`,
-                        data.phone
-                    );
+                    if (data.agreeToSMS) {
+                        await sendWelcomeStylistSms(
+                            `${data.firstName} ${data.lastName}`,
+                            data.formattedPhone
+                        );
+                    }
                 } catch (error) {
                     console.error("Error sending welcome email:", error);
                 }

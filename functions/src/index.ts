@@ -2092,6 +2092,13 @@ app.post("/sms-webhook", async (req: Request, res: Response) => {
     } else if (["START", "UNSTOP", "YES"].includes(messageText)) {
       isOptedIn = true;
       statusReason = `User opted back in via SMS: ${messageText}`;
+
+        // Send confirmation text back via TwiML
+        return res.type('text/xml').send(`
+            <Response>
+                <Message>Welcome back! You have successfully resubscribed to BraidsNow.com updates.</Message>
+            </Response>
+            `);
     } else {
       // It's a normal message, no opt-in change needed
       return res.status(200).send("<Response></Response>");

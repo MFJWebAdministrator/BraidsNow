@@ -61,6 +61,8 @@ export const stylistRegistrationSchema = z.object({
     zipCode: z.string().regex(/^\d{5}$/, "ZIP code must be 5 digits"),
     agreeToTerms: z.boolean().refine((val) => val === true, {
         message: "You must agree to the terms and conditions",
+    agreeToSMS: z.boolean().default(false), {
+        message: "By checking this box, I agree to receive appointment updates and booking confirmations via SMS from BraidsNow.com LLC. Message and data rates may apply. Message frequency varies based on appointment activity. Reply STOP to unsubscribe.",
     }),
 });
 

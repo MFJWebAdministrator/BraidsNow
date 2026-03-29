@@ -1854,7 +1854,7 @@ export const cronJob = onSchedule(
                 .where("expiresAt", "<=", now)
                 .get();
 
-            if (!expiredBookingsQuery.empty) {
+            if (expiredBookingsQuery.empty) {
                 console.log("No expired pending bookings found.");
             } else {
                 const expiredBookingIds: string[] = [];
@@ -2043,18 +2043,18 @@ export const cronJob = onSchedule(
             console.log("confirmedBookings", confirmedBookings.length);
 
             for (const booking of confirmedBookings) {
-                const bookingDate = booking.dateTime;
-
+                // booking.dateTime is already a Firestore Timestamp object
+                const bookingDateTimestamp = booking.dateTime;
                 const now = admin.firestore.Timestamp.now();
-                const bookingDateTimestamp =
-                    admin.firestore.Timestamp.fromDate(bookingDate);
 
-                if (now > bookingDateTimestamp) {
+                // Compare them using milliseconds to avoid the TypeError
+                if (now.toMillis() > bookingDateTimestamp.toMillis()) {
                     await db
                         .collection("bookings")
                         .doc(booking.bookingId)
                         .update({
                             status: "to-be-paid",
+                            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                         });
                 }
             }

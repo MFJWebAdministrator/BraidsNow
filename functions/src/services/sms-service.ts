@@ -120,9 +120,9 @@ interface RescheduleRejectedSmsData {
 export class SmsService {
     private static smsTemplates: Record<SmsType, (data: any) => string> = {
         welcomeClient: (data) =>
-            `Hi ${data.clientName}! Welcome to BraidsNow.com. You can now book with top stylists near you. Ready to get started? Visit https://braidsnow.com/find-stylists\n- BraidsNow.com`,
+            `Hi ${data.clientName}! Welcome to BraidsNow.com. You can now book with top stylists near you. Ready to get started? Visit https://braidsnow.com/find-stylists\n- BraidsNow.com\n\n*You've opted in to booking and payment updates. Message and data rates may apply. Message frequency varies based on appointment activity. Reply STOP to unsubscribe.`,
         welcomeStylist: (data) =>
-            `Hi ${data.stylistName}! Welcome to BraidsNow.com. Setup payouts, add services, and set your schedule now. Visit https://braidsnow.com/dashboard/stylist\n- BraidsNow.com`,
+            `Hi ${data.stylistName}! Welcome to BraidsNow.com. Setup payouts, add services, and set your schedule now. Visit https://braidsnow.com/dashboard/stylist\n- BraidsNow.com\n\n*You've opted in to booking and payment updates. Message and data rates may apply. Message frequency varies based on appointment activity. Reply STOP to unsubscribe.`,
         appointmentBookedStylist: (data: AppointmentSmsData) =>
             `Hi ${data.stylistName},\nYou have a new appointment request.\n\nDate: ${data.appointmentDate}\nTime: ${data.appointmentTime}\nService: ${data.serviceName}\nClient: ${data.clientName}\n\nPlease review and accept or reject this booking in your dashboard.\n\nThank you,\nBraidsNow.com Team`,
         subscriptionPaymentFailedStylist: (

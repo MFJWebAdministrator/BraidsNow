@@ -162,6 +162,8 @@ export class SmsService {
         data: any; 
         customMessage?: string;
     }): Promise<void> {
+		console.log(`DEBUG: SMS Service checking ${params.data?.phoneNumber}. OptIn is: ${params.data?.smsOptIn} (Type: ${typeof params.data?.smsOptIn})`);
+		
         if (!twilioClient) {
             console.error("Twilio client not initialized");
             return;

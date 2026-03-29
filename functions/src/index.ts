@@ -1978,28 +1978,57 @@ export const cronJob = onSchedule(
                 .get();
 
             // check if the confirmed bookings are started, if so we can update their status to be-paid
-            const confirmedBookings = confirmedBookingsQuery.docs.map((doc) =>
-                doc.data()
-            );
+            const confirmedBookings = confirmedBookingsQuery.docs.map((doc) => {
+				const data = doc.data();
+				return {
+					bookingId: doc.id,
+					id: doc.id,
+					dateTime: data.dateTime,
+					...data
+				};
+            });
 
             console.log("confirmedBookings", confirmedBookings.length);
 
             for (const booking of confirmedBookings) {
-                // booking.dateTime is already a Firestore Timestamp object
-                const bookingDateTimestamp = booking.dateTime;
-                const now = admin.firestore.Timestamp.now();
+				// 1. Identify and Validate the ID
+				// Check both common property names; if both are missing, skip this iteration.
+				const bId = booking.bookingId || booking.id; 
 
-                // Compare them using milliseconds to avoid the TypeError
-                if (now.toMillis() > bookingDateTimestamp.toMillis()) {
-                    await db
-                        .collection("bookings")
-                        .doc(booking.bookingId)
-                        .update({
-                            status: "to-be-paid",
-                            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                        });
-                }
-            }
+				if (!bId) {
+					console.error("Skipping booking: No valid ID found in object.", booking);
+					continue; 
+				}
+
+				// 2. Get the raw value
+				const bookingDateRaw = booking.dateTime;
+				
+				// Safety check: if dateTime is missing, skip to avoid the next error
+				if (!bookingDateRaw) {
+					console.warn(`Booking ${bId} is missing a dateTime field.`);
+					continue;
+				}
+
+				const nowMillis = admin.firestore.Timestamp.now().toMillis();
+
+				// 3. Safe conversion for Timestamp vs JS Date
+				const bookingMillis = (typeof bookingDateRaw.toMillis === 'function') 
+					? bookingDateRaw.toMillis() 
+					: new Date(bookingDateRaw).getTime();
+
+				// 4. Compare and Update
+				if (nowMillis > bookingMillis) {
+					await db
+						.collection("bookings")
+						.doc(bId) // Use the validated ID variable
+						.update({
+							status: "to-be-paid",
+							updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+						});
+						
+					console.log(`Updated booking ${bId} to to-be-paid.`);
+				}
+			}
 
             return null;
         } catch (error) {

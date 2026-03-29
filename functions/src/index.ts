@@ -10,7 +10,7 @@ import Stripe from "stripe";
 import { EmailService } from "./services/email-service";
 import { SmsService } from "./services/sms-service";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { getBookingExpiresAt } from "./utils/utils";
+import { getBookingExpiresAt, getSmsPreference } from "./utils/utils";
 import { format } from "date-fns";
 
 const app = express();
@@ -1030,27 +1030,26 @@ app.post(
                     }
                 }, 0);
 
-                setTimeout(async () => {
-                    try {
-                        await SmsService.sendAppointmentAcceptedClientSms({
-                            clientName: bookingData.clientName,
-                            phoneNumber: bookingData.clientPhone,
-                            stylistName: bookingData.stylistName,
-                            appointmentDate: date,
-                            appointmentTime: time + " UTC",
-                            serviceName: bookingData.serviceName,
-                        });
-                    } catch (error) {
-                        console.error(
-                            "Error sending appointment accepted sms to client:",
-                            error
-                        );
-                    }
-                }, 0);
+                try {
+					// 1. Fetch the client's preference from the 'users' collection
+					const clientOptIn = await getSmsPreference(db, bookingData.clientId, "users");
 
-                console.log(
-                    `Booking ${bookingId} accepted by stylist ${userId}`
-                );
+					// 2. Call the service directly (no setTimeout) and pass the preference
+					await SmsService.sendAppointmentAcceptedClientSms({
+						clientName: bookingData.clientName,
+						phoneNumber: bookingData.clientPhone,
+						stylistName: bookingData.stylistName,
+						appointmentDate: date,
+						appointmentTime: time + " UTC",
+						serviceName: bookingData.serviceName,
+						smsOptIn: clientOptIn, // The "Gatekeeper" data
+					});
+				} catch (error) {
+					console.error(
+						"Error sending appointment accepted sms to client:",
+						error
+					);
+				}
 
                 return res.status(200).json({
                     success: true,
@@ -1505,42 +1504,28 @@ app.post(
             }, 0);
 
             // Send SMS to stylist
-            setTimeout(async () => {
-                try {
-                    await SmsService.sendAppointmentCancelledSmsForStylist({
-                        stylistName: bookingData.stylistName || "Stylist",
-                        phoneNumber: bookingData.stylistPhone,
-                        clientName: bookingData.clientName || "Client",
-                        serviceName: bookingData.serviceName,
-                        appointmentDate: bookingData.date,
-                        appointmentTime: bookingData.time,
-                    });
-                } catch (error) {
-                    console.error(
-                        "Error sending cancellation SMS to stylist:",
-                        error
-                    );
-                }
-            }, 0);
+			const stylistOptIn = await getSmsPreference(db, bookingData.stylistId, "stylists");
+            await SmsService.sendAppointmentCancelledSmsForStylist({
+				stylistName: bookingData.stylistName,
+				phoneNumber: bookingData.stylistPhone,
+				clientName: bookingData.clientName,
+				appointmentDate: date,
+				appointmentTime: time,
+				serviceName: bookingData.serviceName,
+				smsOptIn: stylistOptIn, // The firewall data
+			});	
 
             // Send SMS to client
-            setTimeout(async () => {
-                try {
-                    await SmsService.sendAppointmentCancelledSmsForClient({
-                        clientName: bookingData.clientName || "Client",
-                        phoneNumber: bookingData.clientPhone,
-                        stylistName: bookingData.stylistName || "Stylist",
-                        serviceName: bookingData.serviceName,
-                        appointmentDate: date,
-                        appointmentTime: time,
-                    });
-                } catch (error) {
-                    console.error(
-                        "Error sending cancellation SMS to client:",
-                        error
-                    );
-                }
-            }, 0);
+			const clientOptIn = await getSmsPreference(db, bookingData.userId, "users");
+            await SmsService.sendAppointmentCancelledSmsForClient({
+				clientName: bookingData.clientName,
+				phoneNumber: bookingData.clientPhone,
+				stylistName: bookingData.stylistName,
+				appointmentDate: date,
+				appointmentTime: time,
+				serviceName: bookingData.serviceName,
+				smsOptIn: clientOptIn, // The firewall data
+			});
 
             // TODO: send push notification to stylist and client
 
@@ -1777,42 +1762,28 @@ app.post(
 
             // Send SMS Notifications
             // Send SMS to client
-            setTimeout(async () => {
-                try {
-                    await SmsService.sendAppointmentCancelledSmsForClient({
-                        clientName: bookingData.clientName || "Client",
-                        phoneNumber: bookingData.clientPhone,
-                        stylistName: bookingData.stylistName || "Stylist",
-                        serviceName: bookingData.serviceName,
-                        appointmentDate: date,
-                        appointmentTime: time,
-                    });
-                } catch (error) {
-                    console.error(
-                        "Error sending cancellation SMS to client:",
-                        error
-                    );
-                }
-            }, 0);
+			const clientOptIn = await getSmsPreference(db, bookingData.userId, "users");
+            await SmsService.sendAppointmentCancelledSmsForClient({
+				clientName: bookingData.clientName,
+				phoneNumber: bookingData.clientPhone,
+				stylistName: bookingData.stylistName,
+				appointmentDate: date,
+				appointmentTime: time,
+				serviceName: bookingData.serviceName,
+				smsOptIn: clientOptIn, // The firewall data
+			});
 
             // Send SMS to stylist
-            setTimeout(async () => {
-                try {
-                    await SmsService.sendAppointmentCancelledSmsForStylist({
-                        stylistName: bookingData.stylistName || "Stylist",
-                        phoneNumber: bookingData.stylistPhone,
-                        clientName: bookingData.clientName || "Client",
-                        serviceName: bookingData.serviceName,
-                        appointmentDate: date,
-                        appointmentTime: time,
-                    });
-                } catch (error) {
-                    console.error(
-                        "Error sending cancellation SMS to stylist:",
-                        error
-                    );
-                }
-            }, 0);
+			const stylistOptIn = await getSmsPreference(db, bookingData.stylistId, "stylists");
+            await SmsService.sendAppointmentCancelledSmsForStylist({
+				stylistName: bookingData.stylistName,
+				phoneNumber: bookingData.stylistPhone,
+				clientName: bookingData.clientName,
+				appointmentDate: date,
+				appointmentTime: time,
+				serviceName: bookingData.serviceName,
+				smsOptIn: stylistOptIn, // The firewall data
+			});
 
             // TODO: send push notification to stylist and client
 
@@ -1927,91 +1898,62 @@ export const cronJob = onSchedule(
                             });
                         }
 
-                        // Send email/sms notifications to client
-                        const date = format(bookingData.dateTime, "yyyy-MM-dd");
-                        const time =
-                            format(bookingData.dateTime, "HH:mm") + " UTC";
+                        // Send email/sms notifications
+						const date = format(bookingData.dateTime, "yyyy-MM-dd");
+						const time = format(bookingData.dateTime, "HH:mm") + " UTC";
 
-                        //TODO: email
-                        setTimeout(async () => {
-                            try {
-                                await EmailService.sendAppointmentAutoCancelledForClient(
-                                    {
-                                        clientName: bookingData.clientName,
-                                        clientEmail: bookingData.clientPhone,
-                                        stylistName: bookingData.stylistName,
-                                        appointmentDate: date,
-                                        appointmentTime: time,
-                                        serviceName: bookingData.serviceName,
-                                    }
-                                );
-                            } catch (error) {
-                                console.log(
-                                    `Error sending sms to client ${bookingData.clientName} for booking ${bookingId}: `,
-                                    error
-                                );
-                            }
-                        }, 0);
+						try {
+							// 1. Resolve preferences using your global helper
+							const [clientOptIn, stylistOptIn] = await Promise.all([
+								getSmsPreference(db, bookingData.userId, "users"),
+								getSmsPreference(db, bookingData.stylistId, "stylists")
+							]);
 
-                        setTimeout(async () => {
-                            try {
-                                await EmailService.sendAppointmentAutoCancelledForStylist(
-                                    {
-                                        clientName: bookingData.clientName,
-                                        stylistEmail: bookingData.clientPhone,
-                                        stylistName: bookingData.stylistName,
-                                        appointmentDate: date,
-                                        appointmentTime: time,
-                                        serviceName: bookingData.serviceName,
-                                    }
-                                );
-                            } catch (error) {
-                                console.log(
-                                    `Error sending sms to stylist ${bookingData.stylistName} for booking ${bookingId}: `,
-                                    error
-                                );
-                            }
-                        }, 0);
+							// 2. Send Emails (Await these directly, no setTimeout)
+							await Promise.all([
+								EmailService.sendAppointmentAutoCancelledForClient({
+									clientName: bookingData.clientName,
+									clientEmail: bookingData.clientEmail, // Ensure this field name is correct in your data
+									stylistName: bookingData.stylistName,
+									appointmentDate: date,
+									appointmentTime: time,
+									serviceName: bookingData.serviceName,
+								}),
+								EmailService.sendAppointmentAutoCancelledForStylist({
+									clientName: bookingData.clientName,
+									stylistEmail: bookingData.stylistEmail, // Ensure this field name is correct in your data
+									stylistName: bookingData.stylistName,
+									appointmentDate: date,
+									appointmentTime: time,
+									serviceName: bookingData.serviceName,
+								})
+							]);
 
-                        setTimeout(async () => {
-                            try {
-                                await SmsService.sendAppointmentAutoCancelledClientSms(
-                                    {
-                                        clientName: bookingData.clientName,
-                                        phoneNumber: bookingData.clientPhone,
-                                        stylistName: bookingData.stylistName,
-                                        appointmentDate: date,
-                                        appointmentTime: time,
-                                        serviceName: bookingData.serviceName,
-                                    }
-                                );
-                            } catch (error) {
-                                console.error(
-                                    `Error sending sms to client ${bookingData.clientName} for booking ${bookingId}:`,
-                                    error
-                                );
-                            }
-                        }, 0);
+							// 3. Send SMS (The SmsService will now handle the "Skipping" log automatically)
+							await Promise.all([
+								SmsService.sendAppointmentAutoCancelledClientSms({
+									clientName: bookingData.clientName,
+									phoneNumber: bookingData.clientPhone,
+									stylistName: bookingData.stylistName,
+									appointmentDate: date,
+									appointmentTime: time,
+									serviceName: bookingData.serviceName,
+									smsOptIn: clientOptIn, // <--- Pass the preference here
+								}),
+								SmsService.sendAppointmentAutoCancelledStylistSms({
+									stylistName: bookingData.stylistName,
+									phoneNumber: bookingData.stylistPhone,
+									clientName: bookingData.clientName,
+									appointmentDate: date,
+									appointmentTime: time,
+									serviceName: bookingData.serviceName,
+									smsOptIn: stylistOptIn, // <--- Pass the preference here
+								})
+							]);
 
-                        setTimeout(async () => {
-                            try {
-                                await SmsService.sendAppointmentAutoCancelledStylistSms(
-                                    {
-                                        stylistName: bookingData.stylistName,
-                                        phoneNumber: bookingData.stylistPhone,
-                                        clientName: bookingData.clientName,
-                                        appointmentDate: date,
-                                        appointmentTime: time,
-                                        serviceName: bookingData.serviceName,
-                                    }
-                                );
-                            } catch (error) {
-                                console.error(
-                                    `Error sending sms to stylist ${bookingData.stylistName} for booking ${bookingId}:`,
-                                    error
-                                );
-                            }
-                        }, 0);
+						} catch (error) {
+							console.error(`Notification error for booking ${bookingId}:`, error);
+						}
                     })
                 );
 
@@ -2452,6 +2394,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                     );
 
                                     // send sms to stylist about the new appointment
+									const isOptedIn = await getSmsPreference(db, req.body.stylistId, "stylists");
                                     await SmsService.sendAppointmentBookedStylistSms(
                                         {
                                             stylistName:
@@ -2463,6 +2406,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                             serviceName:
                                                 bookingData.serviceName,
                                             clientName: bookingData.clientName,
+											smsOptIn: isOptedIn,
                                         }
                                     );
                                 } catch (error) {
@@ -5128,13 +5072,13 @@ app.post(
     // validateFirebaseIdToken,
     async (
         req: RequestWithRawBody & {
-            body: { clientName: string; phoneNumber: string };
+            body: { clientName: string; phoneNumber: string; smsOptIn?: boolean };
             // user?: admin.auth.DecodedIdToken;
         },
         res: Response
     ) => {
         try {
-            const { clientName, phoneNumber } = req.body;
+            const { clientName, phoneNumber, smsOptIn, } = req.body;
 
             if (!clientName || !phoneNumber) {
                 return res
@@ -5142,12 +5086,13 @@ app.post(
                     .json({ error: "Missing required parameters" });
             }
 
-            console.log("clientName", clientName);
-            console.log("phoneNumber", phoneNumber);
+            console.log(`Processing Welcome SMS for: ${clientName}`); 
+            console.log(`Phone: ${phoneNumber} | Opt-In Status: ${smsOptIn}`);
 
             const response = await SmsService.sendWelcomeClientSms({
                 clientName,
                 phoneNumber,
+				smsOptIn,
             });
 
             console.log("response", response);
@@ -5173,23 +5118,27 @@ app.post(
     // validateFirebaseIdToken,
     async (
         req: RequestWithRawBody & {
-            body: { stylistName: string; phoneNumber: string };
+            body: { stylistName: string; phoneNumber: string; smsOptIn?: boolean };
             // user?: admin.auth.DecodedIdToken;
         },
         res: Response
     ) => {
         try {
-            const { stylistName, phoneNumber } = req.body;
+            const { stylistName, phoneNumber, smsOptIn } = req.body;
 
             if (!stylistName || !phoneNumber) {
                 return res
                     .status(400)
                     .json({ error: "Missing required parameters" });
             }
+			
+			console.log(`Processing Welcome SMS for: ${stylistName}`); 
+            console.log(`Phone: ${phoneNumber} | Opt-In Status: ${smsOptIn}`);
 
             const response = await SmsService.sendWelcomeStylistSms({
                 stylistName,
                 phoneNumber,
+				smsOptIn,
             });
 
             console.log("response", response);

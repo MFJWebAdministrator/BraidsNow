@@ -38,24 +38,31 @@ interface AppointmentSmsData {
     appointmentTime: string;
     serviceName: string;
     clientName: string;
+	smsOptIn?: boolean;
 }
 
 interface SubscriptionPaymentFailedStylistSmsData {
     stylistName: string;
     phoneNumber: string;
     updatePaymentUrl: string;
+	smsOptIn?: boolean;
+
 }
 
 interface NewMessageStylistSmsData {
     stylistName: string;
     phoneNumber: string;
     clientName: string;
+	smsOptIn?: boolean;
+
 }
 
 interface NewMessageClientSmsData {
     clientName: string;
     phoneNumber: string;
     stylistName: string;
+	smsOptIn?: boolean;
+
 }
 
 interface FullPaymentReminderClientSmsData {
@@ -66,6 +73,7 @@ interface FullPaymentReminderClientSmsData {
     appointmentDate: string;
     appointmentTime: string;
     balanceAmount: string;
+	smsOptIn?: boolean;
 }
 
 interface PaymentRequestedClientSmsData extends AppointmentSmsData {}
@@ -83,6 +91,8 @@ interface RescheduleProposalSmsData {
     oldAppointmentTime: string;
     newAppointmentDate: string;
     newAppointmentTime: string;
+	smsOptIn?: boolean;
+
 }
 
 interface RescheduleAcceptedSmsData {
@@ -92,6 +102,8 @@ interface RescheduleAcceptedSmsData {
     serviceName: string;
     newAppointmentDate: string;
     newAppointmentTime: string;
+	smsOptIn?: boolean;
+
 }
 
 interface RescheduleRejectedSmsData {
@@ -101,6 +113,8 @@ interface RescheduleRejectedSmsData {
     serviceName: string;
     oldAppointmentDate: string;
     oldAppointmentTime: string;
+	smsOptIn?: boolean;
+
 }
 
 export class SmsService {
@@ -187,6 +201,8 @@ export class SmsService {
     static async sendWelcomeClientSms(data: {
         clientName: string;
         phoneNumber: string;
+		smsOptIn?: boolean;
+
     }): Promise<void> {
         await this.sendSms({ type: "welcomeClient", data });
     }
@@ -197,6 +213,8 @@ export class SmsService {
     static async sendWelcomeStylistSms(data: {
         stylistName: string;
         phoneNumber: string;
+		smsOptIn?: boolean;
+
     }): Promise<void> {
         await this.sendSms({ type: "welcomeStylist", data });
     }
@@ -256,6 +274,8 @@ export class SmsService {
         appointmentDate: string;
         appointmentTime: string;
         serviceName: string;
+		smsOptIn?: boolean;
+
     }): Promise<void> {
         const message = `Hi ${data.clientName},\nYour appointment for ${data.serviceName} with ${data.stylistName} on ${data.appointmentDate} at ${data.appointmentTime} has been accepted!\n\nWe look forward to seeing you.\n— BraidsNow.com`;
         await this.sendSms({
@@ -275,6 +295,8 @@ export class SmsService {
         appointmentDate: string;
         appointmentTime: string;
         serviceName: string;
+		smsOptIn?: boolean;
+
     }): Promise<void> {
         const message = `Hi ${data.clientName},\nUnfortunately, your appointment for ${data.serviceName} with ${data.stylistName} on ${data.appointmentDate} at ${data.appointmentTime} was rejected.\n\nYour payment will be automatically refunded.\n— BraidsNow.com`;
         await this.sendSms({

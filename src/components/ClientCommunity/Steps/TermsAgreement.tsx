@@ -66,7 +66,7 @@ export function TermsAgreement({ form }: TermsAgreementProps) {
            <div className="space-y-1 leading-none">
               <p className="text-sm text-black tracking-normal font-light">
                  By checking this box, I agree to receive appointment updates and booking 
-                confirmations via SMS from **BraidsNow.com LLC**. Message and data rates 
+                confirmations via SMS from BraidsNow.com LLC. Message and data rates 
                 may apply. Message frequency varies based on appointment activity. 
                 Reply STOP to unsubscribe.
               </p>

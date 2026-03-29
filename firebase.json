@@ -10,7 +10,7 @@
         "npm --prefix \"$RESOURCE_DIR\" run build"
       ],
       "codebase": "default",
-      "runtime": "nodejs18"
+      "runtime": "nodejs22"
     }
   ],
   "hosting": {

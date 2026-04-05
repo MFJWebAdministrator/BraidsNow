@@ -5452,7 +5452,6 @@ app.post(
             }
 
             // Check if appointment is in a valid state for payment request
-            // TODO: these values should be stored in enums
             if (appointmentData?.status !== "to-be-paid") {
                 return res.status(400).json({
                     error: "Appointment must be confirmed or completed to request payment",

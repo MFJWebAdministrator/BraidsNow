@@ -82,7 +82,10 @@ export function ClientInformation({
                                     ),
                                     "h:mm a"
                                 )}
-                                {` ${browserTz}`}
+                                {` (Your timezone)`}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                                Timezone: {browserTz}
                             </p>
                         </div>
                         <div>

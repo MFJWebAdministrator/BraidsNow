@@ -1,9 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase/config";
-import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Card } from "@/components/ui/card";
 import {
     Tooltip,
@@ -11,27 +7,30 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-    format,
-    isBefore,
-    setHours,
-    setMinutes,
-    parse,
-    addMinutes,
-} from "date-fns";
 import { getBookingsForDate } from "@/lib/firebase/booking/getBookings";
+import { db } from "@/lib/firebase/config";
 import type { ServiceSelection } from "@/lib/schemas/booking";
 import type { Schedule } from "@/lib/schemas/schedule";
-import { Matcher } from "react-day-picker";
-import { isOvertimeBooking } from "@/lib/utils/schedule-conflicts";
 import {
-    checkTimeSlotOverlap,
-    isLastAppointmentOfDay,
-    getDayName,
-    checkBreakOverlap,
     calculateTotalBookingTime,
+    checkBreakOverlap,
+    checkTimeSlotOverlap,
+    getDayName,
+    isLastAppointmentOfDay,
 } from "@/lib/utils/booking-time-utils";
-import { toZonedTime } from "date-fns-tz";
+import { isOvertimeBooking } from "@/lib/utils/schedule-conflicts";
+import { useQuery } from "@tanstack/react-query";
+import {
+    addMinutes,
+    format,
+    isBefore,
+    parse,
+    setHours,
+    setMinutes,
+} from "date-fns";
+import { doc, getDoc } from "firebase/firestore";
+import { useState } from "react";
+import { Matcher } from "react-day-picker";
 interface DateTimeSelectionProps {
     stylistId: string;
     selectedService: ServiceSelection;
@@ -77,86 +76,15 @@ export function DateTimeSelection({
         },
     });
 
-    // Convert schedule and breaks to browser's local timezone
-    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // NOTE: We display times in STYLIST'S timezone, not client's timezone
+    // This is to avoid confusion. Client can see stylist's timezone and adjust accordingly.
+    // When booking, we store the time in stylist's timezone and also capture client's timezone
+    // for email formatting later.
+    // const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     let localSchedule = schedule;
-    if (schedule) {
-        // Convert workHours
-        localSchedule = {
-            ...schedule,
-            workHours: Object.fromEntries(
-                Object.entries(schedule.workHours).map(([day, wh]) => {
-                    // Create a date for conversion (arbitrary date, just for time)
-                    const baseDate = new Date();
-                    const startUtc = Date.UTC(
-                        baseDate.getFullYear(),
-                        baseDate.getMonth(),
-                        baseDate.getDate(),
-                        wh.start.hour,
-                        wh.start.minute
-                    );
-
-                    const endUtc = Date.UTC(
-                        baseDate.getFullYear(),
-                        baseDate.getMonth(),
-                        baseDate.getDate(),
-                        wh.end.hour,
-                        wh.end.minute
-                    );
-
-                    const startLocal = toZonedTime(startUtc, browserTz);
-                    const endLocal = toZonedTime(endUtc, browserTz);
-
-                    return [
-                        day,
-                        {
-                            ...wh,
-                            start: {
-                                hour: startLocal.getHours(),
-                                minute: startLocal.getMinutes(),
-                            },
-                            end: {
-                                hour: endLocal.getHours(),
-                                minute: endLocal.getMinutes(),
-                            },
-                        },
-                    ];
-                })
-            ) as Schedule["workHours"],
-            breaks: schedule.breaks.map((br) => {
-                const baseDate = new Date();
-                const startUtc = Date.UTC(
-                    baseDate.getFullYear(),
-                    baseDate.getMonth(),
-                    baseDate.getDate(),
-                    br.start.hour,
-                    br.start.minute
-                );
-
-                const endUtc = Date.UTC(
-                    baseDate.getFullYear(),
-                    baseDate.getMonth(),
-                    baseDate.getDate(),
-                    br.end.hour,
-                    br.end.minute
-                );
-                const startLocal = toZonedTime(startUtc, browserTz);
-                const endLocal = toZonedTime(endUtc, browserTz);
-
-                return {
-                    ...br,
-                    start: {
-                        hour: startLocal.getHours(),
-                        minute: startLocal.getMinutes(),
-                    },
-                    end: {
-                        hour: endLocal.getHours(),
-                        minute: endLocal.getMinutes(),
-                    },
-                };
-            }),
-        };
-    }
+    
+    // Keep schedule as-is (in stylist's timezone) for time slot generation
+    // No timezone conversion needed here
 
     // Fetch bookings for selected date
     const { data: bookings, isLoading: isLoadingBookings } = useQuery({
@@ -421,7 +349,7 @@ export function DateTimeSelection({
 
                                 return (
                                     isBefore(date, today) ||
-                                    !localSchedule.workHours[dayOfWeek]
+                                    !localSchedule?.workHours?.[dayOfWeek]
                                         ?.isEnabled
                                 );
                             }}
@@ -431,9 +359,19 @@ export function DateTimeSelection({
                     {/* Time Slots */}
                     <Card className="p-6">
                         <div className="space-y-6">
-                            <h3 className="text-lg font-medium text-[#3F0052]">
-                                Time Slots
-                            </h3>
+                            <div>
+                                <h3 className="text-lg font-medium text-[#3F0052]">
+                                    Time Slots
+                                </h3>
+                                {schedule?.calculatedTimezone && (
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        Times shown in your timezone • Stylist's timezone:{" "}
+                                        <span className="font-semibold text-[#3F0052]">
+                                            {schedule.calculatedTimezone}
+                                        </span>
+                                    </p>
+                                )}
+                            </div>
 
                             {selectedDate ? (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

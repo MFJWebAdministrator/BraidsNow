@@ -31,6 +31,7 @@ export const bufferTimeSchema = z.object({
 // Complete schedule schema
 export const scheduleSchema = z.object({
   timezone: z.string(),
+  calculatedTimezone: z.string().optional(), // IANA timezone calculated from postal code/city/state
   workHours: z.object({
     monday: workHoursSchema,
     tuesday: workHoursSchema,

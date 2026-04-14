@@ -1,4 +1,9 @@
 import sgMail from "@sendgrid/mail";
+import {
+  formatTimeWithTimezone,
+  getTimezoneAbbreviation,
+  isValidTimezone,
+} from "../utils/timezone-utils";
 
 // Initialize SendGrid
 const apiKey = process.env.SENDGRID_API_KEY || "";
@@ -38,6 +43,8 @@ export interface AppointmentConfirmationData {
     appointmentDate: string;
     appointmentTime: string;
     serviceName: string;
+    clientTimezone?: string; // IANA timezone (e.g., "America/New_York")
+    stylistTimezone?: string; // IANA timezone
 }
 
 export interface StylistAppointmentData {
@@ -47,6 +54,8 @@ export interface StylistAppointmentData {
     appointmentDate: string;
     appointmentTime: string;
     serviceName: string;
+    stylistTimezone?: string; // IANA timezone (e.g., "America/New_York")
+    clientTimezone?: string; // IANA timezone
 }
 
 export interface PaymentFailureData {
@@ -66,6 +75,7 @@ export interface AppointmentDeniedData {
     serviceName: string;
     appointmentDate: string;
     appointmentTime: string;
+    clientTimezone?: string; // IANA timezone
 }
 
 export interface FullPaymentReminderData {
@@ -76,6 +86,7 @@ export interface FullPaymentReminderData {
     appointmentTime: string;
     serviceName: string;
     balanceAmount: string;
+    clientTimezone?: string; // IANA timezone
 }
 
 export interface MessageNotificationData {
@@ -91,6 +102,7 @@ export interface PaymentRequestedData {
     serviceName: string;
     appointmentDate: string;
     appointmentTime: string;
+    clientTimezone?: string; // IANA timezone
 }
 
 export interface RescheduleProposalData {
@@ -102,6 +114,7 @@ export interface RescheduleProposalData {
     oldAppointmentTime: string;
     newAppointmentDate: string;
     newAppointmentTime: string;
+    recipientTimezone?: string; // IANA timezone
 }
 
 export interface RescheduleAcceptedData {
@@ -111,6 +124,7 @@ export interface RescheduleAcceptedData {
     serviceName: string;
     newAppointmentDate: string;
     newAppointmentTime: string;
+    recipientTimezone?: string; // IANA timezone
 }
 
 export interface RescheduleRejectedData {
@@ -120,6 +134,7 @@ export interface RescheduleRejectedData {
     serviceName: string;
     oldAppointmentDate: string;
     oldAppointmentTime: string;
+    recipientTimezone?: string; // IANA timezone
 }
 
 export class EmailService {
@@ -217,6 +232,23 @@ export class EmailService {
         data: StylistAppointmentData
     ): Promise<void> {
         console.log("sending new appointment for stylist", data);
+
+        // Format appointment time with timezone if provided
+        let displayTime = data.appointmentTime;
+        if (data.stylistTimezone && isValidTimezone(data.stylistTimezone)) {
+            displayTime = formatTimeWithTimezone(
+                data.appointmentTime,
+                data.appointmentDate,
+                data.stylistTimezone
+            );
+        } else if (data.appointmentTime && !data.appointmentTime.includes(" ")) {
+            // Add timezone abbreviation if not already included
+            const abbr = data.stylistTimezone
+                ? getTimezoneAbbreviation(data.stylistTimezone)
+                : "UTC";
+            displayTime = `${data.appointmentTime} ${abbr}`;
+        }
+
         await this.sendEmail({
             to: data.stylistEmail,
             templateId: EmailService.TEMPLATE_IDS.NEW_APPOINTMENT_STYLIST,
@@ -224,7 +256,7 @@ export class EmailService {
                 stylistName: data.stylistName,
                 clientName: data.clientName,
                 appointmentDate: data.appointmentDate,
-                appointmentTime: data.appointmentTime,
+                appointmentTime: displayTime,
                 serviceName: data.serviceName,
                 url: "https://braidsnow.com/dashboard/stylist/appointments",
             },
@@ -235,6 +267,27 @@ export class EmailService {
     static async sendAppointmentConfirmationClient(
         data: AppointmentConfirmationData
     ): Promise<void> {
+        // Format appointment time with timezone if provided
+        let displayTime = data.appointmentTime;
+        if (data.clientTimezone && isValidTimezone(data.clientTimezone)) {
+            displayTime = formatTimeWithTimezone(
+                data.appointmentTime,
+                data.appointmentDate,
+                data.clientTimezone
+            );
+        } else if (data.appointmentTime && !data.appointmentTime.includes(" ")) {
+            // Add timezone abbreviation if not already included
+            const abbr = data.clientTimezone
+                ? getTimezoneAbbreviation(data.clientTimezone)
+                : "UTC";
+            displayTime = `${data.appointmentTime} ${abbr}`;
+        }
+
+        // Include timezone information for reference
+        const stylistTimezoneNote = data.stylistTimezone
+            ? `(Stylist's timezone: ${getTimezoneAbbreviation(data.stylistTimezone)})`
+            : "";
+
         await this.sendEmail({
             to: data.clientEmail,
             templateId:
@@ -243,8 +296,9 @@ export class EmailService {
                 clientName: data.clientName,
                 stylistName: data.stylistName,
                 appointmentDate: data.appointmentDate,
-                appointmentTime: data.appointmentTime,
+                appointmentTime: displayTime,
                 serviceName: data.serviceName,
+                stylistTimezoneNote: stylistTimezoneNote,
             },
         });
     }
@@ -253,6 +307,15 @@ export class EmailService {
     static async sendAppointmentDeniedClient(
         data: AppointmentDeniedData
     ): Promise<void> {
+        // Format appointment time for client timezone if available
+        let displayTime = data.appointmentTime;
+        if (data.clientTimezone && isValidTimezone(data.clientTimezone)) {
+            displayTime = formatTimeWithTimezone(
+                data.appointmentTime,
+                data.appointmentDate,
+                data.clientTimezone
+            );
+        }
         await this.sendEmail({
             to: data.clientEmail,
             templateId: EmailService.TEMPLATE_IDS.APPOINTMENT_DENIED_CLIENT,
@@ -261,7 +324,7 @@ export class EmailService {
                 stylistName: data.stylistName,
                 serviceName: data.serviceName,
                 appointmentDate: data.appointmentDate,
-                appointmentTime: data.appointmentTime,
+                appointmentTime: displayTime,
                 findStylistsUrl: "https://braidsnow.com/find-stylists",
             },
         });
@@ -271,6 +334,15 @@ export class EmailService {
     static async sendAppointmentAutoCancelledForClient(
         data: AppointmentDeniedData
     ): Promise<void> {
+        // Format appointment time for client timezone if available
+        let displayTime = data.appointmentTime;
+        if (data.clientTimezone && isValidTimezone(data.clientTimezone)) {
+            displayTime = formatTimeWithTimezone(
+                data.appointmentTime,
+                data.appointmentDate,
+                data.clientTimezone
+            );
+        }
         await this.sendEmail({
             to: data.clientEmail,
             templateId:
@@ -280,7 +352,7 @@ export class EmailService {
                 stylistName: data.stylistName,
                 serviceName: data.serviceName,
                 appointmentDate: data.appointmentDate,
-                appointmentTime: data.appointmentTime,
+                appointmentTime: displayTime,
                 findStylistsUrl: "https://braidsnow.com/find-stylists",
             },
         });
@@ -289,6 +361,15 @@ export class EmailService {
     static async sendAppointmentAutoCancelledForStylist(
         data: StylistAppointmentData
     ): Promise<void> {
+        // Format appointment time for stylist timezone if available
+        let displayTime = data.appointmentTime;
+        if (data.stylistTimezone && isValidTimezone(data.stylistTimezone)) {
+            displayTime = formatTimeWithTimezone(
+                data.appointmentTime,
+                data.appointmentDate,
+                data.stylistTimezone
+            );
+        }
         await this.sendEmail({
             to: data.stylistEmail,
             templateId:
@@ -298,7 +379,7 @@ export class EmailService {
                 stylistName: data.stylistName,
                 serviceName: data.serviceName,
                 appointmentDate: data.appointmentDate,
-                appointmentTime: data.appointmentTime,
+                appointmentTime: displayTime,
                 findStylistsUrl: "https://braidsnow.com/find-stylists",
             },
         });
@@ -308,6 +389,15 @@ export class EmailService {
     static async sendAppointmentCancelledEmailForClient(
         data: AppointmentDeniedData
     ): Promise<void> {
+        // Format appointment time for client timezone if available
+        let displayTime = data.appointmentTime;
+        if (data.clientTimezone && isValidTimezone(data.clientTimezone)) {
+            displayTime = formatTimeWithTimezone(
+                data.appointmentTime,
+                data.appointmentDate,
+                data.clientTimezone
+            );
+        }
         await this.sendEmail({
             to: data.clientEmail,
             templateId: EmailService.TEMPLATE_IDS.APPOINTMENT_CANCELLED_CLIENT,
@@ -316,7 +406,7 @@ export class EmailService {
                 stylistName: data.stylistName,
                 serviceName: data.serviceName,
                 appointmentDate: data.appointmentDate,
-                appointmentTime: data.appointmentTime,
+                appointmentTime: displayTime,
             },
         });
     }
@@ -324,6 +414,15 @@ export class EmailService {
     static async sendAppointmentCancelledEmailForStylist(
         data: StylistAppointmentData
     ): Promise<void> {
+        // Format appointment time for stylist timezone if available
+        let displayTime = data.appointmentTime;
+        if (data.stylistTimezone && isValidTimezone(data.stylistTimezone)) {
+            displayTime = formatTimeWithTimezone(
+                data.appointmentTime,
+                data.appointmentDate,
+                data.stylistTimezone
+            );
+        }
         await this.sendEmail({
             to: data.stylistEmail,
             templateId: EmailService.TEMPLATE_IDS.APPOINTMENT_CANCELLED_STYLIST,
@@ -332,7 +431,7 @@ export class EmailService {
                 stylistName: data.stylistName,
                 serviceName: data.serviceName,
                 appointmentDate: data.appointmentDate,
-                appointmentTime: data.appointmentTime,
+                appointmentTime: displayTime,
             },
         });
     }
@@ -369,6 +468,15 @@ export class EmailService {
         data: FullPaymentReminderData
     ): Promise<void> {
         console.log("sending full payment reminder for client", data);
+        // Format appointment time for client timezone if available
+        let displayTime = data.appointmentTime;
+        if (data.clientTimezone && isValidTimezone(data.clientTimezone)) {
+            displayTime = formatTimeWithTimezone(
+                data.appointmentTime,
+                data.appointmentDate,
+                data.clientTimezone
+            );
+        }
         const response = await this.sendEmail({
             to: data.clientEmail,
             templateId: EmailService.TEMPLATE_IDS.FULL_PAYMENT_REMINDER_CLIENT,
@@ -376,7 +484,7 @@ export class EmailService {
                 clientName: data.clientName,
                 stylistName: data.stylistName,
                 appointmentDate: data.appointmentDate,
-                appointmentTime: data.appointmentTime,
+                appointmentTime: displayTime,
                 serviceName: data.serviceName,
                 balanceAmount: data.balanceAmount,
             },
@@ -415,6 +523,15 @@ export class EmailService {
     static async sendPaymentRequestedClient(
         data: PaymentRequestedData
     ): Promise<void> {
+        // Format appointment time with client timezone if available
+        let displayTime = data.appointmentTime;
+        if (data.clientTimezone && isValidTimezone(data.clientTimezone)) {
+            displayTime = formatTimeWithTimezone(
+                data.appointmentTime,
+                data.appointmentDate,
+                data.clientTimezone
+            );
+        }
         await this.sendEmail({
             to: data.clientEmail,
             templateId: EmailService.TEMPLATE_IDS.PAYMENT_REQUESTED_CLIENT,
@@ -423,7 +540,7 @@ export class EmailService {
                 stylistName: data.stylistName,
                 serviceName: data.serviceName,
                 appointmentDate: data.appointmentDate,
-                appointmentTime: data.appointmentTime,
+                appointmentTime: displayTime,
                 dashboardUrl:
                     "https://braidsnow.com/dashboard/client/appointments",
             },
@@ -434,6 +551,21 @@ export class EmailService {
     static async sendRescheduleProposalNotification(
         data: RescheduleProposalData
     ): Promise<void> {
+        // Format times with recipient's timezone if available
+        let displayOldTime = data.oldAppointmentTime;
+        let displayNewTime = data.newAppointmentTime;
+        if (data.recipientTimezone && isValidTimezone(data.recipientTimezone)) {
+            displayOldTime = formatTimeWithTimezone(
+                data.oldAppointmentTime,
+                data.oldAppointmentDate,
+                data.recipientTimezone
+            );
+            displayNewTime = formatTimeWithTimezone(
+                data.newAppointmentTime,
+                data.newAppointmentDate,
+                data.recipientTimezone
+            );
+        }
         await this.sendEmail({
             to: data.recipientEmail,
             templateId: EmailService.TEMPLATE_IDS.RESCHEDULE_PROPOSAL,
@@ -442,9 +574,9 @@ export class EmailService {
                 proposedBy: data.proposedBy,
                 serviceName: data.serviceName,
                 oldAppointmentDate: data.oldAppointmentDate,
-                oldAppointmentTime: data.oldAppointmentTime,
+                oldAppointmentTime: displayOldTime,
                 newAppointmentDate: data.newAppointmentDate,
-                newAppointmentTime: data.newAppointmentTime,
+                newAppointmentTime: displayNewTime,
             },
         });
     }
@@ -453,6 +585,15 @@ export class EmailService {
     static async sendRescheduleAcceptedNotification(
         data: RescheduleAcceptedData
     ): Promise<void> {
+        // Format time with recipient's timezone if available
+        let displayTime = data.newAppointmentTime;
+        if (data.recipientTimezone && isValidTimezone(data.recipientTimezone)) {
+            displayTime = formatTimeWithTimezone(
+                data.newAppointmentTime,
+                data.newAppointmentDate,
+                data.recipientTimezone
+            );
+        }
         await this.sendEmail({
             to: data.recipientEmail,
             templateId: EmailService.TEMPLATE_IDS.RESCHEDULE_ACCEPTED,
@@ -461,7 +602,7 @@ export class EmailService {
                 acceptedBy: data.acceptedBy,
                 serviceName: data.serviceName,
                 newAppointmentDate: data.newAppointmentDate,
-                newAppointmentTime: data.newAppointmentTime,
+                newAppointmentTime: displayTime,
             },
         });
     }
@@ -470,6 +611,15 @@ export class EmailService {
     static async sendRescheduleRejectedNotification(
         data: RescheduleRejectedData
     ): Promise<void> {
+        // Format time with recipient's timezone if available
+        let displayTime = data.oldAppointmentTime;
+        if (data.recipientTimezone && isValidTimezone(data.recipientTimezone)) {
+            displayTime = formatTimeWithTimezone(
+                data.oldAppointmentTime,
+                data.oldAppointmentDate,
+                data.recipientTimezone
+            );
+        }
         await this.sendEmail({
             to: data.recipientEmail,
             templateId: EmailService.TEMPLATE_IDS.RESCHEDULE_REJECTED,
@@ -478,7 +628,7 @@ export class EmailService {
                 rejectedBy: data.rejectedBy,
                 serviceName: data.serviceName,
                 oldAppointmentDate: data.oldAppointmentDate,
-                oldAppointmentTime: data.oldAppointmentTime,
+                oldAppointmentTime: displayTime,
             },
         });
     }

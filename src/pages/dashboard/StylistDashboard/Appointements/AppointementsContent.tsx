@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,16 +9,72 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, Search, CalendarDays, Clock, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getAuthToken } from "@/lib/firebase/auth";
+import { getAuth } from "firebase/auth";
+import { getFirestore, doc, onSnapshot } from "firebase/firestore";
 import axios from "axios";
 import { format } from "date-fns";
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export function AppointementsContent() {
     const { loading, error, getStylistAppointments } = useAppointments();
-
     const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState("");
     const [activeTab, setActiveTab] = useState("today");
+    const [stylistTimezone, setStylistTimezone] = useState<string | null>(null);
+    const [, setTimezoneLoading] = useState(true);
+
+    // Fetch stylist's timezone from Firestore with real-time updates
+    useEffect(() => {
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+            setTimezoneLoading(false);
+            return;
+        }
+
+        const db = getFirestore();
+        const stylistRef = doc(
+            db,
+            "stylists",
+            currentUser.uid,
+            "settings",
+            "schedule"
+        );
+
+        // Use onSnapshot for real-time updates
+        const unsubscribe = onSnapshot(
+            stylistRef,
+            (docSnap) => {
+                console.log("📍 Real-time timezone update from:", stylistRef.path);
+                console.log("📄 Settings document exists:", docSnap.exists());
+                
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    console.log("📋 Full document data:", data);
+                    const timezone = data?.timezone;
+                    console.log("✓ Found timezone field:", timezone);
+                    if (timezone) {
+                        console.log("✅ Setting stylistTimezone to:", timezone);
+                        setStylistTimezone(timezone);
+                    } else {
+                        console.warn("⚠ No timezone field in document");
+                        console.log("Available fields:", Object.keys(data || {}));
+                    }
+                } else {
+                    console.warn("⚠ No stylist settings document found");
+                }
+                setTimezoneLoading(false);
+            },
+            (error) => {
+                console.error("❌ Error listening to stylist timezone:", error);
+                setTimezoneLoading(false);
+            }
+        );
+
+        // Cleanup listener on unmount
+        return () => unsubscribe();
+    }, []);
 
     // Get stylist-specific appointments
     const stylistAppointments = getStylistAppointments();
@@ -344,6 +400,7 @@ export function AppointementsContent() {
                                     key={appointment.id}
                                     appointment={appointment}
                                     userRole="stylist"
+                                    stylistTimezone={stylistTimezone || undefined}
                                     onContact={handleContact}
                                     onAcceptAppointment={
                                         handleAcceptAppointment
@@ -378,6 +435,7 @@ export function AppointementsContent() {
                                     key={appointment.id}
                                     appointment={appointment}
                                     userRole="stylist"
+                                    stylistTimezone={stylistTimezone || undefined}
                                     onContact={handleContact}
                                     onAcceptAppointment={
                                         handleAcceptAppointment
@@ -412,6 +470,7 @@ export function AppointementsContent() {
                                     key={appointment.id}
                                     appointment={appointment}
                                     userRole="stylist"
+                                    stylistTimezone={stylistTimezone || undefined}
                                     onContact={handleContact}
                                     onAcceptAppointment={
                                         handleAcceptAppointment
@@ -446,6 +505,7 @@ export function AppointementsContent() {
                                     key={appointment.id}
                                     appointment={appointment}
                                     userRole="stylist"
+                                    stylistTimezone={stylistTimezone || undefined}
                                     onContact={handleContact}
                                     onAcceptAppointment={
                                         handleAcceptAppointment

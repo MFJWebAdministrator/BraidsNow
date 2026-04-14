@@ -31,6 +31,7 @@ import {
     cancelBookingByClient,
     cancelBookingByStylist,
 } from "@/lib/api-client";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { useState } from "react";
 import {
     requestPayment,
@@ -54,6 +55,7 @@ import { RescheduleDialog } from "./RescheduleDialog";
 interface AppointmentCardProps {
     appointment: Appointment;
     userRole: "stylist" | "client";
+    stylistTimezone?: string; // Stylist's calculated timezone from postal code
     onContact?: (contactInfo: { phone: string; email: string }) => void;
     onAcceptAppointment?: (appointmentId: string) => void;
     onRejectAppointment?: (appointmentId: string) => void;
@@ -64,6 +66,7 @@ interface AppointmentCardProps {
 export function AppointmentCard({
     appointment,
     userRole,
+    stylistTimezone,
     onAcceptAppointment,
     onRejectAppointment,
     // onCancelAppointment,
@@ -79,6 +82,51 @@ export function AppointmentCard({
     const [isRescheduleActionLoading, setIsRescheduleActionLoading] =
         useState(false);
     const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    // Use stylistTimezone prop first (from real-time listener), then appointment data, then browserTz
+    const effectiveStylistTimezone = stylistTimezone || appointment.stylistTimezone || browserTz;
+    
+    /**
+     * Helper function to convert stylist appointment time
+     * The appointment.dateTime has been pre-converted to browserTz in the hook.
+     * We need to:
+     * 1. Reconstruct the UTC time from the browserTz-adjusted dateTime
+     * 2. Convert UTC to stylist's timezone
+     */
+    const formatStylistAppointmentTime = () => {
+        const stylistTz = effectiveStylistTimezone;
+        
+        try {
+            // Step 1: Reconstruct UTC time from the browserTz-adjusted dateTime
+            const utcDateTime = fromZonedTime(appointment.dateTime, browserTz);
+            
+            // Step 2: Convert UTC time to stylist's timezone
+            const stylistDateTime = toZonedTime(utcDateTime, stylistTz);
+            
+            // Step 3: Format the converted time
+            const timeFormatted = format(stylistDateTime, "h:mm a");
+            return `${timeFormatted} ${stylistTz}`;
+        } catch (error) {
+            console.error("Error formatting stylist appointment time:", error);
+            // Fallback to simple time display
+            return formatTime(
+                appointment.dateTime.getHours() + ":" + String(appointment.dateTime.getMinutes()).padStart(2, '0')
+            ) + " " + stylistTz;
+        }
+    };
+    
+    // Debug logging
+    if (userRole === "stylist") {
+        console.log("🔍 AppointmentCard Debug:", {
+            userRole,
+            clientTimezone: appointment.clientTimezone,
+            appointmentStylistTimezone: appointment.stylistTimezone,
+            propStylistTimezone: stylistTimezone,
+            effectiveStylistTimezone,
+            browserTz,
+            appointmentDateTime: appointment?.dateTime,
+        });
+    }
 
     const copyToClipboard = async (text: string, type: string) => {
         try {
@@ -456,13 +504,14 @@ export function AppointmentCard({
                     <div className="flex items-center gap-2">
                         <Clock className="h-5 w-5 text-gray-500" />
                         <span className="text-sm font-medium">
-                            {formatTime(
-                                appointment?.dateTime?.getHours() +
-                                    ":" +
-                                    appointment?.dateTime?.getMinutes()
-                            ) +
-                                " " +
-                                browserTz}
+                            {userRole === "stylist" 
+                                ? formatStylistAppointmentTime()
+                                : // For client: show time with client's timezone
+                                  formatTime(
+                                      appointment?.dateTime?.getHours() +
+                                          ":" +
+                                          String(appointment?.dateTime?.getMinutes()).padStart(2, '0')
+                                  ) + " " + (appointment.clientTimezone || browserTz)}
                         </span>
                     </div>
                 </div>

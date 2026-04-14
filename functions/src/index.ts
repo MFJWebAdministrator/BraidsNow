@@ -2024,9 +2024,11 @@ export const cronJob = onSchedule(
                         } catch (e) {
                             console.error("Error fetching stylist timezone for auto-cancel:", e);
                         }
-                      
+						
+                      	let clientOptIn = false;
+						let stylist OptIn= false;
                         try {
-                          const [clientOptIn, stylistOptIn] = await Promise.all([
+                          [clientOptIn, stylistOptIn] = await Promise.all([
                             getSmsPreference(db, bookingData.userId, "users"),
                             getSmsPreference(db, bookingData.stylistId, "stylists")
                           ]);     
@@ -2039,7 +2041,7 @@ export const cronJob = onSchedule(
                                 await EmailService.sendAppointmentAutoCancelledForClient(
                                     {
                                         clientName: bookingData.clientName,
-                                        clientEmail: bookingData.clientPhone,
+                                        clientEmail: bookingData.clientEmail,
                                         stylistName: bookingData.stylistName,
                                         appointmentDate: date,
                                         appointmentTime: time,
@@ -2060,7 +2062,7 @@ export const cronJob = onSchedule(
                                 await EmailService.sendAppointmentAutoCancelledForStylist(
                                     {
                                         clientName: bookingData.clientName,
-                                        stylistEmail: bookingData.clientPhone,
+                                        stylistEmail: bookingData.stylistEmail,
                                         stylistName: bookingData.stylistName,
                                         appointmentDate: date,
                                         appointmentTime: time,
@@ -2071,7 +2073,7 @@ export const cronJob = onSchedule(
                                 );
                             } catch (error) {
                                 console.log(
-                                    `Error sending sms to stylist ${bookingData.stylistName} for booking ${bookingId}: `,
+                                    `Error sending email to stylist ${bookingData.stylistName} for booking ${bookingId}: `,
                                     error
                                 );
                             }

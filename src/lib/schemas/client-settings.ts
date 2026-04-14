@@ -14,6 +14,7 @@ export const clientSettingsSchema = z.object({
     .regex(/^[A-Z]{2}$/, 'State must be 2 capital letters'),
   zipCode: z.string()
     .regex(/^\d{5}$/, 'ZIP code must be 5 digits'),
+  timezone: z.string().optional(), // IANA timezone string (e.g., "America/New_York")
 });
 
 export type ClientSettingsForm = z.infer<typeof clientSettingsSchema>;

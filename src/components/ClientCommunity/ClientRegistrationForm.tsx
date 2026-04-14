@@ -36,6 +36,7 @@ export function ClientRegistrationForm() {
             city: "",
             state: "",
             zipCode: "",
+            timezone: undefined, // Will be captured from browser
             agreeToTerms: false,
             agreeToSMS: false,
         },
@@ -44,15 +45,18 @@ export function ClientRegistrationForm() {
     const onSubmit = async (data: FormType) => {
         try {
             setIsLoading(true);
+            
+            // Capture browser timezone if not already set
+            const timezone = data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
             const formattedPhone = `+1${data.phone.replace(/\D/g, "")}`;
-            const enrichedData = {
-                ...data,
-                phone: formattedPhone, // Overwrites raw phone with E.164 format
-                smsOptIn: data.agreeToSMS,
-                smsOptInTimestamp: data.agreeToSMS ? new Date().toISOString() : null,
+            const enrichedData = { 
+              ...data,
+              timezone,
+              phone: formattedPhone,
+              smsOptIn: data.agreetoSMS,
+              smsOptInTimestamp: data.agreeToSMS ? new Date().toISOString() : null,
             };
             await registerClient(enrichedData, profileImage);
-
             toast({
                 title: "Success!",
                 description: "Your account has been created successfully.",

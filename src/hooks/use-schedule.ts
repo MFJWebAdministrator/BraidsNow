@@ -9,6 +9,7 @@ import type { Schedule, Break } from "@/lib/schemas/schedule";
 
 export const DEFAULT_SCHEDULE: Schedule = {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    calculatedTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     workHours: {
         monday: {
             isEnabled: false,

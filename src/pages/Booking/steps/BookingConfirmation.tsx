@@ -71,6 +71,7 @@ export function BookingConfirmation({
                 paymentStatus: isPaymentRequired ? "pending" : "not_required",
                 paymentAmount: paymentAmount / 100, // Store in dollars
                 paymentType: booking.paymentType,
+                clientTimezone: browserTz, // Capture client timezone at booking time
                 createdAt: new Date().toISOString(),
             };
 

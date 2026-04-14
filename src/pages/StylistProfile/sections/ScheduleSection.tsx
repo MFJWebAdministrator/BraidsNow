@@ -20,12 +20,18 @@ const DAYS = [
 export function ScheduleSection({ schedule }: ScheduleSectionProps) {
     return (
         <Card className="p-6">
-            <div className="flex items-center gap-2 mb-6">
+            <div className="flex items-center gap-2 mb-2">
                 <Clock className="w-5 h-5 text-[#3F0052]" />
                 <h2 className="text-xl font-light text-[#3F0052] tracking-normal">
                     Hours of Operation
                 </h2>
             </div>
+            
+            {schedule.calculatedTimezone && (
+                <p className="text-sm text-gray-500 mb-4">
+                    All times shown in <span className="font-semibold">{schedule.calculatedTimezone}</span> timezone
+                </p>
+            )}
 
             <div className="space-y-3">
                 {DAYS.map(({ key, label }) => {

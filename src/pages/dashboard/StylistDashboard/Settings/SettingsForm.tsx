@@ -492,6 +492,24 @@ export function SettingsForm() {
                                     />
                                 </div>
                             </div>
+
+                            {/* Timezone Information */}
+                            {userData?.calculatedTimezone && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <div className="text-sm">
+                                        <p className="font-semibold text-blue-900 mb-1">
+                                            Your Timezone
+                                        </p>
+                                        <p className="text-blue-800">
+                                            {userData.calculatedTimezone}
+                                        </p>
+                                        <p className="text-blue-700 text-xs mt-2">
+                                            Your timezone is automatically calculated based on your location (city, state, ZIP code). 
+                                            It will update automatically when you change your location.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </CardContent>
 

@@ -10,7 +10,16 @@ import Stripe from "stripe";
 import { EmailService } from "./services/email-service";
 import { SmsService } from "./services/sms-service";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+
 import { getBookingExpiresAt, getSmsPreference } from "./utils/utils";
+import {
+    getTimezoneFromPostalCode,
+    calculateTimezoneFromLocation,
+    getTimezoneAbbreviation,
+    formatTimeWithTimezone,
+    isValidTimezone,
+} from "./utils/timezone-utils";
+
 import { format } from "date-fns";
 
 const app = express();
@@ -107,7 +116,12 @@ async function ensureValidPriceId() {
 const validPriceIdPromise: Promise<string> | null = null;
 
 // Middleware
-app.use(cors({ origin: true }));
+app.use(cors({ 
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use(express.urlencoded({extended: false }));
 
@@ -660,7 +674,7 @@ app.post(
                 .doc(pendingBookingId)
                 .set({
                     bookingData,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp(), // TODO
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(), 
                     expiresAt: admin.firestore.Timestamp.fromMillis(
                         Date.now() + 3600000
                     ),
@@ -715,7 +729,7 @@ app.post(
                 pendingBookingId,
                 bookingData,
                 paymentType: bookingData.paymentType,
-                createdAt: admin.firestore.FieldValue.serverTimestamp(), // TODO
+                createdAt: admin.firestore.FieldValue.serverTimestamp(), 
             });
 
             return res.status(200).json({
@@ -822,12 +836,17 @@ app.post(
                 bookingData.time
             );
 
-            await bookingRef.set({
+            // Prepare booking object with timezone
+            const bookingToCreate = {
                 ...bookingData,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 expiresAt,
-            });
+                clientTimezone:
+                    bookingData.clientTimezone || "America/New_York",
+            };
+
+            await bookingRef.set(bookingToCreate);
 
             // Notify the stylist about the new booking
             await db.collection("notifications").add({
@@ -955,7 +974,24 @@ app.post(
                     bookingData.paymentId
                 );
 
-                // Update the booking status to confirmed
+                // Get stylist's timezone from their settings
+                const stylistSettingsSnap = await db
+                    .collection("stylists")
+                    .doc(bookingData.stylistId)
+                    .collection("settings")
+                    .doc("schedule")
+                    .get();
+                const stylistTimezone =
+                    stylistSettingsSnap.data()?.calculatedTimezone ||
+                    stylistSettingsSnap.data()?.timezone ||
+                    undefined;
+
+                console.log("📦 ACCEPT-BOOKING - Storing timezone with booking:");
+                console.log(`   stylistId: ${bookingData.stylistId}`);
+                console.log(`   stylistTimezone: ${stylistTimezone}`);
+                console.log(`   clientTimezone: ${bookingData.clientTimezone}`);
+
+                // Update the booking status to confirmed and include stylist timezone
                 await bookingRef.update({
                     status: "confirmed",
                     paymentStatus: "paid",
@@ -965,6 +1001,7 @@ app.post(
                         admin.firestore.FieldValue.serverTimestamp(),
                     stripeCaptureId: paymentIntent.latest_charge,
                     expiresAt: null,
+                    stylistTimezone: stylistTimezone, // Store stylist's timezone with booking
                 });
 
                 const date = format(bookingData.dateTime, "yyyy-MM-dd");
@@ -1014,13 +1051,18 @@ app.post(
                 // Send email/sms notification
                 setTimeout(async () => {
                     try {
+                        // Get client's timezone from booking
+                        const clientTimezone = bookingData.clientTimezone;
+
                         await EmailService.sendAppointmentConfirmationClient({
                             clientName: bookingData.clientName,
                             clientEmail: bookingData.clientEmail,
                             stylistName: bookingData.stylistName,
                             appointmentDate: date,
-                            appointmentTime: time + " UTC",
+                            appointmentTime: time,
                             serviceName: bookingData.serviceName,
+                            clientTimezone: clientTimezone,
+                            stylistTimezone: stylistTimezone,
                         });
                     } catch (error) {
                         console.log(
@@ -1030,27 +1072,32 @@ app.post(
                     }
                 }, 0);
 
-                try {
-					// 1. Fetch the client's preference from the 'users' collection
-					const clientOptIn = await getSmsPreference(db, bookingData.clientId, "users");
+                setTimeout(async () => {
+                    try {
+                        const clientOptIn = await getSmsPreference(db, bookingData.clientId, "users");
+                        await SmsService.sendAppointmentAcceptedClientSms({
+                            clientName: bookingData.clientName,
+                            phoneNumber: bookingData.clientPhone,
+                            stylistName: bookingData.stylistName,
+                            appointmentDate: date,
+                            appointmentTime: bookingData.clientTimezone && isValidTimezone(bookingData.clientTimezone)
+                                ? formatTimeWithTimezone(time, date, bookingData.clientTimezone)
+                                : time,
+                            serviceName: bookingData.serviceName,
+                            smsOptIn: clientOptIn,
+                        });
+                    } catch (error) {
+                        console.error(
+                            "Error sending appointment accepted sms to client:",
+                            error
+                        );
+                    }
+                }, 0);
 
-					// 2. Call the service directly (no setTimeout) and pass the preference
-					await SmsService.sendAppointmentAcceptedClientSms({
-						clientName: bookingData.clientName,
-						phoneNumber: bookingData.clientPhone,
-						stylistName: bookingData.stylistName,
-						appointmentDate: date,
-						appointmentTime: time + " UTC",
-						serviceName: bookingData.serviceName,
-						smsOptIn: clientOptIn, // The "Gatekeeper" data
-					});
-				} catch (error) {
-					console.error(
-						"Error sending appointment accepted sms to client:",
-						error
-					);
-				}
-
+                console.log(
+                    `Booking ${bookingId} accepted by stylist ${userId}`
+                );
+              
                 return res.status(200).json({
                     success: true,
                     message:
@@ -1240,7 +1287,8 @@ app.post(
                             serviceName: bookingData.serviceName,
                             stylistName: bookingData.stylistName,
                             appointmentDate: date,
-                            appointmentTime: time + " UTC",
+                            appointmentTime: time,
+                            clientTimezone: bookingData.clientTimezone,
                         });
                     } catch (error) {
                         console.log(
@@ -1257,7 +1305,9 @@ app.post(
                             phoneNumber: bookingData.clientPhone,
                             stylistName: bookingData.stylistName,
                             appointmentDate: date,
-                            appointmentTime: time + " UTC",
+                            appointmentTime: bookingData.clientTimezone && isValidTimezone(bookingData.clientTimezone)
+                                ? formatTimeWithTimezone(time, date, bookingData.clientTimezone)
+                                : time,
                             serviceName: bookingData.serviceName,
                         });
                     } catch (error) {
@@ -1463,7 +1513,7 @@ app.post(
             });
 
             const date = format(bookingData.dateTime, "yyyy-MM-dd");
-            const time = format(bookingData.dateTime, "HH:mm") + " UTC";
+            const time = format(bookingData.dateTime, "HH:mm");
 
             // Send email to client
             setTimeout(async () => {
@@ -1475,6 +1525,7 @@ app.post(
                         serviceName: bookingData.serviceName,
                         appointmentDate: date,
                         appointmentTime: time,
+                        clientTimezone: bookingData.clientTimezone,
                     });
                 } catch (error) {
                     console.error(
@@ -1487,6 +1538,17 @@ app.post(
             // Send email to stylist
             setTimeout(async () => {
                 try {
+                    // Get stylist's timezone
+                    const stylistSettingsSnap = await db
+                        .collection("stylists")
+                        .doc(bookingData.stylistId)
+                        .collection("settings")
+                        .doc("schedule")
+                        .get();
+                    const stylistTimezone =
+                        stylistSettingsSnap.data()?.calculatedTimezone ||
+                        stylistSettingsSnap.data()?.timezone;
+
                     await EmailService.sendAppointmentCancelledEmailForStylist({
                         stylistName: bookingData.stylistName || "Stylist",
                         stylistEmail: bookingData.stylistEmail,
@@ -1494,6 +1556,8 @@ app.post(
                         serviceName: bookingData.serviceName,
                         appointmentDate: date,
                         appointmentTime: time,
+                        stylistTimezone: stylistTimezone,
+                        clientTimezone: bookingData.clientTimezone,
                     });
                 } catch (error) {
                     console.error(
@@ -1527,7 +1591,7 @@ app.post(
 				smsOptIn: clientOptIn, // The firewall data
 			});
 
-            // TODO: send push notification to stylist and client
+            // Send push notifications to stylist and client
 
             return res.status(200).json({
                 success: true,
@@ -1720,7 +1784,23 @@ app.post(
             });
 
             const date = format(bookingData.dateTime, "yyyy-MM-dd");
-            const time = format(bookingData.dateTime, "HH:mm") + " UTC";
+            const time = format(bookingData.dateTime, "HH:mm");
+
+            // Get stylist's timezone
+            let stylistCancelTimezone: string | undefined;
+            try {
+                const stylistSettingsSnap = await db
+                    .collection("stylists")
+                    .doc(userId)
+                    .collection("settings")
+                    .doc("schedule")
+                    .get();
+                stylistCancelTimezone =
+                    stylistSettingsSnap.data()?.calculatedTimezone ||
+                    stylistSettingsSnap.data()?.timezone;
+            } catch (e) {
+                console.error("Error fetching stylist timezone for cancel:", e);
+            }
 
             // Send email to client
             setTimeout(async () => {
@@ -1732,6 +1812,7 @@ app.post(
                         serviceName: bookingData.serviceName,
                         appointmentDate: date,
                         appointmentTime: time,
+                        clientTimezone: bookingData.clientTimezone,
                     });
                 } catch (error) {
                     console.error(
@@ -1751,6 +1832,8 @@ app.post(
                         serviceName: bookingData.serviceName,
                         appointmentDate: date,
                         appointmentTime: time,
+                        stylistTimezone: stylistCancelTimezone,
+                        clientTimezone: bookingData.clientTimezone,
                     });
                 } catch (error) {
                     console.error(
@@ -1762,30 +1845,53 @@ app.post(
 
             // Send SMS Notifications
             // Send SMS to client
-			const clientOptIn = await getSmsPreference(db, bookingData.userId, "users");
-            await SmsService.sendAppointmentCancelledSmsForClient({
-				clientName: bookingData.clientName,
-				phoneNumber: bookingData.clientPhone,
-				stylistName: bookingData.stylistName,
-				appointmentDate: date,
-				appointmentTime: time,
-				serviceName: bookingData.serviceName,
-				smsOptIn: clientOptIn, // The firewall data
-			});
+
+            setTimeout(async () => {
+                try {
+                    const clientOptIn = await getSmsPreference(db, bookingData.userId, "users");
+                    await SmsService.sendAppointmentCancelledSmsForClient({
+                        clientName: bookingData.clientName || "Client",
+                        phoneNumber: bookingData.clientPhone,
+                        stylistName: bookingData.stylistName || "Stylist",
+                        serviceName: bookingData.serviceName,
+                        appointmentDate: date,
+                        appointmentTime: bookingData.clientTimezone && isValidTimezone(bookingData.clientTimezone)
+                            ? formatTimeWithTimezone(time, date, bookingData.clientTimezone)
+                            : time,
+                        smsOptIn: clientOptIn,
+                    });
+                } catch (error) {
+                    console.error(
+                        "Error sending cancellation SMS to client:",
+                        error
+                    );
+                }
+            }, 0);
 
             // Send SMS to stylist
-			const stylistOptIn = await getSmsPreference(db, bookingData.stylistId, "stylists");
-            await SmsService.sendAppointmentCancelledSmsForStylist({
-				stylistName: bookingData.stylistName,
-				phoneNumber: bookingData.stylistPhone,
-				clientName: bookingData.clientName,
-				appointmentDate: date,
-				appointmentTime: time,
-				serviceName: bookingData.serviceName,
-				smsOptIn: stylistOptIn, // The firewall data
-			});
+            setTimeout(async () => {
+                try {
+                    const stylistOptIn = await getSmsPreference(db, bookingData.stylistId, "stylists");
+                    await SmsService.sendAppointmentCancelledSmsForStylist({
+                        stylistName: bookingData.stylistName || "Stylist",
+                        phoneNumber: bookingData.stylistPhone,
+                        clientName: bookingData.clientName || "Client",
+                        serviceName: bookingData.serviceName,
+                        appointmentDate: date,
+                        appointmentTime: stylistCancelTimezone && isValidTimezone(stylistCancelTimezone)
+                            ? formatTimeWithTimezone(time, date, stylistCancelTimezone)
+                            : time,
+                        smsOptIn: stylistOptIn,
+                    });
+                } catch (error) {
+                    console.error(
+                        "Error sending cancellation SMS to stylist:",
+                        error
+                    );
+                }
+            }, 0);
 
-            // TODO: send push notification to stylist and client
+            // Send push notifications to stylist and client
 
             return res.status(200).json({
                 success: true,
@@ -1898,62 +2004,124 @@ export const cronJob = onSchedule(
                             });
                         }
 
-                        // Send email/sms notifications
-						const date = format(bookingData.dateTime, "yyyy-MM-dd");
-						const time = format(bookingData.dateTime, "HH:mm") + " UTC";
+                        // Send email/sms notifications to client
+                        const date = format(bookingData.dateTime, "yyyy-MM-dd");
+                        const time =
+                            format(bookingData.dateTime, "HH:mm");
 
-						try {
-							// 1. Resolve preferences using your global helper
-							const [clientOptIn, stylistOptIn] = await Promise.all([
-								getSmsPreference(db, bookingData.userId, "users"),
-								getSmsPreference(db, bookingData.stylistId, "stylists")
-							]);
+                        // Fetch stylist's timezone for auto-cancel notifications
+                        let autoStylistTimezone: string | undefined;
+                        try {
+                            const stylistSettingsSnap = await db
+                                .collection("stylists")
+                                .doc(bookingData.stylistId)
+                                .collection("settings")
+                                .doc("schedule")
+                                .get();
+                            autoStylistTimezone =
+                                stylistSettingsSnap.data()?.calculatedTimezone ||
+                                stylistSettingsSnap.data()?.timezone;
+                        } catch (e) {
+                            console.error("Error fetching stylist timezone for auto-cancel:", e);
+                        }
+                      
+                        try {
+                          const [clientOptIn, stylistOptIn] = await Promise.all([
+                            getSmsPreference(db, bookingData.userId, "users"),
+                            getSmsPreference(db, bookingData.stylistId, "stylists")
+                          ]);     
+                        } catch (e) {
+                            console.error("Error fetching stylist or client SMS opt-in preference:", e);
+                        }
 
-							// 2. Send Emails (Await these directly, no setTimeout)
-							await Promise.all([
-								EmailService.sendAppointmentAutoCancelledForClient({
-									clientName: bookingData.clientName,
-									clientEmail: bookingData.clientEmail, // Ensure this field name is correct in your data
-									stylistName: bookingData.stylistName,
-									appointmentDate: date,
-									appointmentTime: time,
-									serviceName: bookingData.serviceName,
-								}),
-								EmailService.sendAppointmentAutoCancelledForStylist({
-									clientName: bookingData.clientName,
-									stylistEmail: bookingData.stylistEmail, // Ensure this field name is correct in your data
-									stylistName: bookingData.stylistName,
-									appointmentDate: date,
-									appointmentTime: time,
-									serviceName: bookingData.serviceName,
-								})
-							]);
+                        setTimeout(async () => {
+                            try {
+                                await EmailService.sendAppointmentAutoCancelledForClient(
+                                    {
+                                        clientName: bookingData.clientName,
+                                        clientEmail: bookingData.clientPhone,
+                                        stylistName: bookingData.stylistName,
+                                        appointmentDate: date,
+                                        appointmentTime: time,
+                                        serviceName: bookingData.serviceName,
+                                        clientTimezone: bookingData.clientTimezone,
+                                    }
+                                );
+                            } catch (error) {
+                                console.log(
+                                    `Error sending email to client ${bookingData.clientName} for booking ${bookingId}: `,
+                                    error
+                                );
+                            }
+                        }, 0);
 
-							// 3. Send SMS (The SmsService will now handle the "Skipping" log automatically)
-							await Promise.all([
-								SmsService.sendAppointmentAutoCancelledClientSms({
-									clientName: bookingData.clientName,
-									phoneNumber: bookingData.clientPhone,
-									stylistName: bookingData.stylistName,
-									appointmentDate: date,
-									appointmentTime: time,
-									serviceName: bookingData.serviceName,
-									smsOptIn: clientOptIn, // <--- Pass the preference here
-								}),
-								SmsService.sendAppointmentAutoCancelledStylistSms({
-									stylistName: bookingData.stylistName,
-									phoneNumber: bookingData.stylistPhone,
-									clientName: bookingData.clientName,
-									appointmentDate: date,
-									appointmentTime: time,
-									serviceName: bookingData.serviceName,
-									smsOptIn: stylistOptIn, // <--- Pass the preference here
-								})
-							]);
+                        setTimeout(async () => {
+                            try {
+                                await EmailService.sendAppointmentAutoCancelledForStylist(
+                                    {
+                                        clientName: bookingData.clientName,
+                                        stylistEmail: bookingData.clientPhone,
+                                        stylistName: bookingData.stylistName,
+                                        appointmentDate: date,
+                                        appointmentTime: time,
+                                        serviceName: bookingData.serviceName,
+                                        stylistTimezone: autoStylistTimezone,
+                                        clientTimezone: bookingData.clientTimezone,
+                                    }
+                                );
+                            } catch (error) {
+                                console.log(
+                                    `Error sending sms to stylist ${bookingData.stylistName} for booking ${bookingId}: `,
+                                    error
+                                );
+                            }
+                        }, 0);
 
-						} catch (error) {
-							console.error(`Notification error for booking ${bookingId}:`, error);
-						}
+                        setTimeout(async () => {
+                            try {
+                                await SmsService.sendAppointmentAutoCancelledClientSms(
+                                    {
+                                        clientName: bookingData.clientName,
+                                        phoneNumber: bookingData.clientPhone,
+                                        stylistName: bookingData.stylistName,
+                                        appointmentDate: date,
+                                        appointmentTime: bookingData.clientTimezone && isValidTimezone(bookingData.clientTimezone)
+                                            ? formatTimeWithTimezone(time, date, bookingData.clientTimezone)
+                                            : time,
+                                        serviceName: bookingData.serviceName,
+                                        smsOptIn: clientOptIn,
+                                    }
+                                );
+                            } catch (error) {
+                                console.error(
+                                    `Error sending sms to client ${bookingData.clientName} for booking ${bookingId}:`,
+                                    error
+                                );
+                            }
+                        }, 0);
+
+                        setTimeout(async () => {
+                            try {
+                                await SmsService.sendAppointmentAutoCancelledStylistSms(
+                                    {
+                                        stylistName: bookingData.stylistName,
+                                        phoneNumber: bookingData.stylistPhone,
+                                        clientName: bookingData.clientName,
+                                        appointmentDate: date,
+                                        appointmentTime: autoStylistTimezone && isValidTimezone(autoStylistTimezone)
+                                            ? formatTimeWithTimezone(time, date, autoStylistTimezone)
+                                            : time,
+                                        serviceName: bookingData.serviceName,
+                                        smsOptIn: stylistOptIn,
+                                    }
+                                );
+                            } catch (error) {
+                                console.error(
+                                    `Error sending sms to stylist ${bookingData.stylistName} for booking ${bookingId}:`,
+                                    error
+                                );
+                            }
+                        }, 0);
                     })
                 );
 
@@ -2408,6 +2576,18 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                             // send email to stylist about the new appointment
                             setTimeout(async () => {
                                 try {
+                                    // Get stylist's timezone from their schedule settings
+                                    const stylistSettingsSnap = await db
+                                        .collection("stylists")
+                                        .doc(bookingData.stylistId)
+                                        .collection("settings")
+                                        .doc("schedule")
+                                        .get();
+                                    const stylistTimezone =
+                                        stylistSettingsSnap.data()?.calculatedTimezone ||
+                                        stylistSettingsSnap.data()?.timezone ||
+                                        undefined;
+
                                     await EmailService.sendNewAppointmentForStylist(
                                         {
                                             stylistName:
@@ -2416,9 +2596,11 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                                 bookingData.stylistEmail,
                                             clientName: bookingData.clientName,
                                             appointmentDate: date,
-                                            appointmentTime: time + " UTC",
+                                            appointmentTime: time,
                                             serviceName:
                                                 bookingData.serviceName,
+                                            stylistTimezone: stylistTimezone,
+                                            clientTimezone: bookingData.clientTimezone,
                                         }
                                     );
 
@@ -2431,7 +2613,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                             phoneNumber:
                                                 bookingData.stylistPhone,
                                             appointmentDate: date,
-                                            appointmentTime: time + " UTC", // TODO: timezone
+                                            appointmentTime: time,
                                             serviceName:
                                                 bookingData.serviceName,
                                             clientName: bookingData.clientName,
@@ -2462,13 +2644,14 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                                 stylistName:
                                                     bookingData.stylistName,
                                                 appointmentDate: date,
-                                                appointmentTime: time + " UTC",
+                                                appointmentTime: time,
                                                 serviceName:
                                                     bookingData.serviceName,
                                                 balanceAmount: (
                                                     bookingData.totalAmount -
                                                     bookingData.depositAmount
                                                 ).toString(),
+                                                clientTimezone: bookingData.clientTimezone,
                                             }
                                         );
 
@@ -2484,7 +2667,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                                 stylistName:
                                                     bookingData.stylistName,
                                                 appointmentDate: date,
-                                                appointmentTime: time + " UTC",
+                                                appointmentTime: time,
                                                 balanceAmount: (
                                                     bookingData.totalAmount -
                                                     bookingData.depositAmount
@@ -2735,7 +2918,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                 const userId = paymentIntent.metadata?.userId;
                 const stylistId = paymentIntent.metadata?.stylistId;
                 const bookingId = paymentIntent.metadata?.bookingId;
-                const session = paymentIntent.latest_charge as Stripe.Charge; // TODO
+                const session = paymentIntent.latest_charge as Stripe.Charge; 
 
                 console.log("payment intent succeeded", paymentIntent);
 
@@ -2803,7 +2986,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
 
                             // Update stylist's balance - only if not already processed in checkout.session.completed
                             if (!paymentData.balanceUpdated) {
-                                const netAmount = paymentIntent.amount || 0; // TODO
+                                const netAmount = paymentIntent.amount || 0; 
                                 await updateStylistBalance(
                                     stylistId,
                                     netAmount,
@@ -3113,8 +3296,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                 admin.firestore.FieldValue.serverTimestamp(),
                         });
 
-                        //send email to stylist
-                        // TODO: to be tested after a month when the next payment fails
+                        //send email to stylist a month when the next payment fails
                         setTimeout(
                             async () =>
                                 await EmailService.sendPaymentFailureForStylist(
@@ -3969,7 +4151,6 @@ app.post(
 // Create a login link for an existing Connect account
 app.post(
     "/create-account-link",
-    cors({ origin: true }),
     async (req: Request, res: Response) => {
         try {
             // Verify authentication
@@ -4036,7 +4217,6 @@ app.post(
 // Add this endpoint to check account requirements
 app.post(
     "/check-account-requirements",
-    cors({ origin: true }),
     async (req: Request, res: Response) => {
         try {
             // Verify authentication
@@ -4105,7 +4285,6 @@ app.post(
 // Update the check-account-status endpoint to include more detailed account information
 app.post(
     "/check-account-status",
-    cors({ origin: true }),
     async (req: Request, res: Response) => {
         try {
             // Verify authentication
@@ -4204,7 +4383,6 @@ app.post(
 // get stripe account details
 app.post(
     "/get-stripe-account-details",
-    cors({ origin: true }),
     async (req: Request, res: Response) => {
         try {
             const { stylistId } = req.body;
@@ -4306,7 +4484,6 @@ app.post(
 // Get payment details
 app.get(
     "/payment-details",
-    cors({ origin: true }),
     async (req: Request, res: Response) => {
         try {
             // Verify authentication
@@ -4374,7 +4551,6 @@ app.get(
 
 app.get(
     "/test",
-    cors({ origin: true }),
     async (req: Request, res: Response) => {
         return res.status(200).json({ message: "Hello, world!" });
     }
@@ -4741,10 +4917,13 @@ app.post(
             body: {
                 stylistName: string;
                 stylistEmail: string;
+                stylistId?: string;
                 clientName: string;
                 appointmentDate: string;
                 appointmentTime: string;
                 serviceName: string;
+                stylistTimezone?: string;
+                clientTimezone?: string;
             };
             user?: admin.auth.DecodedIdToken;
         },
@@ -4754,10 +4933,13 @@ app.post(
             const {
                 stylistName,
                 stylistEmail,
+                stylistId,
                 clientName,
                 appointmentDate,
                 appointmentTime,
                 serviceName,
+                stylistTimezone: providedStylistTimezone,
+                clientTimezone,
             } = req.body;
 
             if (
@@ -4773,6 +4955,20 @@ app.post(
                     .json({ error: "Missing required parameters" });
             }
 
+            // Get stylist's timezone if not provided
+            let stylistTimezone = providedStylistTimezone;
+            if (!stylistTimezone && stylistId) {
+                const stylistSettingsSnap = await db
+                    .collection("stylists")
+                    .doc(stylistId)
+                    .collection("settings")
+                    .doc("schedule")
+                    .get();
+                stylistTimezone =
+                    stylistSettingsSnap.data()?.calculatedTimezone ||
+                    stylistSettingsSnap.data()?.timezone;
+            }
+
             await EmailService.sendNewAppointmentForStylist({
                 stylistName,
                 stylistEmail,
@@ -4780,6 +4976,8 @@ app.post(
                 appointmentDate,
                 appointmentTime,
                 serviceName,
+                stylistTimezone,
+                clientTimezone,
             });
 
             return res.status(200).json({
@@ -5496,7 +5694,6 @@ app.post(
             }
 
             // Check if appointment is in a valid state for payment request
-            // TODO: these values should be stored in enums
             if (appointmentData?.status !== "to-be-paid") {
                 return res.status(400).json({
                     error: "Appointment must be confirmed or completed to request payment",
@@ -5521,7 +5718,8 @@ app.post(
                         stylistName: appointmentData.stylistName,
                         serviceName: appointmentData.serviceName,
                         appointmentDate: date,
-                        appointmentTime: time + " UTC",
+                        appointmentTime: time,
+                        clientTimezone: appointmentData.clientTimezone,
                     });
                     console.log(
                         "Email notification sent to client, payment requested"
@@ -5543,7 +5741,9 @@ app.post(
                         stylistName: appointmentData.stylistName,
                         serviceName: appointmentData.serviceName,
                         appointmentDate: date,
-                        appointmentTime: time + " UTC",
+                        appointmentTime: appointmentData.clientTimezone && isValidTimezone(appointmentData.clientTimezone)
+                            ? formatTimeWithTimezone(time, date, appointmentData.clientTimezone)
+                            : time,
                     });
                 } catch (error) {
                     console.error(
@@ -6026,6 +6226,28 @@ app.post(
                 ? appointmentData.stylistPhone
                 : appointmentData.clientPhone;
 
+            // Determine recipient's timezone
+            let recipientTimezone: string | undefined;
+            if (isClientProposing) {
+                // Recipient is the stylist - get stylist timezone
+                try {
+                    const stylistSettingsSnap = await db
+                        .collection("stylists")
+                        .doc(appointmentData.stylistId)
+                        .collection("settings")
+                        .doc("schedule")
+                        .get();
+                    recipientTimezone =
+                        stylistSettingsSnap.data()?.calculatedTimezone ||
+                        stylistSettingsSnap.data()?.timezone;
+                } catch (e) {
+                    console.error("Error fetching stylist timezone for reschedule:", e);
+                }
+            } else {
+                // Recipient is the client - use client timezone from booking
+                recipientTimezone = appointmentData.clientTimezone;
+            }
+
             // Send email notification
             setTimeout(async () => {
                 try {
@@ -6038,6 +6260,7 @@ app.post(
                         oldAppointmentTime: oldTime,
                         newAppointmentDate: newDate,
                         newAppointmentTime: newTime,
+                        recipientTimezone,
                     });
                 } catch (error) {
                     console.error(
@@ -6057,9 +6280,13 @@ app.post(
                             proposedBy: proposedByName,
                             serviceName: appointmentData.serviceName,
                             oldAppointmentDate: oldDate,
-                            oldAppointmentTime: oldTime,
+                            oldAppointmentTime: recipientTimezone && isValidTimezone(recipientTimezone)
+                                ? formatTimeWithTimezone(oldTime, oldDate, recipientTimezone)
+                                : oldTime,
                             newAppointmentDate: newDate,
-                            newAppointmentTime: newTime,
+                            newAppointmentTime: recipientTimezone && isValidTimezone(recipientTimezone)
+                                ? formatTimeWithTimezone(newTime, newDate, recipientTimezone)
+                                : newTime,
                         });
                     } catch (error) {
                         console.error(
@@ -6166,7 +6393,27 @@ app.post(
 
             // Send confirmation notifications
             const newDate = format(newDateTime, "yyyy-MM-dd");
-            const newTime = format(newDateTime, "HH:mm") + " UTC";
+            const newTime = format(newDateTime, "HH:mm");
+
+            // Determine proposer's timezone
+            let proposerTimezone: string | undefined;
+            if (proposedBy === "client") {
+                proposerTimezone = appointmentData.clientTimezone;
+            } else {
+                try {
+                    const stylistSettingsSnap = await db
+                        .collection("stylists")
+                        .doc(appointmentData.stylistId)
+                        .collection("settings")
+                        .doc("schedule")
+                        .get();
+                    proposerTimezone =
+                        stylistSettingsSnap.data()?.calculatedTimezone ||
+                        stylistSettingsSnap.data()?.timezone;
+                } catch (e) {
+                    console.error("Error fetching stylist timezone for reschedule accept:", e);
+                }
+            }
 
             // Notify the person who proposed the reschedule
             const proposerName =
@@ -6194,6 +6441,7 @@ app.post(
                         serviceName: appointmentData.serviceName,
                         newAppointmentDate: newDate,
                         newAppointmentTime: newTime,
+                        recipientTimezone: proposerTimezone,
                     });
                 } catch (error) {
                     console.error(
@@ -6215,7 +6463,9 @@ app.post(
                                 : appointmentData.stylistName,
                             serviceName: appointmentData.serviceName,
                             newAppointmentDate: newDate,
-                            newAppointmentTime: newTime,
+                            newAppointmentTime: proposerTimezone && isValidTimezone(proposerTimezone)
+                                ? formatTimeWithTimezone(newTime, newDate, proposerTimezone)
+                                : newTime,
                         });
                     } catch (error) {
                         console.error(
@@ -6333,7 +6583,28 @@ app.post(
 
             const oldDateTime = appointmentData.dateTime;
             const oldDate = format(oldDateTime, "yyyy-MM-dd");
-            const oldTime = format(oldDateTime, "HH:mm") + " UTC";
+            const oldTime = format(oldDateTime, "HH:mm");
+
+            // Determine proposer's timezone
+            let rejectProposerTimezone: string | undefined;
+            if (proposedBy === "client") {
+                rejectProposerTimezone = appointmentData.clientTimezone;
+            } else {
+                try {
+                    const stylistSettingsSnap = await db
+                        .collection("stylists")
+                        .doc(appointmentData.stylistId)
+                        .collection("settings")
+                        .doc("schedule")
+                        .get();
+                    rejectProposerTimezone =
+                        stylistSettingsSnap.data()?.calculatedTimezone ||
+                        stylistSettingsSnap.data()?.timezone;
+                } catch (e) {
+                    console.error("Error fetching stylist timezone for reschedule reject:", e);
+                }
+            }
+
             // Send SMS notification to proposer
             if (proposerPhone) {
                 setTimeout(async () => {
@@ -6346,7 +6617,9 @@ app.post(
                                 : appointmentData.stylistName,
                             serviceName: appointmentData.serviceName,
                             oldAppointmentDate: oldDate,
-                            oldAppointmentTime: oldTime,
+                            oldAppointmentTime: rejectProposerTimezone && isValidTimezone(rejectProposerTimezone)
+                                ? formatTimeWithTimezone(oldTime, oldDate, rejectProposerTimezone)
+                                : oldTime,
                         });
                     } catch (error) {
                         console.error(
@@ -6370,6 +6643,7 @@ app.post(
                             serviceName: appointmentData.serviceName,
                             oldAppointmentDate: oldDate,
                             oldAppointmentTime: oldTime,
+                            recipientTimezone: rejectProposerTimezone,
                         });
                     } catch (error) {
                         console.error(
@@ -6598,6 +6872,126 @@ app.delete(
             });
         } catch (error) {
             console.error("Error disconnecting Google Calendar:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+// Handle OPTIONS preflight for update-stylist-settings
+app.options("/update-stylist-settings", cors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Update stylist settings with automatic timezone calculation
+app.post(
+    "/update-stylist-settings",
+    cors({ 
+        origin: true,
+        credentials: true,
+        methods: ['POST', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization']
+    }),
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & { user?: admin.auth.DecodedIdToken },
+        res: Response
+    ) => {
+        try {
+            const userId = req.user?.uid;
+            const { city, state, zipCode, businessAddress } = req.body;
+
+            if (!userId) {
+                return res
+                    .status(401)
+                    .json({ error: "User not authenticated" });
+            }
+
+            // Verify that the user is a stylist
+            const stylistRef = db.collection("stylists").doc(userId);
+            const stylistDoc = await stylistRef.get();
+
+            if (!stylistDoc.exists) {
+                return res
+                    .status(403)
+                    .json({ error: "Only stylists can update settings" });
+            }
+
+            // Calculate timezone from location info using priority logic
+            // Priority: postal code + city/state > postal code alone > city + state > state alone
+            let calculatedTimezone = undefined;
+            if (zipCode || city || state) {
+                try {
+                    console.log("═══════════════════════════════════════════════");
+                    console.log("🔧 UPDATE-STYLIST-SETTINGS called");
+                    console.log(`📍 Input: city=${city}, state=${state}, zipCode=${zipCode}`);
+                    
+                    calculatedTimezone = calculateTimezoneFromLocation(
+                        city,
+                        state,
+                        zipCode
+                    );
+                    
+                    console.log(`✓ Calculated timezone: ${calculatedTimezone}`);
+                    console.log("═══════════════════════════════════════════════");
+                } catch (error) {
+                    console.error("❌ Error calculating timezone:", error);
+                }
+            }
+
+            // Update stylist profile with location
+            const updateData: { [key: string]: any } = {};
+
+            if (businessAddress !== undefined) updateData.businessAddress = businessAddress;
+            if (city !== undefined) updateData.city = city;
+            if (state !== undefined) updateData.state = state;
+            if (zipCode !== undefined) updateData.zipCode = zipCode;
+            if (calculatedTimezone) updateData.calculatedTimezone = calculatedTimezone;
+
+            updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+            if (Object.keys(updateData).length > 0) {
+                await stylistRef.update(updateData);
+
+                // Also update the schedule settings
+                if (calculatedTimezone) {
+                    const scheduleRef = stylistRef
+                        .collection("settings")
+                        .doc("schedule");
+                    const scheduleDoc = await scheduleRef.get();
+
+                    if (scheduleDoc.exists) {
+                        await scheduleRef.update({
+                            calculatedTimezone: calculatedTimezone,
+                            timezone: calculatedTimezone,
+                            updatedAt:
+                                admin.firestore.FieldValue.serverTimestamp(),
+                        });
+                    } else {
+                        // Create if doesn't exist
+                        await scheduleRef.set({
+                            calculatedTimezone: calculatedTimezone,
+                            timezone: calculatedTimezone,
+                            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                        });
+                    }
+                }
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: "Stylist settings updated successfully",
+                calculatedTimezone: calculatedTimezone,
+            });
+        } catch (error) {
+            console.error("Error updating stylist settings:", error);
             return res.status(500).json({
                 error:
                     error instanceof Error

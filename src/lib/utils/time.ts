@@ -1,7 +1,7 @@
 export function formatTime(hour: number, minute: number): string {
   const period = hour >= 12 ? 'PM' : 'AM';
   const displayHour = hour % 12 || 12;
-  return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
+  return `${displayHour}:${minute?.toString()?.padStart(2, '0')} ${period}`;
 }
 
 export function parseTime(timeString: string): { hour: number, minute: number } {

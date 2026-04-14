@@ -28,6 +28,8 @@ export interface Appointment {
     };
     clientName: string;
     clientPhone: string;
+    clientTimezone?: string; // IANA timezone captured at booking time
+    stylistTimezone?: string; // IANA timezone calculated from stylist's postal code/location
     createdAt: Timestamp;
     dateTime: Date;
     // date: string;

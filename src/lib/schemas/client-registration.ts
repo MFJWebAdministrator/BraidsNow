@@ -26,6 +26,7 @@ export const clientRegistrationSchema = z.object({
     .regex(/^[A-Z]{2}$/, 'State must be 2 capital letters'),
   zipCode: z.string()
     .regex(/^\d{5}$/, 'ZIP code must be 5 digits'),
+  timezone: z.string().optional(), // IANA timezone (e.g., "America/New_York"), will be captured from browser
   agreeToTerms: z.boolean()
     .refine(val => val === true, {
       message: 'You must agree to the terms and conditions'

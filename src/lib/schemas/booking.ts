@@ -77,6 +77,9 @@ export const bookingSchema = z.object({
         .optional(),
     bookingSource: z.enum(["website", "app"]).optional(),
     createdAt: z.date().optional(),
+    clientTimezone: z.string().optional(), // IANA timezone string captured at booking time
+    date: z.string().optional(),
+    time: z.string().optional(),
 });
 
 export type ServiceSelection = z.infer<typeof serviceSelectionSchema>;
@@ -89,5 +92,6 @@ export interface Booking extends BookingForm {
     status: "pending" | "confirmed" | "cancelled";
     date?: string;
     time?: string;
+    clientTimezone?: string; // IANA timezone captured at booking time
     updatedAt: Date;
 }

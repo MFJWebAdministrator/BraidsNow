@@ -9,12 +9,27 @@ import { clientSettingsSchema } from "@/lib/schemas/client-settings";
 import { useUserData } from "./use-user-data";
 import type { ClientSettingsForm } from "@/lib/schemas/client-settings";
 
+/**
+ * Capture the client's browser timezone
+ * Returns IANA timezone string (e.g., "America/New_York")
+ */
+function captureClientTimezone(): string {
+    try {
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        return timezone || "America/New_York"; // Fallback to EST if detection fails
+    } catch (error) {
+        console.error("Error capturing timezone:", error);
+        return "America/New_York";
+    }
+}
+
 export function useClientSettings() {
     const { user } = useAuth();
     const { userData, loading: userLoading } = useUserData(user?.uid);
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
+    const [clientTimezone, setClientTimezone] = useState<string>("America/New_York");
 
     const form = useForm<ClientSettingsForm>({
         resolver: zodResolver(clientSettingsSchema),
@@ -27,8 +42,15 @@ export function useClientSettings() {
             city: "",
             state: "",
             zipCode: "",
+            timezone: undefined,
         },
     });
+
+    // Capture client timezone on mount
+    useEffect(() => {
+        const timezone = captureClientTimezone();
+        setClientTimezone(timezone);
+    }, []);
 
     // Initialize form with user data
     useEffect(() => {
@@ -42,9 +64,10 @@ export function useClientSettings() {
                 city: userData.city || "",
                 state: userData.state || "",
                 zipCode: userData.zipCode || "",
+                timezone: userData.timezone || clientTimezone,
             });
         }
-    }, [userData, form]);
+    }, [userData, form, clientTimezone]);
 
     // Track form changes
     useEffect(() => {
@@ -68,7 +91,12 @@ export function useClientSettings() {
 
         try {
             setIsLoading(true);
-            await updateClientProfile(user.uid, data);
+            // Always include the current timezone
+            const dataWithTimezone = {
+                ...data,
+                timezone: data.timezone || clientTimezone,
+            };
+            await updateClientProfile(user.uid, dataWithTimezone);
 
             toast({
                 title: "Success",
@@ -123,5 +151,7 @@ export function useClientSettings() {
         handleSubmit: form.handleSubmit(handleSubmit),
         handleImageChange,
         userData,
+        clientTimezone,
+        captureClientTimezone,
     };
 }

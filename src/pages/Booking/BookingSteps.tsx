@@ -26,6 +26,7 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
         service: null as ServiceSelectionType | null,
         dateTime: null as Date | null,
         clientInfo: null as ClientInformationType | null,
+        clientTimezone: undefined as string | undefined,
     });
     const navigate = useNavigate();
     const location = useLocation();
@@ -57,7 +58,8 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
     const handleDateTimeSelect = (dateTime: Date) => {
         const date = dateTime ? dateTime.toISOString().split("T")[0] : null;
         const time = dateTime ? dateTime.toTimeString().slice(0, 5) : null;
-        setBookingData((prev) => ({ ...prev, dateTime, date, time }));
+        const clientTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        setBookingData((prev) => ({ ...prev, dateTime, date, time, clientTimezone }));
         setStep(3);
     };
 
@@ -96,6 +98,7 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
             service: bookingData.service,
             dateTime: bookingData.dateTime,
             clientInfo: bookingData.clientInfo,
+            clientTimezone: bookingData.clientTimezone,
 
             // Additional required fields for API and database
             stylistId: stylistId,
@@ -207,7 +210,7 @@ export function BookingSteps({ stylistId }: BookingStepsProps) {
                         <DateTimeSelection
                             stylistId={stylistId}
                             onSelect={handleDateTimeSelect}
-                            selectedService={bookingData.service}
+                            selectedService={bookingData?.service}
                         />
                     )}
                     {step === 3 &&

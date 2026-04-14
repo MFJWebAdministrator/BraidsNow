@@ -11,6 +11,13 @@ import { EmailService } from "./services/email-service";
 import { SmsService } from "./services/sms-service";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { getBookingExpiresAt } from "./utils/utils";
+import {
+    getTimezoneFromPostalCode,
+    calculateTimezoneFromLocation,
+    getTimezoneAbbreviation,
+    formatTimeWithTimezone,
+    isValidTimezone,
+} from "./utils/timezone-utils";
 import { format } from "date-fns";
 
 const app = express();
@@ -107,7 +114,12 @@ async function ensureValidPriceId() {
 const validPriceIdPromise: Promise<string> | null = null;
 
 // Middleware
-app.use(cors({ origin: true }));
+app.use(cors({ 
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 interface RequestWithRawBody extends Request {
@@ -821,12 +833,17 @@ app.post(
                 bookingData.time
             );
 
-            await bookingRef.set({
+            // Prepare booking object with timezone
+            const bookingToCreate = {
                 ...bookingData,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 expiresAt,
-            });
+                clientTimezone:
+                    bookingData.clientTimezone || "America/New_York",
+            };
+
+            await bookingRef.set(bookingToCreate);
 
             // Notify the stylist about the new booking
             await db.collection("notifications").add({
@@ -954,7 +971,24 @@ app.post(
                     bookingData.paymentId
                 );
 
-                // Update the booking status to confirmed
+                // Get stylist's timezone from their settings
+                const stylistSettingsSnap = await db
+                    .collection("stylists")
+                    .doc(bookingData.stylistId)
+                    .collection("settings")
+                    .doc("schedule")
+                    .get();
+                const stylistTimezone =
+                    stylistSettingsSnap.data()?.calculatedTimezone ||
+                    stylistSettingsSnap.data()?.timezone ||
+                    undefined;
+
+                console.log("📦 ACCEPT-BOOKING - Storing timezone with booking:");
+                console.log(`   stylistId: ${bookingData.stylistId}`);
+                console.log(`   stylistTimezone: ${stylistTimezone}`);
+                console.log(`   clientTimezone: ${bookingData.clientTimezone}`);
+
+                // Update the booking status to confirmed and include stylist timezone
                 await bookingRef.update({
                     status: "confirmed",
                     paymentStatus: "paid",
@@ -964,6 +998,7 @@ app.post(
                         admin.firestore.FieldValue.serverTimestamp(),
                     stripeCaptureId: paymentIntent.latest_charge,
                     expiresAt: null,
+                    stylistTimezone: stylistTimezone, // Store stylist's timezone with booking
                 });
 
                 const date = format(bookingData.dateTime, "yyyy-MM-dd");
@@ -1013,13 +1048,18 @@ app.post(
                 // Send email/sms notification
                 setTimeout(async () => {
                     try {
+                        // Get client's timezone from booking
+                        const clientTimezone = bookingData.clientTimezone;
+
                         await EmailService.sendAppointmentConfirmationClient({
                             clientName: bookingData.clientName,
                             clientEmail: bookingData.clientEmail,
                             stylistName: bookingData.stylistName,
                             appointmentDate: date,
-                            appointmentTime: time + " UTC",
+                            appointmentTime: time,
                             serviceName: bookingData.serviceName,
+                            clientTimezone: clientTimezone,
+                            stylistTimezone: stylistTimezone,
                         });
                     } catch (error) {
                         console.log(
@@ -1036,7 +1076,9 @@ app.post(
                             phoneNumber: bookingData.clientPhone,
                             stylistName: bookingData.stylistName,
                             appointmentDate: date,
-                            appointmentTime: time + " UTC",
+                            appointmentTime: bookingData.clientTimezone && isValidTimezone(bookingData.clientTimezone)
+                                ? formatTimeWithTimezone(time, date, bookingData.clientTimezone)
+                                : time,
                             serviceName: bookingData.serviceName,
                         });
                     } catch (error) {
@@ -1240,7 +1282,8 @@ app.post(
                             serviceName: bookingData.serviceName,
                             stylistName: bookingData.stylistName,
                             appointmentDate: date,
-                            appointmentTime: time + " UTC",
+                            appointmentTime: time,
+                            clientTimezone: bookingData.clientTimezone,
                         });
                     } catch (error) {
                         console.log(
@@ -1257,7 +1300,9 @@ app.post(
                             phoneNumber: bookingData.clientPhone,
                             stylistName: bookingData.stylistName,
                             appointmentDate: date,
-                            appointmentTime: time + " UTC",
+                            appointmentTime: bookingData.clientTimezone && isValidTimezone(bookingData.clientTimezone)
+                                ? formatTimeWithTimezone(time, date, bookingData.clientTimezone)
+                                : time,
                             serviceName: bookingData.serviceName,
                         });
                     } catch (error) {
@@ -1463,7 +1508,7 @@ app.post(
             });
 
             const date = format(bookingData.dateTime, "yyyy-MM-dd");
-            const time = format(bookingData.dateTime, "HH:mm") + " UTC";
+            const time = format(bookingData.dateTime, "HH:mm");
 
             // Send email to client
             setTimeout(async () => {
@@ -1475,6 +1520,7 @@ app.post(
                         serviceName: bookingData.serviceName,
                         appointmentDate: date,
                         appointmentTime: time,
+                        clientTimezone: bookingData.clientTimezone,
                     });
                 } catch (error) {
                     console.error(
@@ -1487,6 +1533,17 @@ app.post(
             // Send email to stylist
             setTimeout(async () => {
                 try {
+                    // Get stylist's timezone
+                    const stylistSettingsSnap = await db
+                        .collection("stylists")
+                        .doc(bookingData.stylistId)
+                        .collection("settings")
+                        .doc("schedule")
+                        .get();
+                    const stylistTimezone =
+                        stylistSettingsSnap.data()?.calculatedTimezone ||
+                        stylistSettingsSnap.data()?.timezone;
+
                     await EmailService.sendAppointmentCancelledEmailForStylist({
                         stylistName: bookingData.stylistName || "Stylist",
                         stylistEmail: bookingData.stylistEmail,
@@ -1494,6 +1551,8 @@ app.post(
                         serviceName: bookingData.serviceName,
                         appointmentDate: date,
                         appointmentTime: time,
+                        stylistTimezone: stylistTimezone,
+                        clientTimezone: bookingData.clientTimezone,
                     });
                 } catch (error) {
                     console.error(
@@ -1734,7 +1793,23 @@ app.post(
             });
 
             const date = format(bookingData.dateTime, "yyyy-MM-dd");
-            const time = format(bookingData.dateTime, "HH:mm") + " UTC";
+            const time = format(bookingData.dateTime, "HH:mm");
+
+            // Get stylist's timezone
+            let stylistCancelTimezone: string | undefined;
+            try {
+                const stylistSettingsSnap = await db
+                    .collection("stylists")
+                    .doc(userId)
+                    .collection("settings")
+                    .doc("schedule")
+                    .get();
+                stylistCancelTimezone =
+                    stylistSettingsSnap.data()?.calculatedTimezone ||
+                    stylistSettingsSnap.data()?.timezone;
+            } catch (e) {
+                console.error("Error fetching stylist timezone for cancel:", e);
+            }
 
             // Send email to client
             setTimeout(async () => {
@@ -1746,6 +1821,7 @@ app.post(
                         serviceName: bookingData.serviceName,
                         appointmentDate: date,
                         appointmentTime: time,
+                        clientTimezone: bookingData.clientTimezone,
                     });
                 } catch (error) {
                     console.error(
@@ -1765,6 +1841,8 @@ app.post(
                         serviceName: bookingData.serviceName,
                         appointmentDate: date,
                         appointmentTime: time,
+                        stylistTimezone: stylistCancelTimezone,
+                        clientTimezone: bookingData.clientTimezone,
                     });
                 } catch (error) {
                     console.error(
@@ -1784,7 +1862,9 @@ app.post(
                         stylistName: bookingData.stylistName || "Stylist",
                         serviceName: bookingData.serviceName,
                         appointmentDate: date,
-                        appointmentTime: time,
+                        appointmentTime: bookingData.clientTimezone && isValidTimezone(bookingData.clientTimezone)
+                            ? formatTimeWithTimezone(time, date, bookingData.clientTimezone)
+                            : time,
                     });
                 } catch (error) {
                     console.error(
@@ -1803,7 +1883,9 @@ app.post(
                         clientName: bookingData.clientName || "Client",
                         serviceName: bookingData.serviceName,
                         appointmentDate: date,
-                        appointmentTime: time,
+                        appointmentTime: stylistCancelTimezone && isValidTimezone(stylistCancelTimezone)
+                            ? formatTimeWithTimezone(time, date, stylistCancelTimezone)
+                            : time,
                     });
                 } catch (error) {
                     console.error(
@@ -1929,9 +2011,24 @@ export const cronJob = onSchedule(
                         // Send email/sms notifications to client
                         const date = format(bookingData.dateTime, "yyyy-MM-dd");
                         const time =
-                            format(bookingData.dateTime, "HH:mm") + " UTC";
+                            format(bookingData.dateTime, "HH:mm");
 
-                        // Email Notifications
+                        // Fetch stylist's timezone for auto-cancel notifications
+                        let autoStylistTimezone: string | undefined;
+                        try {
+                            const stylistSettingsSnap = await db
+                                .collection("stylists")
+                                .doc(bookingData.stylistId)
+                                .collection("settings")
+                                .doc("schedule")
+                                .get();
+                            autoStylistTimezone =
+                                stylistSettingsSnap.data()?.calculatedTimezone ||
+                                stylistSettingsSnap.data()?.timezone;
+                        } catch (e) {
+                            console.error("Error fetching stylist timezone for auto-cancel:", e);
+                        }
+
                         setTimeout(async () => {
                             try {
                                 await EmailService.sendAppointmentAutoCancelledForClient(
@@ -1942,6 +2039,7 @@ export const cronJob = onSchedule(
                                         appointmentDate: date,
                                         appointmentTime: time,
                                         serviceName: bookingData.serviceName,
+                                        clientTimezone: bookingData.clientTimezone,
                                     }
                                 );
                             } catch (error) {
@@ -1962,6 +2060,8 @@ export const cronJob = onSchedule(
                                         appointmentDate: date,
                                         appointmentTime: time,
                                         serviceName: bookingData.serviceName,
+                                        stylistTimezone: autoStylistTimezone,
+                                        clientTimezone: bookingData.clientTimezone,
                                     }
                                 );
                             } catch (error) {
@@ -1980,7 +2080,9 @@ export const cronJob = onSchedule(
                                         phoneNumber: bookingData.clientPhone,
                                         stylistName: bookingData.stylistName,
                                         appointmentDate: date,
-                                        appointmentTime: time,
+                                        appointmentTime: bookingData.clientTimezone && isValidTimezone(bookingData.clientTimezone)
+                                            ? formatTimeWithTimezone(time, date, bookingData.clientTimezone)
+                                            : time,
                                         serviceName: bookingData.serviceName,
                                     }
                                 );
@@ -2000,7 +2102,9 @@ export const cronJob = onSchedule(
                                         phoneNumber: bookingData.stylistPhone,
                                         clientName: bookingData.clientName,
                                         appointmentDate: date,
-                                        appointmentTime: time,
+                                        appointmentTime: autoStylistTimezone && isValidTimezone(autoStylistTimezone)
+                                            ? formatTimeWithTimezone(time, date, autoStylistTimezone)
+                                            : time,
                                         serviceName: bookingData.serviceName,
                                     }
                                 );
@@ -2371,6 +2475,18 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                             // send email to stylist about the new appointment
                             setTimeout(async () => {
                                 try {
+                                    // Get stylist's timezone from their schedule settings
+                                    const stylistSettingsSnap = await db
+                                        .collection("stylists")
+                                        .doc(bookingData.stylistId)
+                                        .collection("settings")
+                                        .doc("schedule")
+                                        .get();
+                                    const stylistTimezone =
+                                        stylistSettingsSnap.data()?.calculatedTimezone ||
+                                        stylistSettingsSnap.data()?.timezone ||
+                                        undefined;
+
                                     await EmailService.sendNewAppointmentForStylist(
                                         {
                                             stylistName:
@@ -2379,9 +2495,11 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                                 bookingData.stylistEmail,
                                             clientName: bookingData.clientName,
                                             appointmentDate: date,
-                                            appointmentTime: time + " UTC",
+                                            appointmentTime: time,
                                             serviceName:
                                                 bookingData.serviceName,
+                                            stylistTimezone: stylistTimezone,
+                                            clientTimezone: bookingData.clientTimezone,
                                         }
                                     );
 
@@ -2393,7 +2511,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                             phoneNumber:
                                                 bookingData.stylistPhone,
                                             appointmentDate: date,
-                                            appointmentTime: time + " UTC", // TODO: timezone updates by user regions (EST | CST | MST | AKT | HAT) This cover all U.S. Timezones.
+                                            appointmentTime: time,
                                             serviceName:
                                                 bookingData.serviceName,
                                             clientName: bookingData.clientName,
@@ -2423,13 +2541,14 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                                 stylistName:
                                                     bookingData.stylistName,
                                                 appointmentDate: date,
-                                                appointmentTime: time + " UTC",
+                                                appointmentTime: time,
                                                 serviceName:
                                                     bookingData.serviceName,
                                                 balanceAmount: (
                                                     bookingData.totalAmount -
                                                     bookingData.depositAmount
                                                 ).toString(),
+                                                clientTimezone: bookingData.clientTimezone,
                                             }
                                         );
 
@@ -2445,7 +2564,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                                 stylistName:
                                                     bookingData.stylistName,
                                                 appointmentDate: date,
-                                                appointmentTime: time + " UTC",
+                                                appointmentTime: time,
                                                 balanceAmount: (
                                                     bookingData.totalAmount -
                                                     bookingData.depositAmount
@@ -3929,7 +4048,6 @@ app.post(
 // Create a login link for an existing Connect account
 app.post(
     "/create-account-link",
-    cors({ origin: true }),
     async (req: Request, res: Response) => {
         try {
             // Verify authentication
@@ -3996,7 +4114,6 @@ app.post(
 // Add this endpoint to check account requirements
 app.post(
     "/check-account-requirements",
-    cors({ origin: true }),
     async (req: Request, res: Response) => {
         try {
             // Verify authentication
@@ -4065,7 +4182,6 @@ app.post(
 // Update the check-account-status endpoint to include more detailed account information
 app.post(
     "/check-account-status",
-    cors({ origin: true }),
     async (req: Request, res: Response) => {
         try {
             // Verify authentication
@@ -4164,7 +4280,6 @@ app.post(
 // get stripe account details
 app.post(
     "/get-stripe-account-details",
-    cors({ origin: true }),
     async (req: Request, res: Response) => {
         try {
             const { stylistId } = req.body;
@@ -4266,7 +4381,6 @@ app.post(
 // Get payment details
 app.get(
     "/payment-details",
-    cors({ origin: true }),
     async (req: Request, res: Response) => {
         try {
             // Verify authentication
@@ -4334,7 +4448,6 @@ app.get(
 
 app.get(
     "/test",
-    cors({ origin: true }),
     async (req: Request, res: Response) => {
         return res.status(200).json({ message: "Hello, world!" });
     }
@@ -4701,10 +4814,13 @@ app.post(
             body: {
                 stylistName: string;
                 stylistEmail: string;
+                stylistId?: string;
                 clientName: string;
                 appointmentDate: string;
                 appointmentTime: string;
                 serviceName: string;
+                stylistTimezone?: string;
+                clientTimezone?: string;
             };
             user?: admin.auth.DecodedIdToken;
         },
@@ -4714,10 +4830,13 @@ app.post(
             const {
                 stylistName,
                 stylistEmail,
+                stylistId,
                 clientName,
                 appointmentDate,
                 appointmentTime,
                 serviceName,
+                stylistTimezone: providedStylistTimezone,
+                clientTimezone,
             } = req.body;
 
             if (
@@ -4733,6 +4852,20 @@ app.post(
                     .json({ error: "Missing required parameters" });
             }
 
+            // Get stylist's timezone if not provided
+            let stylistTimezone = providedStylistTimezone;
+            if (!stylistTimezone && stylistId) {
+                const stylistSettingsSnap = await db
+                    .collection("stylists")
+                    .doc(stylistId)
+                    .collection("settings")
+                    .doc("schedule")
+                    .get();
+                stylistTimezone =
+                    stylistSettingsSnap.data()?.calculatedTimezone ||
+                    stylistSettingsSnap.data()?.timezone;
+            }
+
             await EmailService.sendNewAppointmentForStylist({
                 stylistName,
                 stylistEmail,
@@ -4740,6 +4873,8 @@ app.post(
                 appointmentDate,
                 appointmentTime,
                 serviceName,
+                stylistTimezone,
+                clientTimezone,
             });
 
             return res.status(200).json({
@@ -5475,7 +5610,8 @@ app.post(
                         stylistName: appointmentData.stylistName,
                         serviceName: appointmentData.serviceName,
                         appointmentDate: date,
-                        appointmentTime: time + " UTC",
+                        appointmentTime: time,
+                        clientTimezone: appointmentData.clientTimezone,
                     });
                     console.log(
                         "Email notification sent to client, payment requested"
@@ -5497,7 +5633,9 @@ app.post(
                         stylistName: appointmentData.stylistName,
                         serviceName: appointmentData.serviceName,
                         appointmentDate: date,
-                        appointmentTime: time + " UTC",
+                        appointmentTime: appointmentData.clientTimezone && isValidTimezone(appointmentData.clientTimezone)
+                            ? formatTimeWithTimezone(time, date, appointmentData.clientTimezone)
+                            : time,
                     });
                 } catch (error) {
                     console.error(
@@ -5980,6 +6118,28 @@ app.post(
                 ? appointmentData.stylistPhone
                 : appointmentData.clientPhone;
 
+            // Determine recipient's timezone
+            let recipientTimezone: string | undefined;
+            if (isClientProposing) {
+                // Recipient is the stylist - get stylist timezone
+                try {
+                    const stylistSettingsSnap = await db
+                        .collection("stylists")
+                        .doc(appointmentData.stylistId)
+                        .collection("settings")
+                        .doc("schedule")
+                        .get();
+                    recipientTimezone =
+                        stylistSettingsSnap.data()?.calculatedTimezone ||
+                        stylistSettingsSnap.data()?.timezone;
+                } catch (e) {
+                    console.error("Error fetching stylist timezone for reschedule:", e);
+                }
+            } else {
+                // Recipient is the client - use client timezone from booking
+                recipientTimezone = appointmentData.clientTimezone;
+            }
+
             // Send email notification
             setTimeout(async () => {
                 try {
@@ -5992,6 +6152,7 @@ app.post(
                         oldAppointmentTime: oldTime,
                         newAppointmentDate: newDate,
                         newAppointmentTime: newTime,
+                        recipientTimezone,
                     });
                 } catch (error) {
                     console.error(
@@ -6011,9 +6172,13 @@ app.post(
                             proposedBy: proposedByName,
                             serviceName: appointmentData.serviceName,
                             oldAppointmentDate: oldDate,
-                            oldAppointmentTime: oldTime,
+                            oldAppointmentTime: recipientTimezone && isValidTimezone(recipientTimezone)
+                                ? formatTimeWithTimezone(oldTime, oldDate, recipientTimezone)
+                                : oldTime,
                             newAppointmentDate: newDate,
-                            newAppointmentTime: newTime,
+                            newAppointmentTime: recipientTimezone && isValidTimezone(recipientTimezone)
+                                ? formatTimeWithTimezone(newTime, newDate, recipientTimezone)
+                                : newTime,
                         });
                     } catch (error) {
                         console.error(
@@ -6120,7 +6285,27 @@ app.post(
 
             // Send confirmation notifications
             const newDate = format(newDateTime, "yyyy-MM-dd");
-            const newTime = format(newDateTime, "HH:mm") + " UTC";
+            const newTime = format(newDateTime, "HH:mm");
+
+            // Determine proposer's timezone
+            let proposerTimezone: string | undefined;
+            if (proposedBy === "client") {
+                proposerTimezone = appointmentData.clientTimezone;
+            } else {
+                try {
+                    const stylistSettingsSnap = await db
+                        .collection("stylists")
+                        .doc(appointmentData.stylistId)
+                        .collection("settings")
+                        .doc("schedule")
+                        .get();
+                    proposerTimezone =
+                        stylistSettingsSnap.data()?.calculatedTimezone ||
+                        stylistSettingsSnap.data()?.timezone;
+                } catch (e) {
+                    console.error("Error fetching stylist timezone for reschedule accept:", e);
+                }
+            }
 
             // Notify the person who proposed the reschedule
             const proposerName =
@@ -6148,6 +6333,7 @@ app.post(
                         serviceName: appointmentData.serviceName,
                         newAppointmentDate: newDate,
                         newAppointmentTime: newTime,
+                        recipientTimezone: proposerTimezone,
                     });
                 } catch (error) {
                     console.error(
@@ -6169,7 +6355,9 @@ app.post(
                                 : appointmentData.stylistName,
                             serviceName: appointmentData.serviceName,
                             newAppointmentDate: newDate,
-                            newAppointmentTime: newTime,
+                            newAppointmentTime: proposerTimezone && isValidTimezone(proposerTimezone)
+                                ? formatTimeWithTimezone(newTime, newDate, proposerTimezone)
+                                : newTime,
                         });
                     } catch (error) {
                         console.error(
@@ -6287,7 +6475,28 @@ app.post(
 
             const oldDateTime = appointmentData.dateTime;
             const oldDate = format(oldDateTime, "yyyy-MM-dd");
-            const oldTime = format(oldDateTime, "HH:mm") + " UTC";
+            const oldTime = format(oldDateTime, "HH:mm");
+
+            // Determine proposer's timezone
+            let rejectProposerTimezone: string | undefined;
+            if (proposedBy === "client") {
+                rejectProposerTimezone = appointmentData.clientTimezone;
+            } else {
+                try {
+                    const stylistSettingsSnap = await db
+                        .collection("stylists")
+                        .doc(appointmentData.stylistId)
+                        .collection("settings")
+                        .doc("schedule")
+                        .get();
+                    rejectProposerTimezone =
+                        stylistSettingsSnap.data()?.calculatedTimezone ||
+                        stylistSettingsSnap.data()?.timezone;
+                } catch (e) {
+                    console.error("Error fetching stylist timezone for reschedule reject:", e);
+                }
+            }
+
             // Send SMS notification to proposer
             if (proposerPhone) {
                 setTimeout(async () => {
@@ -6300,7 +6509,9 @@ app.post(
                                 : appointmentData.stylistName,
                             serviceName: appointmentData.serviceName,
                             oldAppointmentDate: oldDate,
-                            oldAppointmentTime: oldTime,
+                            oldAppointmentTime: rejectProposerTimezone && isValidTimezone(rejectProposerTimezone)
+                                ? formatTimeWithTimezone(oldTime, oldDate, rejectProposerTimezone)
+                                : oldTime,
                         });
                     } catch (error) {
                         console.error(
@@ -6324,6 +6535,7 @@ app.post(
                             serviceName: appointmentData.serviceName,
                             oldAppointmentDate: oldDate,
                             oldAppointmentTime: oldTime,
+                            recipientTimezone: rejectProposerTimezone,
                         });
                     } catch (error) {
                         console.error(
@@ -6552,6 +6764,126 @@ app.delete(
             });
         } catch (error) {
             console.error("Error disconnecting Google Calendar:", error);
+            return res.status(500).json({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Unknown error occurred",
+            });
+        }
+    }
+);
+
+// Handle OPTIONS preflight for update-stylist-settings
+app.options("/update-stylist-settings", cors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Update stylist settings with automatic timezone calculation
+app.post(
+    "/update-stylist-settings",
+    cors({ 
+        origin: true,
+        credentials: true,
+        methods: ['POST', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization']
+    }),
+    validateFirebaseIdToken,
+    async (
+        req: RequestWithRawBody & { user?: admin.auth.DecodedIdToken },
+        res: Response
+    ) => {
+        try {
+            const userId = req.user?.uid;
+            const { city, state, zipCode, businessAddress } = req.body;
+
+            if (!userId) {
+                return res
+                    .status(401)
+                    .json({ error: "User not authenticated" });
+            }
+
+            // Verify that the user is a stylist
+            const stylistRef = db.collection("stylists").doc(userId);
+            const stylistDoc = await stylistRef.get();
+
+            if (!stylistDoc.exists) {
+                return res
+                    .status(403)
+                    .json({ error: "Only stylists can update settings" });
+            }
+
+            // Calculate timezone from location info using priority logic
+            // Priority: postal code + city/state > postal code alone > city + state > state alone
+            let calculatedTimezone = undefined;
+            if (zipCode || city || state) {
+                try {
+                    console.log("═══════════════════════════════════════════════");
+                    console.log("🔧 UPDATE-STYLIST-SETTINGS called");
+                    console.log(`📍 Input: city=${city}, state=${state}, zipCode=${zipCode}`);
+                    
+                    calculatedTimezone = calculateTimezoneFromLocation(
+                        city,
+                        state,
+                        zipCode
+                    );
+                    
+                    console.log(`✓ Calculated timezone: ${calculatedTimezone}`);
+                    console.log("═══════════════════════════════════════════════");
+                } catch (error) {
+                    console.error("❌ Error calculating timezone:", error);
+                }
+            }
+
+            // Update stylist profile with location
+            const updateData: { [key: string]: any } = {};
+
+            if (businessAddress !== undefined) updateData.businessAddress = businessAddress;
+            if (city !== undefined) updateData.city = city;
+            if (state !== undefined) updateData.state = state;
+            if (zipCode !== undefined) updateData.zipCode = zipCode;
+            if (calculatedTimezone) updateData.calculatedTimezone = calculatedTimezone;
+
+            updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+            if (Object.keys(updateData).length > 0) {
+                await stylistRef.update(updateData);
+
+                // Also update the schedule settings
+                if (calculatedTimezone) {
+                    const scheduleRef = stylistRef
+                        .collection("settings")
+                        .doc("schedule");
+                    const scheduleDoc = await scheduleRef.get();
+
+                    if (scheduleDoc.exists) {
+                        await scheduleRef.update({
+                            calculatedTimezone: calculatedTimezone,
+                            timezone: calculatedTimezone,
+                            updatedAt:
+                                admin.firestore.FieldValue.serverTimestamp(),
+                        });
+                    } else {
+                        // Create if doesn't exist
+                        await scheduleRef.set({
+                            calculatedTimezone: calculatedTimezone,
+                            timezone: calculatedTimezone,
+                            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                        });
+                    }
+                }
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: "Stylist settings updated successfully",
+                calculatedTimezone: calculatedTimezone,
+            });
+        } catch (error) {
+            console.error("Error updating stylist settings:", error);
             return res.status(500).json({
                 error:
                     error instanceof Error

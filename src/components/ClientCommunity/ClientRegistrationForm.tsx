@@ -36,6 +36,7 @@ export function ClientRegistrationForm() {
             city: "",
             state: "",
             zipCode: "",
+            timezone: undefined, // Will be captured from browser
             agreeToTerms: false,
         },
     });
@@ -43,7 +44,12 @@ export function ClientRegistrationForm() {
     const onSubmit = async (data: FormType) => {
         try {
             setIsLoading(true);
-            await registerClient(data, profileImage);
+            
+            // Capture browser timezone if not already set
+            const timezone = data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const dataWithTimezone = { ...data, timezone };
+            
+            await registerClient(dataWithTimezone, profileImage);
 
             toast({
                 title: "Success!",

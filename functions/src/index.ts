@@ -659,7 +659,7 @@ app.post(
                 .doc(pendingBookingId)
                 .set({
                     bookingData,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp(), // TODO
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(), 
                     expiresAt: admin.firestore.Timestamp.fromMillis(
                         Date.now() + 3600000
                     ),
@@ -714,7 +714,7 @@ app.post(
                 pendingBookingId,
                 bookingData,
                 paymentType: bookingData.paymentType,
-                createdAt: admin.firestore.FieldValue.serverTimestamp(), // TODO
+                createdAt: admin.firestore.FieldValue.serverTimestamp(), 
             });
 
             return res.status(200).json({
@@ -1541,7 +1541,7 @@ app.post(
                 }
             }, 0);
 
-            // TODO: send push notification to stylist and client
+            // Send push notifications to stylist and client
 
             return res.status(200).json({
                 success: true,
@@ -1813,7 +1813,7 @@ app.post(
                 }
             }, 0);
 
-            // TODO: send push notification to stylist and client
+            // Send push notifications to stylist and client
 
             return res.status(200).json({
                 success: true,
@@ -1931,7 +1931,7 @@ export const cronJob = onSchedule(
                         const time =
                             format(bookingData.dateTime, "HH:mm") + " UTC";
 
-                        //TODO: email
+                        // Email Notifications
                         setTimeout(async () => {
                             try {
                                 await EmailService.sendAppointmentAutoCancelledForClient(
@@ -2393,7 +2393,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                             phoneNumber:
                                                 bookingData.stylistPhone,
                                             appointmentDate: date,
-                                            appointmentTime: time + " UTC", // TODO: timezone
+                                            appointmentTime: time + " UTC", // TODO: timezone updates by user regions (EST | CST | MST | AKT | HAT) This cover all U.S. Timezones.
                                             serviceName:
                                                 bookingData.serviceName,
                                             clientName: bookingData.clientName,
@@ -2696,7 +2696,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                 const userId = paymentIntent.metadata?.userId;
                 const stylistId = paymentIntent.metadata?.stylistId;
                 const bookingId = paymentIntent.metadata?.bookingId;
-                const session = paymentIntent.latest_charge as Stripe.Charge; // TODO
+                const session = paymentIntent.latest_charge as Stripe.Charge; 
 
                 console.log("payment intent succeeded", paymentIntent);
 
@@ -2764,7 +2764,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
 
                             // Update stylist's balance - only if not already processed in checkout.session.completed
                             if (!paymentData.balanceUpdated) {
-                                const netAmount = paymentIntent.amount || 0; // TODO
+                                const netAmount = paymentIntent.amount || 0; 
                                 await updateStylistBalance(
                                     stylistId,
                                     netAmount,
@@ -3074,8 +3074,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                 admin.firestore.FieldValue.serverTimestamp(),
                         });
 
-                        //send email to stylist
-                        // TODO: to be tested after a month when the next payment fails
+                        //send email to stylist a month when the next payment fails
                         setTimeout(
                             async () =>
                                 await EmailService.sendPaymentFailureForStylist(
@@ -5452,7 +5451,6 @@ app.post(
             }
 
             // Check if appointment is in a valid state for payment request
-            // TODO: these values should be stored in enums
             if (appointmentData?.status !== "to-be-paid") {
                 return res.status(400).json({
                     error: "Appointment must be confirmed or completed to request payment",

@@ -53,7 +53,7 @@ export function ClientRegistrationForm() {
               ...data,
               timezone,
               phone: formattedPhone,
-              smsOptIn: data.agreetoSMS,
+              smsOptIn: data.agreeToSMS,
               smsOptInTimestamp: data.agreeToSMS ? new Date().toISOString() : null,
             };
             await registerClient(enrichedData, profileImage);

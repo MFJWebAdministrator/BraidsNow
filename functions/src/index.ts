@@ -2026,7 +2026,7 @@ export const cronJob = onSchedule(
                         }
 						
                       	let clientOptIn = false;
-						let stylist OptIn= false;
+						let stylistOptIn= false;
                         try {
                           [clientOptIn, stylistOptIn] = await Promise.all([
                             getSmsPreference(db, bookingData.userId, "users"),

@@ -10,7 +10,8 @@ import Stripe from "stripe";
 import { EmailService } from "./services/email-service";
 import { SmsService } from "./services/sms-service";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { getBookingExpiresAt } from "./utils/utils";
+
+import { getBookingExpiresAt, getSmsPreference } from "./utils/utils";
 import {
     getTimezoneFromPostalCode,
     calculateTimezoneFromLocation,
@@ -18,6 +19,7 @@ import {
     formatTimeWithTimezone,
     isValidTimezone,
 } from "./utils/timezone-utils";
+
 import { format } from "date-fns";
 
 const app = express();
@@ -121,6 +123,7 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
+app.use(express.urlencoded({extended: false }));
 
 interface RequestWithRawBody extends Request {
     rawBody?: Buffer;
@@ -1071,6 +1074,7 @@ app.post(
 
                 setTimeout(async () => {
                     try {
+                        const clientOptIn = await getSmsPreference(db, bookingData.clientId, "users");
                         await SmsService.sendAppointmentAcceptedClientSms({
                             clientName: bookingData.clientName,
                             phoneNumber: bookingData.clientPhone,
@@ -1080,6 +1084,7 @@ app.post(
                                 ? formatTimeWithTimezone(time, date, bookingData.clientTimezone)
                                 : time,
                             serviceName: bookingData.serviceName,
+                            smsOptIn: clientOptIn,
                         });
                     } catch (error) {
                         console.error(
@@ -1092,7 +1097,7 @@ app.post(
                 console.log(
                     `Booking ${bookingId} accepted by stylist ${userId}`
                 );
-
+              
                 return res.status(200).json({
                     success: true,
                     message:
@@ -1563,42 +1568,28 @@ app.post(
             }, 0);
 
             // Send SMS to stylist
-            setTimeout(async () => {
-                try {
-                    await SmsService.sendAppointmentCancelledSmsForStylist({
-                        stylistName: bookingData.stylistName || "Stylist",
-                        phoneNumber: bookingData.stylistPhone,
-                        clientName: bookingData.clientName || "Client",
-                        serviceName: bookingData.serviceName,
-                        appointmentDate: bookingData.date,
-                        appointmentTime: bookingData.time,
-                    });
-                } catch (error) {
-                    console.error(
-                        "Error sending cancellation SMS to stylist:",
-                        error
-                    );
-                }
-            }, 0);
+			const stylistOptIn = await getSmsPreference(db, bookingData.stylistId, "stylists");
+            await SmsService.sendAppointmentCancelledSmsForStylist({
+				stylistName: bookingData.stylistName,
+				phoneNumber: bookingData.stylistPhone,
+				clientName: bookingData.clientName,
+				appointmentDate: date,
+				appointmentTime: time,
+				serviceName: bookingData.serviceName,
+				smsOptIn: stylistOptIn, // The firewall data
+			});	
 
             // Send SMS to client
-            setTimeout(async () => {
-                try {
-                    await SmsService.sendAppointmentCancelledSmsForClient({
-                        clientName: bookingData.clientName || "Client",
-                        phoneNumber: bookingData.clientPhone,
-                        stylistName: bookingData.stylistName || "Stylist",
-                        serviceName: bookingData.serviceName,
-                        appointmentDate: date,
-                        appointmentTime: time,
-                    });
-                } catch (error) {
-                    console.error(
-                        "Error sending cancellation SMS to client:",
-                        error
-                    );
-                }
-            }, 0);
+			const clientOptIn = await getSmsPreference(db, bookingData.userId, "users");
+            await SmsService.sendAppointmentCancelledSmsForClient({
+				clientName: bookingData.clientName,
+				phoneNumber: bookingData.clientPhone,
+				stylistName: bookingData.stylistName,
+				appointmentDate: date,
+				appointmentTime: time,
+				serviceName: bookingData.serviceName,
+				smsOptIn: clientOptIn, // The firewall data
+			});
 
             // Send push notifications to stylist and client
 
@@ -1854,8 +1845,10 @@ app.post(
 
             // Send SMS Notifications
             // Send SMS to client
+
             setTimeout(async () => {
                 try {
+                    const clientOptIn = await getSmsPreference(db, bookingData.userId, "users");
                     await SmsService.sendAppointmentCancelledSmsForClient({
                         clientName: bookingData.clientName || "Client",
                         phoneNumber: bookingData.clientPhone,
@@ -1865,6 +1858,7 @@ app.post(
                         appointmentTime: bookingData.clientTimezone && isValidTimezone(bookingData.clientTimezone)
                             ? formatTimeWithTimezone(time, date, bookingData.clientTimezone)
                             : time,
+                        smsOptIn: clientOptIn,
                     });
                 } catch (error) {
                     console.error(
@@ -1877,6 +1871,7 @@ app.post(
             // Send SMS to stylist
             setTimeout(async () => {
                 try {
+                    const stylistOptIn = await getSmsPreference(db, bookingData.stylistId, "stylists");
                     await SmsService.sendAppointmentCancelledSmsForStylist({
                         stylistName: bookingData.stylistName || "Stylist",
                         phoneNumber: bookingData.stylistPhone,
@@ -1886,6 +1881,7 @@ app.post(
                         appointmentTime: stylistCancelTimezone && isValidTimezone(stylistCancelTimezone)
                             ? formatTimeWithTimezone(time, date, stylistCancelTimezone)
                             : time,
+                        smsOptIn: stylistOptIn,
                     });
                 } catch (error) {
                     console.error(
@@ -1935,7 +1931,7 @@ export const cronJob = onSchedule(
                 .where("expiresAt", "<=", now)
                 .get();
 
-            if (!expiredBookingsQuery.empty) {
+            if (expiredBookingsQuery.empty) {
                 console.log("No expired pending bookings found.");
             } else {
                 const expiredBookingIds: string[] = [];
@@ -2028,6 +2024,15 @@ export const cronJob = onSchedule(
                         } catch (e) {
                             console.error("Error fetching stylist timezone for auto-cancel:", e);
                         }
+                      
+                        try {
+                          const [clientOptIn, stylistOptIn] = await Promise.all([
+                            getSmsPreference(db, bookingData.userId, "users"),
+                            getSmsPreference(db, bookingData.stylistId, "stylists")
+                          ]);     
+                        } catch (e) {
+                            console.error("Error fetching stylist or client SMS opt-in preference:", e);
+                        }
 
                         setTimeout(async () => {
                             try {
@@ -2044,7 +2049,7 @@ export const cronJob = onSchedule(
                                 );
                             } catch (error) {
                                 console.log(
-                                    `Error sending sms to client ${bookingData.clientName} for booking ${bookingId}: `,
+                                    `Error sending email to client ${bookingData.clientName} for booking ${bookingId}: `,
                                     error
                                 );
                             }
@@ -2084,6 +2089,7 @@ export const cronJob = onSchedule(
                                             ? formatTimeWithTimezone(time, date, bookingData.clientTimezone)
                                             : time,
                                         serviceName: bookingData.serviceName,
+                                        smsOptIn: clientOptIn,
                                     }
                                 );
                             } catch (error) {
@@ -2106,6 +2112,7 @@ export const cronJob = onSchedule(
                                             ? formatTimeWithTimezone(time, date, autoStylistTimezone)
                                             : time,
                                         serviceName: bookingData.serviceName,
+                                        smsOptIn: stylistOptIn,
                                     }
                                 );
                             } catch (error) {
@@ -2139,28 +2146,57 @@ export const cronJob = onSchedule(
                 .get();
 
             // check if the confirmed bookings are started, if so we can update their status to be-paid
-            const confirmedBookings = confirmedBookingsQuery.docs.map((doc) =>
-                doc.data()
-            );
+            const confirmedBookings = confirmedBookingsQuery.docs.map((doc) => {
+				const data = doc.data();
+				return {
+					bookingId: doc.id,
+					id: doc.id,
+					dateTime: data.dateTime,
+					...data
+				};
+            });
 
             console.log("confirmedBookings", confirmedBookings.length);
 
             for (const booking of confirmedBookings) {
-                const bookingDate = booking.dateTime;
+				// 1. Identify and Validate the ID
+				// Check both common property names; if both are missing, skip this iteration.
+				const bId = booking.bookingId || booking.id; 
 
-                const now = admin.firestore.Timestamp.now();
-                const bookingDateTimestamp =
-                    admin.firestore.Timestamp.fromDate(bookingDate);
+				if (!bId) {
+					console.error("Skipping booking: No valid ID found in object.", booking);
+					continue; 
+				}
 
-                if (now > bookingDateTimestamp) {
-                    await db
-                        .collection("bookings")
-                        .doc(booking.bookingId)
-                        .update({
-                            status: "to-be-paid",
-                        });
-                }
-            }
+				// 2. Get the raw value
+				const bookingDateRaw = booking.dateTime;
+				
+				// Safety check: if dateTime is missing, skip to avoid the next error
+				if (!bookingDateRaw) {
+					console.warn(`Booking ${bId} is missing a dateTime field.`);
+					continue;
+				}
+
+				const nowMillis = admin.firestore.Timestamp.now().toMillis();
+
+				// 3. Safe conversion for Timestamp vs JS Date
+				const bookingMillis = (typeof bookingDateRaw.toMillis === 'function') 
+					? bookingDateRaw.toMillis() 
+					: new Date(bookingDateRaw).getTime();
+
+				// 4. Compare and Update
+				if (nowMillis > bookingMillis) {
+					await db
+						.collection("bookings")
+						.doc(bId) // Use the validated ID variable
+						.update({
+							status: "to-be-paid",
+							updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+						});
+						
+					console.log(`Updated booking ${bId} to to-be-paid.`);
+				}
+			}
 
             return null;
         } catch (error) {
@@ -2172,6 +2208,71 @@ export const cronJob = onSchedule(
         }
     }
 );
+
+// Twilio STOP webhook
+app.post("/sms-webhook", async (req: Request, res: Response) => {
+    const { Body, From } = req.body;
+
+    if (!From || !Body) {
+        return res.status(400).send("Invalid Request");
+    }
+
+    const incomingPhone = From; // Format: "+15551234567"
+  const messageText = Body.trim().toUpperCase();
+
+  try {
+    let isOptedIn = true;
+    let statusReason = "";
+
+    // Check for standard Twilio STOP/START keywords
+    if (["STOP", "QUIT", "UNSUBSCRIBE", "CANCEL"].includes(messageText)) {
+      isOptedIn = false;
+      statusReason = `User opted out via SMS: ${messageText}`;
+    } else if (["START", "UNSTOP", "YES"].includes(messageText)) {
+      isOptedIn = true;
+      statusReason = `User opted back in via SMS: ${messageText}`;
+
+        // Send confirmation text back via TwiML
+        return res.type('text/xml').send(`
+            <Response>
+                <Message>Welcome back! You have successfully resubscribed to BraidsNow.com updates.</Message>
+            </Response>
+            `);
+    } else {
+      // It's a normal message, no opt-in change needed
+      return res.status(200).send("<Response></Response>");
+    }
+
+    const batch = db.batch();
+    
+    // We search both 'users' (clients) and 'stylists' collections 
+    // to find the matching phone number
+    const collections = ["users", "stylists"];
+    
+    for (const col of collections) {
+      const snapshot = await db.collection(col)
+        .where("phone", "==", incomingPhone)
+        .get();
+
+      snapshot.forEach((doc) => {
+        batch.update(doc.ref, {
+          smsOptIn: isOptedIn,
+          smsStatusReason: statusReason,
+          smsLastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+    }
+
+    await batch.commit();
+    console.log(`SMS Opt-in updated for ${incomingPhone}: ${isOptedIn}`);
+
+    // Twilio expects a TwiML response (even if empty)
+    res.type('text/xml').send("<Response></Response>");
+  } catch (error) {
+    console.error("SMS Webhook Error:", error);
+    res.status(500).send("Internal Error");
+  }
+});
 
 // Add a webhook handler to create the booking when payment is successful
 app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
@@ -2504,6 +2605,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                     );
 
                                     // send sms to stylist about the new appointment
+									const isOptedIn = await getSmsPreference(db, req.body.stylistId, "stylists");
                                     await SmsService.sendAppointmentBookedStylistSms(
                                         {
                                             stylistName:
@@ -2515,6 +2617,7 @@ app.post("/webhook", async (req: RequestWithRawBody, res: Response) => {
                                             serviceName:
                                                 bookingData.serviceName,
                                             clientName: bookingData.clientName,
+											smsOptIn: isOptedIn,
                                         }
                                     );
                                 } catch (error) {
@@ -5196,13 +5299,13 @@ app.post(
     // validateFirebaseIdToken,
     async (
         req: RequestWithRawBody & {
-            body: { clientName: string; phoneNumber: string };
+            body: { clientName: string; phoneNumber: string; smsOptIn?: boolean };
             // user?: admin.auth.DecodedIdToken;
         },
         res: Response
     ) => {
         try {
-            const { clientName, phoneNumber } = req.body;
+            const { clientName, phoneNumber, smsOptIn, } = req.body;
 
             if (!clientName || !phoneNumber) {
                 return res
@@ -5210,12 +5313,13 @@ app.post(
                     .json({ error: "Missing required parameters" });
             }
 
-            console.log("clientName", clientName);
-            console.log("phoneNumber", phoneNumber);
+            console.log(`Processing Welcome SMS for: ${clientName}`); 
+            console.log(`Phone: ${phoneNumber} | Opt-In Status: ${smsOptIn}`);
 
             const response = await SmsService.sendWelcomeClientSms({
                 clientName,
                 phoneNumber,
+				smsOptIn,
             });
 
             console.log("response", response);
@@ -5241,23 +5345,27 @@ app.post(
     // validateFirebaseIdToken,
     async (
         req: RequestWithRawBody & {
-            body: { stylistName: string; phoneNumber: string };
+            body: { stylistName: string; phoneNumber: string; smsOptIn?: boolean };
             // user?: admin.auth.DecodedIdToken;
         },
         res: Response
     ) => {
         try {
-            const { stylistName, phoneNumber } = req.body;
+            const { stylistName, phoneNumber, smsOptIn } = req.body;
 
             if (!stylistName || !phoneNumber) {
                 return res
                     .status(400)
                     .json({ error: "Missing required parameters" });
             }
+			
+			console.log(`Processing Welcome SMS for: ${stylistName}`); 
+            console.log(`Phone: ${phoneNumber} | Opt-In Status: ${smsOptIn}`);
 
             const response = await SmsService.sendWelcomeStylistSms({
                 stylistName,
                 phoneNumber,
+				smsOptIn,
             });
 
             console.log("response", response);

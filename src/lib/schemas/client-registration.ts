@@ -30,7 +30,8 @@ export const clientRegistrationSchema = z.object({
   agreeToTerms: z.boolean()
     .refine(val => val === true, {
       message: 'You must agree to the terms and conditions'
-    })
+    }),
+  agreeToSMS: z.boolean().default(false),
 });
 
 export type ClientRegistrationForm = z.infer<typeof clientRegistrationSchema>;

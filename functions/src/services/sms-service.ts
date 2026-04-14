@@ -28,6 +28,7 @@ interface SmsData {
     phoneNumber: string;
     clientName?: string;
     stylistName?: string;
+    smsOptIn?: boolean;
 }
 
 interface AppointmentSmsData {
@@ -37,24 +38,31 @@ interface AppointmentSmsData {
     appointmentTime: string;
     serviceName: string;
     clientName: string;
+	smsOptIn?: boolean;
 }
 
 interface SubscriptionPaymentFailedStylistSmsData {
     stylistName: string;
     phoneNumber: string;
     updatePaymentUrl: string;
+	smsOptIn?: boolean;
+
 }
 
 interface NewMessageStylistSmsData {
     stylistName: string;
     phoneNumber: string;
     clientName: string;
+	smsOptIn?: boolean;
+
 }
 
 interface NewMessageClientSmsData {
     clientName: string;
     phoneNumber: string;
     stylistName: string;
+	smsOptIn?: boolean;
+
 }
 
 interface FullPaymentReminderClientSmsData {
@@ -65,6 +73,7 @@ interface FullPaymentReminderClientSmsData {
     appointmentDate: string;
     appointmentTime: string;
     balanceAmount: string;
+	smsOptIn?: boolean;
 }
 
 interface PaymentRequestedClientSmsData extends AppointmentSmsData {}
@@ -82,6 +91,8 @@ interface RescheduleProposalSmsData {
     oldAppointmentTime: string;
     newAppointmentDate: string;
     newAppointmentTime: string;
+	smsOptIn?: boolean;
+
 }
 
 interface RescheduleAcceptedSmsData {
@@ -91,6 +102,8 @@ interface RescheduleAcceptedSmsData {
     serviceName: string;
     newAppointmentDate: string;
     newAppointmentTime: string;
+	smsOptIn?: boolean;
+
 }
 
 interface RescheduleRejectedSmsData {
@@ -100,14 +113,16 @@ interface RescheduleRejectedSmsData {
     serviceName: string;
     oldAppointmentDate: string;
     oldAppointmentTime: string;
+	smsOptIn?: boolean;
+
 }
 
 export class SmsService {
     private static smsTemplates: Record<SmsType, (data: any) => string> = {
         welcomeClient: (data) =>
-            `Hi ${data.clientName}! Welcome to BraidsNow.com. You can now book with top stylists near you. Ready to get started? Visit https://braidsnow.com/find-stylists\n- BraidsNow.com`,
+            `Hi ${data.clientName}! Welcome to BraidsNow.com. You can now book with top stylists near you. Ready to get started? Visit https://braidsnow.com/find-stylists\n- BraidsNow.com\n\n*You've opted in to booking and payment updates. Message and data rates may apply. Message frequency varies based on appointment activity. Reply STOP to unsubscribe.`,
         welcomeStylist: (data) =>
-            `Hi ${data.stylistName}! Welcome to BraidsNow.com. Setup payouts, add services, and set your schedule now. Visit https://braidsnow.com/dashboard/stylist\n- BraidsNow.com`,
+            `Hi ${data.stylistName}! Welcome to BraidsNow.com. Setup payouts, add services, and set your schedule now. Visit https://braidsnow.com/dashboard/stylist\n- BraidsNow.com\n\n*You've opted in to booking and payment updates. Message and data rates may apply. Message frequency varies based on appointment activity. Reply STOP to unsubscribe.`,
         appointmentBookedStylist: (data: AppointmentSmsData) =>
             `Hi ${data.stylistName},\nYou have a new appointment request.\n\nDate: ${data.appointmentDate}\nTime: ${data.appointmentTime}\nService: ${data.serviceName}\nClient: ${data.clientName}\n\nPlease review and accept or reject this booking in your dashboard.\n\nThank you,\nBraidsNow.com Team`,
         subscriptionPaymentFailedStylist: (
@@ -139,33 +154,45 @@ export class SmsService {
             `Hi ${data.recipientName}, ${data.rejectedBy} has declined your reschedule proposal for your ${data.serviceName} appointment.\n\nYour appointment remains scheduled for: ${data.oldAppointmentDate} at ${data.oldAppointmentTime}\n\nIf you need to reschedule, please contact your stylist directly.\n- BraidsNow.com`,
     };
 
-    /**
+/**
      * Generic SMS sender with error handling and templating
      */
-    static async sendSms({
-        type,
-        data,
-        customMessage,
-    }: {
-        type: SmsType;
-        data: SmsData;
+    static async sendSms(params: {
+        type: SmsType | null;
+        data: any; 
         customMessage?: string;
     }): Promise<void> {
+		console.log(`DEBUG: SMS Service checking ${params.data?.phoneNumber}. OptIn is: ${params.data?.smsOptIn} (Type: ${typeof params.data?.smsOptIn})`);
+		
         if (!twilioClient) {
-            console.warn("Twilio not configured. Skipping SMS send.");
+            console.error("Twilio client not initialized");
+            return;
+        }
+
+        // The Opt-In Check
+        // If smsOptIn is explicitly false, we skip. 
+        // If it's undefined or true, we proceed (to support existing users).
+        if (params.data && params.data.smsOptIn === false) {
+            console.log(`Skipping SMS to ${params.data.phoneNumber}: User has opted out.`);
             return;
         }
 
         try {
-            const message = customMessage || this.smsTemplates[type](data);
+            const message = params.customMessage || (params.type ? this.smsTemplates[params.type](params.data) : "");
+            
+            if (!message) {
+                console.error("No message content provided for SMS");
+                return;
+            }
+
             await twilioClient.messages.create({
                 body: message,
                 from: fromNumber,
-                to: data.phoneNumber,
+                to: params.data.phoneNumber,
             });
-            console.log(`SMS sent to ${data.phoneNumber} [${type}]`);
+            console.log(`SMS sent to ${params.data.phoneNumber} [${params.type || 'custom'}]`);
         } catch (error) {
-            console.error(`Failed to send SMS to ${data.phoneNumber}:`, error);
+            console.error(`Failed to send SMS to ${params.data.phoneNumber}:`, error);
             throw error;
         }
     }
@@ -176,6 +203,8 @@ export class SmsService {
     static async sendWelcomeClientSms(data: {
         clientName: string;
         phoneNumber: string;
+		smsOptIn?: boolean;
+
     }): Promise<void> {
         await this.sendSms({ type: "welcomeClient", data });
     }
@@ -186,6 +215,8 @@ export class SmsService {
     static async sendWelcomeStylistSms(data: {
         stylistName: string;
         phoneNumber: string;
+		smsOptIn?: boolean;
+
     }): Promise<void> {
         await this.sendSms({ type: "welcomeStylist", data });
     }
@@ -245,6 +276,8 @@ export class SmsService {
         appointmentDate: string;
         appointmentTime: string;
         serviceName: string;
+		smsOptIn?: boolean;
+
     }): Promise<void> {
         const message = `Hi ${data.clientName},\nYour appointment for ${data.serviceName} with ${data.stylistName} on ${data.appointmentDate} at ${data.appointmentTime} has been accepted!\n\nWe look forward to seeing you.\n— BraidsNow.com`;
         await this.sendSms({
@@ -264,6 +297,8 @@ export class SmsService {
         appointmentDate: string;
         appointmentTime: string;
         serviceName: string;
+		smsOptIn?: boolean;
+
     }): Promise<void> {
         const message = `Hi ${data.clientName},\nUnfortunately, your appointment for ${data.serviceName} with ${data.stylistName} on ${data.appointmentDate} at ${data.appointmentTime} was rejected.\n\nYour payment will be automatically refunded.\n— BraidsNow.com`;
         await this.sendSms({

@@ -38,6 +38,7 @@ export function ClientRegistrationForm() {
             zipCode: "",
             timezone: undefined, // Will be captured from browser
             agreeToTerms: false,
+            agreeToSMS: false,
         },
     });
 
@@ -47,10 +48,15 @@ export function ClientRegistrationForm() {
             
             // Capture browser timezone if not already set
             const timezone = data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-            const dataWithTimezone = { ...data, timezone };
-            
-            await registerClient(dataWithTimezone, profileImage);
-
+            const formattedPhone = `+1${data.phone.replace(/\D/g, "")}`;
+            const enrichedData = { 
+              ...data,
+              timezone,
+              phone: formattedPhone,
+              smsOptIn: data.agreetoSMS,
+              smsOptInTimestamp: data.agreeToSMS ? new Date().toISOString() : null,
+            };
+            await registerClient(enrichedData, profileImage);
             toast({
                 title: "Success!",
                 description: "Your account has been created successfully.",
@@ -65,10 +71,12 @@ export function ClientRegistrationForm() {
                 });
 
                 // send welcome sms
-                await sendWelcomeClientSms(
-                    `${data.firstName} ${data.lastName}`,
-                    data.phone
-                );
+                if (data.agreeToSMS) {
+                    await sendWelcomeClientSms(
+                        `${data.firstName} ${data.lastName}`,
+                        formattedPhone
+                    );
+                }
             } catch (error) {
                 console.error("Error sending welcome email/sms:", error);
             }

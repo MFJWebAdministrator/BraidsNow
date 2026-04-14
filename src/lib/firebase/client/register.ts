@@ -2,10 +2,10 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config';
 import { uploadProfileImage } from '../storage/uploadProfileImage';
-import type { ClientRegistrationForm } from '@/lib/schemas/client-registration';
+// import type { ClientRegistrationForm } from '@/lib/schemas/client-registration';
 
 export async function registerClient(
-  data: ClientRegistrationForm,
+  data: any,
   profileImage: File | null
 ) {
   // Create user account

@@ -70,6 +70,7 @@ export function StylistRegistrationForm() {
             state: "",
             zipCode: "",
             agreeToTerms: false,
+            agreeToSMS: false,
         },
     });
 
@@ -100,6 +101,8 @@ export function StylistRegistrationForm() {
                 {
                     userId: registeredUser.uid,
                     email: formData.email,
+                    phone: formData.phone,
+                    smsOptIn: formData.agreeToSMS,
                     successUrl,
                     cancelUrl,
                     mode: "subscription",

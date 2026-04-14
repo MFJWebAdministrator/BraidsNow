@@ -28,3 +28,21 @@ export function getBookingExpiresAt(
     );
     return admin.firestore.Timestamp.fromMillis(expiresAtMs);
 }
+
+/**
+ * Global helper to resolve SMS preference from Firestore
+ */
+export async function getSmsPreference(
+    db: admin.firestore.Firestore, 
+    id: string, 
+    type: "users" | "stylists"
+): Promise<boolean> {
+    try {
+        const doc = await db.collection(type).doc(id).get();
+        // Returns true unless explicitly set to false
+        return doc.data()?.smsOptIn !== false;
+    } catch (error) {
+        console.error(`Error resolving SMS preference for ${id}:`, error);
+        return true; 
+    }
+}
